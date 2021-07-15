@@ -1,0 +1,7 @@
+
+[workspace]
+members = [
+    "ch2",
+    "ast",
+    "asm"
+]
