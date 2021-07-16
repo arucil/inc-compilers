@@ -8,3 +8,4 @@ pub struct PassError {
 
 pub mod uniquify;
 pub mod anf;
+pub mod control;

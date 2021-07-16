@@ -1,0 +1,13 @@
+---
+source: ch2/src/pass/control.rs
+expression: result.to_string_pretty()
+
+---
+_start:
+    x.0 = (read)
+    y.1 = (+ 2 3)
+    tmp.0 = (read)
+    tmp.1 = (- tmp.0)
+    tmp.2 = (- 2)
+    tmp.3 = (+ y.1 tmp.2)
+    return (+ tmp.1 tmp.3)

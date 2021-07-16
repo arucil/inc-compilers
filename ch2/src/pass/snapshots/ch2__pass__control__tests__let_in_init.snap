@@ -1,0 +1,11 @@
+---
+source: ch2/src/pass/control.rs
+expression: result.to_string_pretty()
+
+---
+_start:
+    x.0 = 20
+    x.1 = 22
+    tmp.0 = x.1
+    y.2 = (+ x.0 tmp.0)
+    return y.2

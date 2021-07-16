@@ -104,4 +104,5 @@ mod tests {
     let result = anf(prog);
     assert_snapshot!(result.to_string_pretty());
   }
+
 }
