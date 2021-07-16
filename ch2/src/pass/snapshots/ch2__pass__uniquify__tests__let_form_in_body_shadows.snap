@@ -1,0 +1,14 @@
+---
+source: ch2/src/pass/uniquify.rs
+expression: result.to_string_pretty()
+
+---
+(let
+ [x.1 (let [x.0 3] x.0)]
+ (+
+  (let
+   [x.2 3]
+   (let
+    [y.3 (read)]
+    (+ x.2 y.3)))
+  x.1))

@@ -36,7 +36,7 @@ impl<'a> Parser<'a> {
     Self {
       input,
       s: input,
-      token: ((0, 0), Token::Eof),
+      token: ((0, 0).into(), Token::Eof),
       i: 0,
     }
   }
@@ -62,7 +62,7 @@ impl<'a> Parser<'a> {
       Some(c@('(' | ')' | '[' | ']')) => {
         self.advance();
         let tok = Token::Punc(c);
-        self.token = ((start, self.i), Token::Punc(c));
+        self.token = ((start, self.i).into(), Token::Punc(c));
         Ok(tok)
       }
       Some('"') => {
@@ -71,7 +71,7 @@ impl<'a> Parser<'a> {
           match self.peek() {
             Some('\\') => self.advance(),
             None => return Err(ParseError {
-              range: (start, self.i),
+              range: (start, self.i).into(),
               message: format!("unclosed string"),
             }),
             _ => {}
@@ -79,7 +79,7 @@ impl<'a> Parser<'a> {
           self.advance();
         }
         self.advance();
-        self.token = ((start, self.i), Token::Str);
+        self.token = ((start, self.i).into(), Token::Str);
         Ok(Token::Str)
       }
       Some(c) if !"])".contains(c) => {
@@ -89,16 +89,15 @@ impl<'a> Parser<'a> {
           self.advance();
           c = self.peek();
         }
-        self.token = ((start, self.i), Token::SymOrNum);
-        println!("{}, {}", start, self.i);
+        self.token = ((start, self.i).into(), Token::SymOrNum);
         Ok(Token::SymOrNum)
       }
       None => {
-        self.token = ((start, self.i), Token::Eof);
+        self.token = ((start, self.i).into(), Token::Eof);
         Ok(Token::Eof)
       }
       Some(c) => Err(ParseError {
-        range: (start, start + c.len_utf8()),
+        range: (start, start + c.len_utf8()).into(),
         message: format!("unexpected char '{}'", c),
       })
     }
@@ -142,7 +141,7 @@ impl<'a> Parser<'a> {
 
   fn parse_sym(&mut self, range: Range) -> Result<Cst> {
     self.get_token()?;
-    if let Err(err) = self.input[range.0..range.1].parse::<i64>() {
+    if let Err(err) = self.input[range.start..range.end].parse::<i64>() {
       use std::num::IntErrorKind;
       if let IntErrorKind::PosOverflow | IntErrorKind::NegOverflow = err.kind() {
         return Err(ParseError {
@@ -158,15 +157,15 @@ impl<'a> Parser<'a> {
   }
 
   fn parse_list(&mut self, close: char) -> Result<Cst> {
-    let start = self.token.0.0;
+    let start = self.token.0.start;
     self.get_token()?;
     let mut xs = vec![];
     loop {
       match self.token.1 {
         Token::Punc(c) if c == close => {
-          let end = self.token.0.1;
+          let end = self.token.0.end;
           self.get_token()?;
-          return Ok(Cst::List(xs, (start, end)));
+          return Ok(Cst::List(xs, (start, end).into()));
         }
         _ => xs.push(self.parse_exp()?)
       }
@@ -199,7 +198,7 @@ fn build_exp(input: &str, cst: Cst) -> Result<(Range, Exp)> {
   match cst {
     Cst::List(xs, range) => {
       if let Some(&Cst::Symbol(sym_range)) = xs.get(0) {
-        let op = &input[sym_range.0..sym_range.1];
+        let op = &input[sym_range.start..sym_range.end];
         match op {
           "read" => {
             if xs.len() == 1 {
@@ -245,19 +244,19 @@ fn build_exp(input: &str, cst: Cst) -> Result<(Range, Exp)> {
       }
     }
     Cst::Symbol(range) => {
-      Ok((range, Exp::Var(input[range.0..range.1].to_owned())))
+      Ok((range, Exp::Var(input[range.start..range.end].to_owned())))
     }
     Cst::String(range) => {
       let mut buf = String::new();
       let mut escape = false;
-      for (i, c) in input[range.0 + 1..range.1 - 1].chars().enumerate() {
+      for (i, c) in input[range.start + 1..range.end - 1].chars().enumerate() {
         if escape {
           buf.push(match c {
             'n' => '\n',
             't' => '\t',
             '\\' => '\\',
             _ => return Err(ParseError {
-              range: (range.0 + i, range.0 + i + 2),
+              range: (range.start + i, range.start + i + 2).into(),
               message: format!("unrecognized escape sequence"),
             })
           });
@@ -271,7 +270,7 @@ fn build_exp(input: &str, cst: Cst) -> Result<(Range, Exp)> {
       Ok((range, Exp::Str(buf)))
     }
     Cst::Number(range) => {
-      Ok((range, Exp::Int(input[range.0..range.1].parse().unwrap())))
+      Ok((range, Exp::Int(input[range.start..range.end].parse().unwrap())))
     }
   }
 }
@@ -289,7 +288,7 @@ fn build_let(
           if xs.len() == 2 {
             let init = build_exp(input, xs.pop().unwrap())?;
             if let Cst::Symbol(sym_range) = xs.pop().unwrap() {
-              let var = input[sym_range.0..sym_range.1].to_owned();
+              let var = input[sym_range.start..sym_range.end].to_owned();
               Ok(((sym_range, var), init))
             } else {
               Err(ParseError {
@@ -343,14 +342,14 @@ mod tests {
   #[test]
   fn number() {
     let result = Parser::new(r#"3820"#).parse();
-    let prog = Cst::Number((0, 4));
+    let prog = Cst::Number((0, 4).into());
     assert_eq!(result, Result::Ok(vec![prog]));
   }
 
   #[test]
   fn negative_number() {
     let result = Parser::new(r#"-3820"#).parse();
-    let prog = Cst::Number((0, 5));
+    let prog = Cst::Number((0, 5).into());
     assert_eq!(result, Result::Ok(vec![prog]));
   }
 
@@ -358,7 +357,7 @@ mod tests {
   fn number_overflow() {
     let result = Parser::new(r#"123456789012345678901234567890"#).parse();
     let err = ParseError {
-      range: (0, 30),
+      range: (0, 30).into(),
       message: format!("integer overflow"),
     };
     assert_eq!(result, Result::Err(err));
@@ -368,46 +367,36 @@ mod tests {
   fn ascii_symbol() {
     let result = Parser::new(r#" 
   abc-Y7^#"#).parse();
-    let prog = Cst::Symbol((4, 12));
+    let prog = Cst::Symbol((4, 12).into());
     assert_eq!(result, Result::Ok(vec![prog]));
   }
 
   #[test]
   fn nonascii_symbol() {
     let result = Parser::new(r#"1a啊🐱   "#).parse();
-    let prog = Cst::Symbol((0, 9));
+    let prog = Cst::Symbol((0, 9).into());
     assert_eq!(result, Result::Ok(vec![prog]));
   }
 
   #[test]
   fn string() {
     let result = Parser::new(r#"  "abc 123"  "#).parse();
-    let prog = Cst::String((2, 11));
+    let prog = Cst::String((2, 11).into());
     assert_eq!(result, Result::Ok(vec![prog]));
   }
 
   #[test]
   fn escape_sequence_in_string() {
     let result = Parser::new(r#"  "abc\n\t12\\3"  "#).parse();
-    let prog = Cst::String((2, 16));
+    let prog = Cst::String((2, 16).into());
     assert_eq!(result, Result::Ok(vec![prog]));
-  }
-
-  #[test]
-  fn invalid_escape_sequence_in_string() {
-    let result = Parser::new(r#"  "abc\a\t12\\3"  "#).parse();
-    let err = ParseError {
-      range: (6, 8),
-      message: format!("unrecognized escape sequence"),
-    };
-    assert_eq!(result, Result::Err(err));
   }
 
   #[test]
   fn comment() {
     let result = Parser::new(r#" ;;hff
 7;;);;;;"#).parse();
-    let prog = Cst::Number((7, 8));
+    let prog = Cst::Number((7, 8).into());
     assert_eq!(result, Result::Ok(vec![prog]));
   }
 
@@ -415,10 +404,10 @@ mod tests {
   fn list() {
     let result = Parser::new(r#" ( 1 a  () )  "#).parse();
     let prog = Cst::List(vec![
-      Cst::Number((3, 4)),
-      Cst::Symbol((5, 6)),
-      Cst::List(vec![], (8, 10)),
-    ], (1, 12));
+      Cst::Number((3, 4).into()),
+      Cst::Symbol((5, 6).into()),
+      Cst::List(vec![], (8, 10).into()),
+    ], (1, 12).into());
     assert_eq!(result, Result::Ok(vec![prog]));
   }
 
@@ -426,10 +415,10 @@ mod tests {
   fn list_with_brackets() {
     let result = Parser::new(r#" [ 1 a  () ]  "#).parse();
     let prog = Cst::List(vec![
-      Cst::Number((3, 4)),
-      Cst::Symbol((5, 6)),
-      Cst::List(vec![], (8, 10)),
-    ], (1, 12));
+      Cst::Number((3, 4).into()),
+      Cst::Symbol((5, 6).into()),
+      Cst::List(vec![], (8, 10).into()),
+    ], (1, 12).into());
     assert_eq!(result, Result::Ok(vec![prog]));
   }
 
@@ -440,10 +429,10 @@ mod tests {
 ;;;;
 ];"#).parse();
     let prog = Cst::List(vec![
-      Cst::Number((3, 4)),
-      Cst::Symbol((5, 6)),
-      Cst::List(vec![], (11, 13)),
-    ], (1, 23));
+      Cst::Number((3, 4).into()),
+      Cst::Symbol((5, 6).into()),
+      Cst::List(vec![], (11, 13).into()),
+    ], (1, 23).into());
     assert_eq!(result, Result::Ok(vec![prog]));
   }
 
@@ -453,9 +442,9 @@ mod tests {
 1 (+) ;;;
 
 "#).parse();
-    let prog1 = Cst::Symbol((1, 4));
-    let prog2 = Cst::Number((5, 6));
-    let prog3 = Cst::List(vec![Cst::Symbol((8, 9))], (7, 10));
+    let prog1 = Cst::Symbol((1, 4).into());
+    let prog2 = Cst::Number((5, 6).into());
+    let prog3 = Cst::List(vec![Cst::Symbol((8, 9).into())], (7, 10).into());
     assert_eq!(result, Result::Ok(vec![prog1, prog2, prog3]));
   }
 }

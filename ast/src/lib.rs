@@ -1,29 +1,95 @@
 #![feature(never_type, box_syntax)]
 
+use pretty::*;
+use std::fmt::Debug;
+use std::iter;
+
 pub mod parser;
 
 pub use parser::{parse, ParseError, Result};
 
-pub type Range = (usize, usize);
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Range {
+  pub start: usize,
+  pub end: usize,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Program {
-  body: Vec<(Range, Exp)>,
+pub struct Program<VAR=String> {
+  pub body: Vec<(Range, Exp<VAR>)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum Exp {
+pub enum Exp<VAR=String> {
   Int(i64),
   Prim {
     op: (Range, String),
-    args: Vec<(Range, Exp)>,
+    args: Vec<(Range, Exp<VAR>)>,
   },
-  Var(String),
+  Var(VAR),
   Str(String),
   Let {
-    var: (Range, String),
-    init: Box<(Range, Exp)>,
-    body: Box<(Range, Exp)>,
+    var: (Range, VAR),
+    init: Box<(Range, Exp<VAR>)>,
+    body: Box<(Range, Exp<VAR>)>,
+  }
+}
+
+impl From<(usize, usize)> for Range {
+  fn from((start, end): (usize, usize)) -> Self {
+    Self { start, end }
+  }
+}
+
+impl<VAR: Debug> Program<VAR> {
+  pub fn to_string_pretty(&self) -> String {
+    let doc = self.to_doc();
+    let mut buf = String::new();
+    doc.render_fmt(30, &mut buf).unwrap();
+    buf
+  }
+
+  fn to_doc(&self) -> RcDoc {
+    RcDoc::intersperse(self.body.iter().map(|(_, exp)| exp.to_doc()), Doc::line())
+  }
+}
+
+impl<VAR: Debug> Exp<VAR> {
+  fn to_doc(&self) -> RcDoc {
+    match self {
+      Exp::Int(n) => RcDoc::text(format!("{}", n)),
+      Exp::Str(s) => RcDoc::text(format!("{:?}", s)),
+      Exp::Var(var) => RcDoc::text(format!("{:?}", var)),
+      Exp::Prim { op, args } => {
+        RcDoc::text("(")
+          .append(
+            RcDoc::intersperse(
+              iter::once(RcDoc::text(&op.1))
+                .chain(args.iter().map(|(_, arg)| arg.to_doc())),
+              Doc::line())
+            .nest(1)
+            .group())
+          .append(RcDoc::text(")"))
+      }
+      Exp::Let { var, init, body } => {
+        RcDoc::text("(")
+          .append(
+            RcDoc::text("let")
+              .append(Doc::line())
+              .append(RcDoc::text("[")
+                .append(RcDoc::text(format!("{:?}", var.1))
+                  .append(Doc::line())
+                  .append(init.1.to_doc())
+                  .nest(1)
+                  .group())
+                .append(RcDoc::text("]")))
+              .append(Doc::line())
+              .append(body.1.to_doc())
+              .nest(1)
+              .group())
+          .append(RcDoc::text(")"))
+      }
+    }
   }
 }
