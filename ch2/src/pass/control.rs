@@ -9,7 +9,7 @@ pub struct CProgram {
 }
 
 pub struct CInfo {
-  pub locals: IndexSet<String>,
+  pub locals: IndexSet<IdxVar>,
 }
 
 pub enum CTail {
@@ -127,10 +127,48 @@ impl CAtom {
 }
 
 pub fn explicate_control(mut prog: Program<IdxVar>) -> CProgram {
+  let locals = collect_locals(&prog);
   CProgram {
+    info: CInfo {
+      locals,
+    },
     body: vec![
       ("start".to_owned(), explicate_tail(prog.body.pop().unwrap().1))
     ]
+  }
+}
+
+fn collect_locals(
+  prog: &Program<IdxVar>,
+) -> IndexSet<IdxVar> {
+  let mut locals = IndexSet::new();
+  for (_, exp) in &prog.body {
+    collect_exp_locals(exp, &mut locals);
+  }
+  locals
+}
+
+fn collect_exp_locals(
+  exp: &Exp<IdxVar>,
+  locals: &mut IndexSet<IdxVar>,
+) {
+  match exp {
+    Exp::Int(_) => {}
+    Exp::Var(var) => {
+      locals.insert(var.clone());
+    }
+    Exp::Str(_) => {}
+    Exp::Let { var, init, body } => {
+      locals.insert(var.1.clone());
+      collect_exp_locals(&init.1, locals);
+      collect_exp_locals(&body.1, locals);
+    }
+    Exp::Prim { op: _, args } => {
+      for (_, arg) in args {
+        collect_exp_locals(arg, locals);
+      }
+    }
+    _ => unimplemented!()
   }
 }
 

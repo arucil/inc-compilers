@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::fmt::{self, Debug, Formatter};
 use super::PassError;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct IdxVar {
   pub name: String,
   pub index: usize,
