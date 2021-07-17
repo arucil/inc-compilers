@@ -1,9 +1,15 @@
 use super::uniquify::IdxVar;
 use ast::{Program, Exp, Range};
 use std::fmt::{self, Write};
+use indexmap::IndexSet;
 
 pub struct CProgram {
+  pub info: CInfo,
   pub body: Vec<(String, CTail)>,
+}
+
+pub struct CInfo {
+  pub locals: IndexSet<String>,
 }
 
 pub enum CTail {
@@ -37,11 +43,18 @@ pub enum CAtom {
 impl CProgram {
   pub fn to_string_pretty(&self) -> String {
     let mut buf = String::new();
+    self.info.write(&mut buf).unwrap();
     for (label, tail) in &self.body {
       writeln!(&mut buf, "{}:", label).unwrap();
       tail.write(&mut buf).unwrap();
     }
     buf
+  }
+}
+
+impl CInfo {
+  fn write(&self, f: &mut impl Write) -> fmt::Result {
+    writeln!(f, "locals: {:?}\n", self.locals)
   }
 }
 
@@ -116,7 +129,7 @@ impl CAtom {
 pub fn explicate_control(mut prog: Program<IdxVar>) -> CProgram {
   CProgram {
     body: vec![
-      ("_start".to_owned(), explicate_tail(prog.body.pop().unwrap().1))
+      ("start".to_owned(), explicate_tail(prog.body.pop().unwrap().1))
     ]
   }
 }

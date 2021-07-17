@@ -3,7 +3,7 @@ source: ch2/src/pass/control.rs
 expression: result.to_string_pretty()
 
 ---
-_start:
+start:
     x.0 = 20
     x.1 = 22
     tmp.0 = x.1

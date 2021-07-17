@@ -3,7 +3,7 @@ source: ch2/src/pass/control.rs
 expression: result.to_string_pretty()
 
 ---
-_start:
+start:
     x.0 = (read)
     y.1 = (+ 2 3)
     tmp.0 = (read)

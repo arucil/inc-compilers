@@ -1,0 +1,22 @@
+---
+source: ch2/src/pass/instruction.rs
+expression: result.to_string_pretty()
+
+---
+start:
+    callq read_int
+    movq rax, x.0
+    movq 2, y.1
+    addq 3, y.1
+    callq read_int
+    movq rax, tmp.0
+    movq tmp.0, tmp.1
+    negq tmp.1, 
+    movq 2, tmp.2
+    negq tmp.2, 
+    movq y.1, tmp.3
+    addq tmp.2, tmp.3
+    movq tmp.1, rax
+    addq tmp.3, rax
+    jmp conclusion
+
