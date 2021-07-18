@@ -1,7 +1,7 @@
 #![feature(never_type, box_syntax)]
 
 use pretty::*;
-use std::fmt::Debug;
+use std::fmt::{self, Debug, Formatter};
 use std::iter;
 
 pub mod parser;
@@ -33,6 +33,18 @@ pub enum Exp<VAR=String> {
     var: (Range, VAR),
     init: Box<(Range, Exp<VAR>)>,
     body: Box<(Range, Exp<VAR>)>,
+  }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct IdxVar {
+  pub name: String,
+  pub index: usize,
+}
+
+impl Debug for IdxVar {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    write!(f, "{}.{}", self.name, self.index)
   }
 }
 

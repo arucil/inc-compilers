@@ -2,9 +2,11 @@
 
 use num_derive::FromPrimitive;
 use std::fmt::{self, Debug, Write};
+use support::WritePretty;
 
 #[derive(Debug, Clone)]
-pub struct Program<VAR=!> {
+pub struct Program<INFO=(),VAR=!> {
+  pub info: INFO,
   pub blocks: Vec<(String, Block<VAR>)>,
 }
 
@@ -54,9 +56,10 @@ pub enum Reg {
   R15,
 }
 
-impl<VAR: Debug> Program<VAR> {
+impl<INFO: WritePretty, VAR: Debug> Program<INFO, VAR> {
   pub fn to_string_pretty(&self) -> String {
     let mut buf = String::new();
+    self.info.write(&mut buf).unwrap();
     for (label, block) in &self.blocks {
       writeln!(&mut buf, "{}:", label).unwrap();
       block.write(&mut buf).unwrap();
@@ -65,7 +68,7 @@ impl<VAR: Debug> Program<VAR> {
   }
 }
 
-impl<VAR: Debug> Block<VAR> {
+impl<VAR: Debug> WritePretty for Block<VAR> {
   fn write(&self, f: &mut impl Write) -> fmt::Result {
     for instr in &self.code {
       write!(f, "    ")?;
@@ -76,7 +79,7 @@ impl<VAR: Debug> Block<VAR> {
   }
 }
 
-impl<VAR: Debug> Instr<VAR> {
+impl<VAR: Debug> WritePretty for Instr<VAR> {
   fn write(&self, f: &mut impl Write) -> fmt::Result {
     match self {
       Self::Addq(src, dest) => self.write_binary(f, "addq", src, dest),
@@ -90,7 +93,9 @@ impl<VAR: Debug> Instr<VAR> {
       Self::Subq(src, dest) => self.write_binary(f, "subq", src, dest),
     }
   }
+}
 
+impl<VAR: Debug> Instr<VAR> {
   fn write_unary(
     &self,
     f: &mut impl Write,
@@ -116,7 +121,7 @@ impl<VAR: Debug> Instr<VAR> {
   }
 }
 
-impl<VAR: Debug> Arg<VAR> {
+impl<VAR: Debug> WritePretty for Arg<VAR> {
   fn write(&self, f: &mut impl Write) -> fmt::Result {
     match self {
       Self::Imm(n) => write!(f, "{}", n),

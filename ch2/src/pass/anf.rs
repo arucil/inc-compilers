@@ -1,5 +1,4 @@
-use ast::{Program, Exp, Range};
-use super::uniquify::IdxVar;
+use ast::{Program, Exp, Range, IdxVar};
 
 pub fn anf(prog: Program<IdxVar>) -> Program<IdxVar> {
   let mut counter = 0;

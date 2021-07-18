@@ -1,10 +1,25 @@
 use super::control::{CExp, CProgram, CStmt, CTail, CAtom, CPrim};
-use super::uniquify::IdxVar;
+use ast::IdxVar;
 use asm::{Program, Block, Instr, Arg, Reg};
-use std::iter;
+use indexmap::IndexSet;
+use support::WritePretty;
+use std::fmt::{self, Write};
 
-pub fn select_instruction(prog: CProgram) -> Program<IdxVar> {
+pub struct Info {
+  pub locals: IndexSet<IdxVar>,
+}
+
+impl WritePretty for Info {
+  fn write(&self, f: &mut impl Write) -> fmt::Result {
+    writeln!(f, "locals: {:?}\n", self.locals)
+  }
+}
+
+pub fn select_instruction(prog: CProgram) -> Program<Info, IdxVar> {
   Program {
+    info: Info {
+      locals: prog.info.locals,
+    },
     blocks: prog.body.into_iter()
       .map(|(label, tail)| (label, tail_block(tail)))
       .collect()

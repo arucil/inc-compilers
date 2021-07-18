@@ -1,19 +1,7 @@
-use ast::{Exp, Program, Range};
+use ast::{Exp, Program, Range, IdxVar};
 use std::collections::HashMap;
-use std::fmt::{self, Debug, Formatter};
 use super::PassError;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct IdxVar {
-  pub name: String,
-  pub index: usize,
-}
-
-impl Debug for IdxVar {
-  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-    write!(f, "{}.{}", self.name, self.index)
-  }
-}
 
 pub fn uniquify(prog: Program) -> Result<Program<IdxVar>, PassError> {
   let mut counter = 0;

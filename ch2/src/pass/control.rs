@@ -1,7 +1,7 @@
-use super::uniquify::IdxVar;
-use ast::{Program, Exp, Range};
+use ast::{Program, Exp, Range, IdxVar};
 use std::fmt::{self, Write};
 use indexmap::IndexSet;
+use support::WritePretty;
 
 pub struct CProgram {
   pub info: CInfo,
@@ -52,13 +52,13 @@ impl CProgram {
   }
 }
 
-impl CInfo {
+impl WritePretty for CInfo {
   fn write(&self, f: &mut impl Write) -> fmt::Result {
     writeln!(f, "locals: {:?}\n", self.locals)
   }
 }
 
-impl CTail {
+impl WritePretty for CTail {
   fn write(&self, f: &mut impl Write) -> fmt::Result {
     match self {
       Self::Return(exp) => {
@@ -75,7 +75,7 @@ impl CTail {
   }
 }
 
-impl CStmt {
+impl WritePretty for CStmt {
   fn write(&self, f: &mut impl Write) -> fmt::Result {
     match self {
       Self::Assign { var, exp } => {
@@ -86,7 +86,7 @@ impl CStmt {
   }
 }
 
-impl CExp {
+impl WritePretty for CExp {
   fn write(&self, f: &mut impl Write) -> fmt::Result {
     match self {
       Self::Atom(atom) => atom.write(f),
@@ -95,7 +95,7 @@ impl CExp {
   }
 }
 
-impl CPrim {
+impl WritePretty for CPrim {
   fn write(&self, f: &mut impl Write) -> fmt::Result {
     match self {
       Self::Add(arg1, arg2) => {
@@ -117,7 +117,7 @@ impl CPrim {
   }
 }
 
-impl CAtom {
+impl WritePretty for CAtom {
   fn write(&self, f: &mut impl Write) -> fmt::Result {
     match self {
       Self::Int(n) => write!(f, "{}", n),
@@ -177,7 +177,7 @@ fn explicate_tail(exp: Exp<IdxVar>) -> CTail {
     exp@(Exp::Int(_) | Exp::Var(_)) => {
       CTail::Return(CExp::Atom(atom(exp)))
     }
-    ast::Exp::Prim { op: (_, op), mut args } => {
+    ast::Exp::Prim { op: (_, op), args } => {
       CTail::Return(CExp::Prim(prim(op, args)))
     }
     ast::Exp::Let { var, init, body } => {

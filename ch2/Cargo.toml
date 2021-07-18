@@ -8,6 +8,7 @@ edition = "2018"
 [dependencies]
 ast = { path = "../ast" }
 asm = { path = "../asm" }
+support = { path = "../support" }
 indexmap = "1.6.1"
 
 [dev-dependencies]
