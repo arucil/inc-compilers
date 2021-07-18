@@ -1,12 +1,8 @@
-use crate::{Program, Exp, Range};
+use crate::{Program, Exp};
+use support::{Range, CompileError};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParseError {
-  pub range: Range,
-  pub message: String,
-}
 
-pub type Result<T> = std::result::Result<T, ParseError>;
+pub type Result<T> = std::result::Result<T, CompileError>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Cst {
@@ -70,7 +66,7 @@ impl<'a> Parser<'a> {
         while self.peek() != Some('"') {
           match self.peek() {
             Some('\\') => self.advance(),
-            None => return Err(ParseError {
+            None => return Err(CompileError {
               range: (start, self.i).into(),
               message: format!("unclosed string"),
             }),
@@ -96,7 +92,7 @@ impl<'a> Parser<'a> {
         self.token = ((start, self.i).into(), Token::Eof);
         Ok(Token::Eof)
       }
-      Some(c) => Err(ParseError {
+      Some(c) => Err(CompileError {
         range: (start, start + c.len_utf8()).into(),
         message: format!("unexpected char '{}'", c),
       })
@@ -128,11 +124,11 @@ impl<'a> Parser<'a> {
         Ok(Cst::String(range))
       }
       Token::SymOrNum => self.parse_sym(self.token.0),
-      Token::Eof => Err(ParseError {
+      Token::Eof => Err(CompileError {
         range: self.token.0,
         message: format!("unexpected EOF"),
       }),
-      Token::Punc(c) => Err(ParseError {
+      Token::Punc(c) => Err(CompileError {
         range: self.token.0,
         message: format!("unexpected char '{}'", c),
       })
@@ -144,7 +140,7 @@ impl<'a> Parser<'a> {
     if let Err(err) = self.input[range.start..range.end].parse::<i64>() {
       use std::num::IntErrorKind;
       if let IntErrorKind::PosOverflow | IntErrorKind::NegOverflow = err.kind() {
-        return Err(ParseError {
+        return Err(CompileError {
           range,
           message: format!("integer overflow"),
         });
@@ -204,7 +200,7 @@ fn build_exp(input: &str, cst: Cst) -> Result<(Range, Exp)> {
             if xs.len() == 1 {
               make_prim(input, range, sym_range, op, xs)
             } else {
-              Err(ParseError {
+              Err(CompileError {
                 range,
                 message: format!("read does not take arguments"),
               })
@@ -214,7 +210,7 @@ fn build_exp(input: &str, cst: Cst) -> Result<(Range, Exp)> {
             if xs.len() == 2 {
               make_prim(input, range, sym_range, op, xs)
             } else {
-              Err(ParseError {
+              Err(CompileError {
                 range,
                 message: format!("- expects one argument"),
               })
@@ -224,20 +220,20 @@ fn build_exp(input: &str, cst: Cst) -> Result<(Range, Exp)> {
             if xs.len() == 3 {
               make_prim(input, range, sym_range, op, xs)
             } else {
-              Err(ParseError {
+              Err(CompileError {
                 range,
                 message: format!("+ expects two arguments"),
               })
             }
           }
           "let" => build_let(input, xs, range),
-          _ => Err(ParseError {
+          _ => Err(CompileError {
             range,
             message: format!("unrecognized form"),
           })
         }
       } else {
-        return Err(ParseError {
+        return Err(CompileError {
           range,
           message: format!("unrecognized form"),
         })
@@ -255,7 +251,7 @@ fn build_exp(input: &str, cst: Cst) -> Result<(Range, Exp)> {
             'n' => '\n',
             't' => '\t',
             '\\' => '\\',
-            _ => return Err(ParseError {
+            _ => return Err(CompileError {
               range: (range.start + i, range.start + i + 2).into(),
               message: format!("unrecognized escape sequence"),
             })
@@ -291,26 +287,26 @@ fn build_let(
               let var = input[sym_range.start..sym_range.end].to_owned();
               Ok(((sym_range, var), init))
             } else {
-              Err(ParseError {
+              Err(CompileError {
                 range,
                 message: format!("invalid let form"),
               })
             }
           } else {
-            Err(ParseError {
+            Err(CompileError {
               range,
               message: format!("invalid let form"),
             })
           }
         } else {
-          Err(ParseError {
+          Err(CompileError {
             range,
             message: format!("invalid let form"),
           })
         }
       }).collect::<Result<Vec<_>>>()?
     } else {
-      return Err(ParseError {
+      return Err(CompileError {
         range,
         message: format!("invalid let form"),
       })
@@ -319,7 +315,7 @@ fn build_let(
       .fold(body, |body, (var, init)|
         (range, Exp::Let { var, init: box init, body: box body })))
   } else {
-    Err(ParseError {
+    Err(CompileError {
       range,
       message: format!("invalid let form"),
     })
@@ -356,7 +352,7 @@ mod tests {
   #[test]
   fn number_overflow() {
     let result = Parser::new(r#"123456789012345678901234567890"#).parse();
-    let err = ParseError {
+    let err = CompileError {
       range: (0, 30).into(),
       message: format!("integer overflow"),
     };

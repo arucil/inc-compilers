@@ -16,6 +16,7 @@ pub struct Block<VAR=!> {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum Instr<VAR=!> {
   Addq(Arg<VAR>, Arg<VAR>),
   Subq(Arg<VAR>, Arg<VAR>),
@@ -26,6 +27,7 @@ pub enum Instr<VAR=!> {
   Pushq(Arg<VAR>),
   Popq(Arg<VAR>),
   Jmp(String),
+  Syscall,
 }
 
 #[derive(Debug, Clone)]
@@ -66,6 +68,15 @@ impl<INFO: WritePretty, VAR: Debug> Program<INFO, VAR> {
     }
     buf
   }
+
+  pub fn to_nasm(&self) -> String {
+    let mut buf = format!("section .text\n");
+    for (label, block) in &self.blocks {
+      writeln!(&mut buf, "{}:", label).unwrap();
+      block.write(&mut buf).unwrap();
+    }
+    buf
+  }
 }
 
 impl<VAR: Debug> WritePretty for Block<VAR> {
@@ -83,7 +94,7 @@ impl<VAR: Debug> WritePretty for Instr<VAR> {
   fn write(&self, f: &mut impl Write) -> fmt::Result {
     match self {
       Self::Addq(src, dest) => self.write_binary(f, "addq", src, dest),
-      Self::Movq(src, dest) => self.write_binary(f, "movq", src, dest),
+      Self::Movq(src, dest) => self.write_binary(f, "mov", src, dest),
       Self::Callq(label, _) => write!(f, "callq {}", label),
       Self::Jmp(label) => write!(f, "jmp {}", label),
       Self::Negq(dest) => self.write_unary(f, "negq", dest),
@@ -91,6 +102,7 @@ impl<VAR: Debug> WritePretty for Instr<VAR> {
       Self::Pushq(src) => self.write_unary(f, "pushq", src),
       Self::Retq => write!(f, "retq"),
       Self::Subq(src, dest) => self.write_binary(f, "subq", src, dest),
+      Self::Syscall => write!(f, "syscall"),
     }
   }
 }

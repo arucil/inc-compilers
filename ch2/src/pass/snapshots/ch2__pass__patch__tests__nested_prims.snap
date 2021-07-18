@@ -1,0 +1,27 @@
+---
+source: ch2/src/pass/patch.rs
+expression: result.to_string_pretty()
+
+---
+locals: {x.0, y.1, tmp.0, tmp.1, tmp.2, tmp.3}
+stack_space: 48 bytes
+start:
+    callq read_int
+    movq rax, -8(rbp)
+    movq 2, -16(rbp)
+    addq 3, -16(rbp)
+    callq read_int
+    movq rax, -24(rbp)
+    movq -24(rbp), rax
+    movq rax, -32(rbp)
+    negq -32(rbp), 
+    movq 2, -40(rbp)
+    negq -40(rbp), 
+    movq -16(rbp), rax
+    movq rax, -48(rbp)
+    movq -40(rbp), rax
+    addq rax, -48(rbp)
+    movq -32(rbp), rax
+    addq -48(rbp), rax
+    jmp conclusion
+

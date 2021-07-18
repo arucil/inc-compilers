@@ -1,12 +1,7 @@
-use ast::Range;
-
-#[derive(Debug, Clone)]
-pub struct PassError {
-  pub range: Range,
-  pub message: String,
-}
 
 pub mod uniquify;
 pub mod anf;
 pub mod control;
 pub mod instruction;
+pub mod assign;
+pub mod patch;

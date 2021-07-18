@@ -1,7 +1,7 @@
-use ast::{Program, Exp, Range, IdxVar};
+use ast::{Program, Exp, IdxVar};
 use std::fmt::{self, Write};
 use indexmap::IndexSet;
-use support::WritePretty;
+use support::{WritePretty, Range};
 
 pub struct CProgram {
   pub info: CInfo,

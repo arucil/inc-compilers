@@ -3,16 +3,12 @@
 use pretty::*;
 use std::fmt::{self, Debug, Formatter};
 use std::iter;
+use support::Range;
 
 pub mod parser;
 
-pub use parser::{parse, ParseError, Result};
+pub use parser::{parse, Result};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Range {
-  pub start: usize,
-  pub end: usize,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Program<VAR=String> {
@@ -45,12 +41,6 @@ pub struct IdxVar {
 impl Debug for IdxVar {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     write!(f, "{}.{}", self.name, self.index)
-  }
-}
-
-impl From<(usize, usize)> for Range {
-  fn from((start, end): (usize, usize)) -> Self {
-    Self { start, end }
   }
 }
 

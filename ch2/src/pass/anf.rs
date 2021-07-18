@@ -1,4 +1,5 @@
-use ast::{Program, Exp, Range, IdxVar};
+use ast::{Program, Exp, IdxVar};
+use support::Range;
 
 pub fn anf(prog: Program<IdxVar>) -> Program<IdxVar> {
   let mut counter = 0;

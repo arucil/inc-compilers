@@ -1,9 +1,9 @@
-use ast::{Exp, Program, Range, IdxVar};
+use ast::{Exp, Program, IdxVar};
 use std::collections::HashMap;
-use super::PassError;
+use support::{Range, CompileError};
 
 
-pub fn uniquify(prog: Program) -> Result<Program<IdxVar>, PassError> {
+pub fn uniquify(prog: Program) -> Result<Program<IdxVar>, CompileError> {
   let mut counter = 0;
   let mut env = HashMap::new();
   Ok(Program {
@@ -17,12 +17,12 @@ fn uniquify_exp(
   (range, exp): (Range, Exp),
   env: &mut HashMap<String, usize>,
   counter: &mut usize,
-) -> Result<Exp<IdxVar>, PassError> {
+) -> Result<Exp<IdxVar>, CompileError> {
   match exp {
     Exp::Int(n) => Ok(Exp::Int(n)),
     Exp::Var(var) => {
       env.get(&var).map_or_else(
-        || Err(PassError { range, message: format!("variable {} not found", var) }),
+        || Err(CompileError { range, message: format!("variable {} not found", var) }),
         |&index| Ok(Exp::Var(IdxVar { name: var.clone(), index })),
       )
     }
