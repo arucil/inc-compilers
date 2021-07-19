@@ -72,6 +72,9 @@ impl<INFO: WritePretty, VAR: Debug> Program<INFO, VAR> {
   pub fn to_nasm(&self) -> String {
     let mut buf = format!("section .text\n");
     for (label, block) in &self.blocks {
+      if label == "_start" {
+        writeln!(&mut buf, "    global _start").unwrap();
+      }
       writeln!(&mut buf, "{}:", label).unwrap();
       block.write(&mut buf).unwrap();
     }
@@ -93,15 +96,15 @@ impl<VAR: Debug> WritePretty for Block<VAR> {
 impl<VAR: Debug> WritePretty for Instr<VAR> {
   fn write(&self, f: &mut impl Write) -> fmt::Result {
     match self {
-      Self::Addq(src, dest) => self.write_binary(f, "addq", src, dest),
-      Self::Movq(src, dest) => self.write_binary(f, "mov", src, dest),
-      Self::Callq(label, _) => write!(f, "callq {}", label),
+      Self::Addq(src, dest) => self.write_binary(f, "add", dest, src),
+      Self::Movq(src, dest) => self.write_binary(f, "mov", dest, src),
+      Self::Callq(label, _) => write!(f, "call {}", label),
       Self::Jmp(label) => write!(f, "jmp {}", label),
-      Self::Negq(dest) => self.write_unary(f, "negq", dest),
-      Self::Popq(dest) => self.write_unary(f, "popq", dest),
-      Self::Pushq(src) => self.write_unary(f, "pushq", src),
-      Self::Retq => write!(f, "retq"),
-      Self::Subq(src, dest) => self.write_binary(f, "subq", src, dest),
+      Self::Negq(dest) => self.write_unary(f, "neg", dest),
+      Self::Popq(dest) => self.write_unary(f, "pop", dest),
+      Self::Pushq(src) => self.write_unary(f, "push", src),
+      Self::Retq => write!(f, "ret"),
+      Self::Subq(src, dest) => self.write_binary(f, "sub", dest, src),
       Self::Syscall => write!(f, "syscall"),
     }
   }
@@ -138,7 +141,15 @@ impl<VAR: Debug> WritePretty for Arg<VAR> {
     match self {
       Self::Imm(n) => write!(f, "{}", n),
       Self::Var(var) => write!(f, "{:?}", var),
-      Self::Deref(r, i) => write!(f, "{}({:?})", i, r),
+      Self::Deref(r, i) => {
+        if *i > 0 {
+          write!(f, "[{:?} + {}]", r, i)
+        } else if *i == 0 {
+          write!(f, "[{:?}]", r)
+        } else {
+          write!(f, "[{:?} - {}]", r, -i)
+        }
+      }
       Self::Reg(r) => write!(f, "{:?}", r),
     }
   }

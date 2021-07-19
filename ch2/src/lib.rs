@@ -1,8 +1,7 @@
 #![feature(box_patterns, box_syntax, bindings_after_at)]
 
 use asm::{Program, Block, Instr, Arg, Reg};
-use support::{CompileError, WritePretty};
-use std::fmt::Write;
+use support::CompileError;
 
 mod pass;
 
@@ -21,7 +20,7 @@ pub fn compile(input: &str) -> Result<String, CompileError> {
 }
 
 fn add_prologue(prog: &mut Program<self::pass::assign::Info>) {
-  let stack_space = stack_space_aligned(prog.info.stack_space);
+  let stack_space = (prog.info.stack_space + 15) & !15;
   let block = Block {
     code: vec![
       Instr::Pushq(Arg::Reg(Reg::Rbp)),
@@ -30,11 +29,10 @@ fn add_prologue(prog: &mut Program<self::pass::assign::Info>) {
       Instr::Jmp("start".to_owned()),
     ]
   };
-  prog.blocks.push(("main".to_owned(), block));
+  prog.blocks.push(("_start".to_owned(), block));
 }
 
 fn add_epilogue(prog: &mut Program<self::pass::assign::Info>) {
-  let stack_space = stack_space_aligned(prog.info.stack_space);
   let block = Block {
     code: vec![
       Instr::Movq(Arg::Reg(Reg::Rbp), Arg::Reg(Reg::Rsp)),
@@ -43,8 +41,4 @@ fn add_epilogue(prog: &mut Program<self::pass::assign::Info>) {
     ]
   };
   prog.blocks.push(("conclusion".to_owned(), block));
-}
-
-fn stack_space_aligned(space: usize) -> usize {
-  (space + 15) & !15
 }
