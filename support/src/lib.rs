@@ -29,8 +29,30 @@ pub struct CompileError {
 }
 
 pub struct CompileErrorPrinter {
+  input: String,
   line_offsets: Vec<usize>,
 }
 
 impl CompileErrorPrinter {
+  pub fn new(input: impl ToString) -> Self {
+    let input = input.to_string();
+    let line_offsets = Self::compute_line_offsets(&input);
+    Self {
+      input,
+      line_offsets,
+    }
+  }
+
+  pub fn print(err: CompileError) {
+  }
+
+  fn compute_line_offsets(input: &str) -> Vec<usize> {
+    let mut offset = 0;
+    let mut offsets = vec![];
+    for line in input.split('\n') {
+      offsets.push(offset);
+      offset += line.len() + 1;
+    }
+    offsets
+  }
 }

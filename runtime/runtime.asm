@@ -1,8 +1,62 @@
 section .bss
     int_buf resb 20
+    char_buf resb 1
+    input_buf resb 8192
+    input_buf_len equ $-input_buf
+
+section .data
+    has_char dq 0
 
 section .rodata
     newline db `\n`
+    invalid_integer db `Invalid integer\n`
+    invalid_integer_len equ $-invalid_integer
+
+;; args
+;;   rax: int
+;;
+;; returns:
+;;   rcx: length
+;;   r8: 1=negative, 0=non-negative
+;;
+;; uses:
+;;   rbx, rdx
+%macro int_len 0
+    mov rbx, 10
+    xor rcx, rcx
+    xor r8, r8
+    cmp rax, 0
+    jge int_len_loop
+    inc rcx
+    neg rax
+    inc r8
+int_len_loop:
+    inc rcx
+    xor rdx, rdx
+    div rbx
+    cmp rax, 0
+    jne int_len_loop
+%endmacro
+
+%macro is_space 1
+    cmp %1, ' '
+    je %%end
+    cmp %1, 10
+    je %%end
+    cmp %1, 8
+    je %%end
+    cmp %1, 13
+    je %%end
+%%end:
+%endmacro
+
+%macro read_char 1
+    xor rax, rax
+    mov rdi, 0
+    mov rsi, %1
+    mov rdx, 1
+    syscall
+%endmacro
 
 section .text
 
@@ -18,7 +72,7 @@ section .text
     global int_to_str
 int_to_str:
     mov rsi, rax
-    call int_len
+    int_len
     mov rax, rsi
     cmp r8, 0
     je int_to_str_positive
@@ -54,9 +108,8 @@ str_len_loop:
 str_len_end:
     ret
 
-;; args:
-;;   rdi: address
-;;   rcx: length
+;; rdi: address
+;; rcx: length
 ;;
 ;; returns:
 ;;   rax: int
@@ -79,6 +132,10 @@ str_to_int_loop:
     mul rbx
     xor rdx, rdx
     mov dl, [rdi]
+    cmp dl, 57
+    jg str_to_int_error
+    cmp dl, 48
+    jl str_to_int_error
     sub rdx, 48
     add rax, rdx
     dec rcx
@@ -90,6 +147,15 @@ str_to_int_after:
     neg rax
 str_to_int_end:
     ret
+str_to_int_error:
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, invalid_integer
+    mov rdx, invalid_integer_len
+    syscall
+    mov rax, 60
+    mov rdi, 1
+    syscall
 
 ;; args
 ;;   rax: int
@@ -134,28 +200,67 @@ exit:
     mov rax, 60
     syscall
 
-;; args
+;; returns:
 ;;   rax: int
+;;
+;; uses:
+;;   rax, rsi, rdx, r8, r9, r10
+read_int:
+    mov rdi, input_buf
+    mov rcx, input_buf_len
+    call read_line
+    mov rsi, input_buf
+    ; skip spaces
+read_int_skip_spaces:
+    mov al, [rsi]
+    is_space al
+    jne read_int_skip_trailing_spaces
+    inc rsi
+    dec rcx
+    jmp read_int_skip_spaces
+read_int_skip_trailing_spaces:
+    mov rdi, rsi
+    add rsi, rcx
+    dec rsi
+read_int_skip_trailing_spaces_loop:
+    mov al, [rsi]
+    is_space al
+    jne str_to_int
+    dec rsi
+    dec rcx
+    jmp read_int_skip_trailing_spaces_loop
+
+;; args:
+;;   rdi: buffer address
+;;   rcx: max length
 ;;
 ;; returns:
 ;;   rcx: length
-;;   r8: 1=negative, 0=non-negative
 ;;
 ;; uses:
-;;   rbx, rdx
-int_len:
-    mov rbx, 10
-    xor rcx, rcx
-    xor r8, r8
-    cmp rax, 0
-    jge int_len_loop
-    inc rcx
-    neg rax
+;;   rax, rsi, rdx, r8, r9, r10
+read_line:
+    mov r8, rdi
+    mov r10, rcx
+    xor r9, r9
+    cmp qword [has_char], 0
+    jne read_line_skip_read
+    jmp read_line_start
+read_line_loop:
+    mov byte [r8], al
     inc r8
-int_len_loop:
-    inc rcx
-    xor rdx, rdx
-    div rbx
+    inc r9
+    cmp r9, r10
+    jge read_line_end
+read_line_start:
+    read_char char_buf
     cmp rax, 0
-    jne int_len_loop
+    je read_line_end
+read_line_skip_read:
+    mov al, [char_buf]
+    cmp al, `\n`
+    jne read_line_loop
+read_line_end:
+    mov rcx, r9
+    mov qword [has_char], 0
     ret
