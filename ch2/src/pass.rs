@@ -1,4 +1,4 @@
-
+pub mod partial;
 pub mod uniquify;
 pub mod anf;
 pub mod control;

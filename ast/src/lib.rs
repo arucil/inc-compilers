@@ -20,7 +20,7 @@ pub struct Program<VAR=String> {
 pub enum Exp<VAR=String> {
   Int(i64),
   Prim {
-    op: (Range, String),
+    op: (Range, &'static str),
     args: Vec<(Range, Exp<VAR>)>,
   },
   Var(VAR),
@@ -67,7 +67,7 @@ impl<VAR: Debug> Exp<VAR> {
         RcDoc::text("(")
           .append(
             RcDoc::intersperse(
-              iter::once(RcDoc::text(&op.1))
+              iter::once(RcDoc::text(op.1))
                 .chain(args.iter().map(|(_, arg)| arg.to_doc())),
               Doc::line())
             .nest(1)

@@ -180,10 +180,10 @@ fn build_exp(input: &str, cst: Cst) -> Result<(Range, Exp)> {
     input: &str,
     range: Range,
     sym_range: Range,
-    op: &str,
+    op: &'static str,
     xs: Vec<Cst>,
   ) -> Result<(Range, Exp)> {
-    let op = (sym_range, op.to_owned());
+    let op = (sym_range, op);
     let args = xs.into_iter()
       .skip(1)
       .map(|c| build_exp(input, c))
@@ -198,7 +198,7 @@ fn build_exp(input: &str, cst: Cst) -> Result<(Range, Exp)> {
         match op {
           "read" => {
             if xs.len() == 1 {
-              make_prim(input, range, sym_range, op, xs)
+              make_prim(input, range, sym_range, "read", xs)
             } else {
               Err(CompileError {
                 range,
@@ -208,7 +208,7 @@ fn build_exp(input: &str, cst: Cst) -> Result<(Range, Exp)> {
           }
           "-" => {
             if xs.len() == 2 {
-              make_prim(input, range, sym_range, op, xs)
+              make_prim(input, range, sym_range, "-", xs)
             } else {
               Err(CompileError {
                 range,
@@ -218,7 +218,7 @@ fn build_exp(input: &str, cst: Cst) -> Result<(Range, Exp)> {
           }
           "+" => {
             if xs.len() == 3 {
-              make_prim(input, range, sym_range, op, xs)
+              make_prim(input, range, sym_range, "+", xs)
             } else {
               Err(CompileError {
                 range,

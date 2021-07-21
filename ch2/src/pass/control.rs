@@ -223,8 +223,8 @@ fn atom(exp: Exp<IdxVar>) -> CAtom {
   }
 }
 
-fn prim(op: String, mut args: Vec<(Range, Exp<IdxVar>)>) -> CPrim {
-  match op.as_str() {
+fn prim(op: &str, mut args: Vec<(Range, Exp<IdxVar>)>) -> CPrim {
+  match op {
     "read" => CPrim::Read,
     "-" => CPrim::Neg(atom(args.pop().unwrap().1)),
     "+" => CPrim::Add(

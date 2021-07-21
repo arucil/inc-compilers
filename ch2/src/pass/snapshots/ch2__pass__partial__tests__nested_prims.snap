@@ -1,0 +1,6 @@
+---
+source: ch2/src/pass/partial.rs
+expression: result.to_string_pretty()
+
+---
+(+ 3 (read))
