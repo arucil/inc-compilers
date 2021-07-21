@@ -73,8 +73,9 @@ impl<INFO: WritePretty, VAR: Debug> Program<INFO, VAR> {
     let mut buf = format!("extern read_int, print_int, print_newline\n\
       section .text\n");
     for (label, block) in &self.blocks {
+      buf += "\n";
       if label == "_start" {
-        writeln!(&mut buf, "    global _start").unwrap();
+        buf += "    global _start\n";
       }
       writeln!(&mut buf, "{}:", label).unwrap();
       block.write(&mut buf).unwrap();

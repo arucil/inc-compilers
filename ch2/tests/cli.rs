@@ -3,7 +3,7 @@ use assert_cmd::Command;
 use scopeguard::defer;
 
 #[test]
-fn nested_primes() {
+fn nested_prims() {
   let mut cmd = Command::cargo_bin("ch2").unwrap();
   cmd.arg("tests/fixtures/nested_prims.prog");
   cmd.assert().success();

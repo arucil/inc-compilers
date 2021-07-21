@@ -15,6 +15,6 @@ Cargo.lock
 /target
 
 **/*.o
-*.asm
-*.prog
-*.txt
+/*.asm
+/*.prog
+/*.txt

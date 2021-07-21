@@ -7,6 +7,7 @@ mod pass;
 
 pub fn compile(input: &str) -> Result<String, CompileError> {
   let prog = ast::parse(input)?;
+  let prog = self::pass::partial::partial_evaluate(prog);
   let prog = self::pass::uniquify::uniquify(prog)?;
   let prog = self::pass::anf::anf(prog);
   let prog = self::pass::control::explicate_control(prog);
