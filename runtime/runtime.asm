@@ -205,6 +205,7 @@ exit:
 ;;
 ;; uses:
 ;;   rax, rsi, rdx, r8, r9, r10
+    global read_int
 read_int:
     mov rdi, input_buf
     mov rcx, input_buf_len
@@ -239,6 +240,7 @@ read_int_skip_trailing_spaces_loop:
 ;;
 ;; uses:
 ;;   rax, rsi, rdx, r8, r9, r10
+    global read_line
 read_line:
     mov r8, rdi
     mov r10, rcx

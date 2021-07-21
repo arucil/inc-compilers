@@ -70,7 +70,8 @@ impl<INFO: WritePretty, VAR: Debug> Program<INFO, VAR> {
   }
 
   pub fn to_nasm(&self) -> String {
-    let mut buf = format!("section .text\n");
+    let mut buf = format!("extern read_int, print_int, print_newline\n\
+      section .text\n");
     for (label, block) in &self.blocks {
       if label == "_start" {
         writeln!(&mut buf, "    global _start").unwrap();
@@ -118,8 +119,7 @@ impl<VAR: Debug> Instr<VAR> {
     arg: &Arg<VAR>,
   ) -> fmt::Result {
     write!(f, "{} ", op)?;
-    arg.write(f)?;
-    write!(f, ", ")
+    arg.write(f)
   }
 
   fn write_binary(
@@ -143,11 +143,11 @@ impl<VAR: Debug> WritePretty for Arg<VAR> {
       Self::Var(var) => write!(f, "{:?}", var),
       Self::Deref(r, i) => {
         if *i > 0 {
-          write!(f, "[{:?} + {}]", r, i)
+          write!(f, "qword [{:?} + {}]", r, i)
         } else if *i == 0 {
-          write!(f, "[{:?}]", r)
+          write!(f, "qword [{:?}]", r)
         } else {
-          write!(f, "[{:?} - {}]", r, -i)
+          write!(f, "qword [{:?} - {}]", r, -i)
         }
       }
       Self::Reg(r) => write!(f, "{:?}", r),

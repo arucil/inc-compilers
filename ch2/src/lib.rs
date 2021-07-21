@@ -25,7 +25,7 @@ fn add_prologue(prog: &mut Program<self::pass::assign::Info>) {
     code: vec![
       Instr::Pushq(Arg::Reg(Reg::Rbp)),
       Instr::Movq(Arg::Reg(Reg::Rsp), Arg::Reg(Reg::Rbp)),
-      Instr::Subq(Arg::Reg(Reg::Rsp), Arg::Imm(stack_space as i64)),
+      Instr::Subq(Arg::Imm(stack_space as i64), Arg::Reg(Reg::Rsp)),
       Instr::Jmp("start".to_owned()),
     ]
   };
@@ -37,7 +37,11 @@ fn add_epilogue(prog: &mut Program<self::pass::assign::Info>) {
     code: vec![
       Instr::Movq(Arg::Reg(Reg::Rbp), Arg::Reg(Reg::Rsp)),
       Instr::Popq(Arg::Reg(Reg::Rbp)),
-      Instr::Jmp("start".to_owned()),
+      Instr::Callq("print_int".to_owned(), 0),
+      Instr::Callq("print_newline".to_owned(), 0),
+      Instr::Movq(Arg::Imm(60), Arg::Reg(Reg::Rax)),
+      Instr::Movq(Arg::Imm(0), Arg::Reg(Reg::Rdi)),
+      Instr::Syscall,
     ]
   };
   prog.blocks.push(("conclusion".to_owned(), block));

@@ -1,6 +1,7 @@
 use std::env;
 use std::process;
 use std::fs;
+use std::path::Path;
 use support::CompileErrorPrinter;
 
 fn main() {
@@ -10,8 +11,8 @@ fn main() {
     process::exit(1);
   }
 
-  let file = &args[1];
-  let input = fs::read_to_string(file).unwrap_or_else(|err| {
+  let path = &args[1];
+  let input = fs::read_to_string(path).unwrap_or_else(|err| {
     eprintln!("read file error");
     eprintln!("{:?}", err);
     process::exit(1);
@@ -19,10 +20,24 @@ fn main() {
 
   match ch2::compile(&input) {
     Ok(output) => {
+      let new_path = Path::new(path).with_extension("asm");
+      let binary_path = new_path.with_extension("");
+      fs::write(&new_path, output).unwrap_or_else(|err| {
+        eprintln!("write file {} error", new_path.display());
+        eprintln!("{:?}", err);
+        process::exit(1);
+      });
+      println!("Run:");
+      println!("nasm -f elf64 {}.asm && \
+        nasm -f elf64 runtime/runtime.asm && \
+        ld -o {} runtime/runtime.o {}.o",
+        binary_path.display(),
+        binary_path.display(),
+        binary_path.display());
     }
     Err(err) => {
-      let printer = CompileErrorPrinter::new(&input);
-      printer.print(err);
+      let printer = CompileErrorPrinter::new(path, &input);
+      printer.print(&err);
       process::exit(1);
     }
   }
