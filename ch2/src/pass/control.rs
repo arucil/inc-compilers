@@ -41,6 +41,7 @@ pub enum CAtom {
 }
 
 impl CProgram {
+  #[allow(unused)]
   pub fn to_string_pretty(&self) -> String {
     let mut buf = String::new();
     self.info.write(&mut buf).unwrap();
