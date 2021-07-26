@@ -1,7 +1,7 @@
 use std::env;
-use std::process;
 use std::fs;
 use std::path::Path;
+use std::process;
 use support::CompileErrorPrinter;
 
 fn main() {
@@ -28,12 +28,14 @@ fn main() {
         process::exit(1);
       });
       println!("Run:");
-      println!("nasm -f elf64 {}.asm && \
+      println!(
+        "nasm -f elf64 {}.asm && \
         nasm -f elf64 runtime/runtime.asm && \
         ld -o {} runtime/runtime.o {}.o",
         binary_path.display(),
         binary_path.display(),
-        binary_path.display());
+        binary_path.display()
+      );
     }
     Err(err) => {
       let printer = CompileErrorPrinter::new(path, &input);

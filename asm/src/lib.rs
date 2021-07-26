@@ -5,19 +5,19 @@ use std::fmt::{self, Debug, Write};
 use support::WritePretty;
 
 #[derive(Debug, Clone)]
-pub struct Program<INFO=(),VAR=!> {
+pub struct Program<INFO = (), VAR = !> {
   pub info: INFO,
   pub blocks: Vec<(String, Block<VAR>)>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Block<VAR=!> {
+pub struct Block<VAR = !> {
   pub code: Vec<Instr<VAR>>,
 }
 
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub enum Instr<VAR=!> {
+pub enum Instr<VAR = !> {
   Addq(Arg<VAR>, Arg<VAR>),
   Subq(Arg<VAR>, Arg<VAR>),
   Movq(Arg<VAR>, Arg<VAR>),
@@ -31,7 +31,7 @@ pub enum Instr<VAR=!> {
 }
 
 #[derive(Debug, Clone)]
-pub enum Arg<VAR=!> {
+pub enum Arg<VAR = !> {
   Imm(i64),
   Reg(Reg),
   Deref(Reg, i32),
@@ -70,8 +70,10 @@ impl<INFO: WritePretty, VAR: Debug> Program<INFO, VAR> {
   }
 
   pub fn to_nasm(&self) -> String {
-    let mut buf = format!("extern read_int, print_int, print_newline\n\
-      section .text\n");
+    let mut buf = format!(
+      "extern read_int, print_int, print_newline\n\
+      section .text\n"
+    );
     for (label, block) in &self.blocks {
       buf += "\n";
       if label == "_start" {
@@ -113,12 +115,7 @@ impl<VAR: Debug> WritePretty for Instr<VAR> {
 }
 
 impl<VAR: Debug> Instr<VAR> {
-  fn write_unary(
-    &self,
-    f: &mut impl Write,
-    op: &str,
-    arg: &Arg<VAR>,
-  ) -> fmt::Result {
+  fn write_unary(&self, f: &mut impl Write, op: &str, arg: &Arg<VAR>) -> fmt::Result {
     write!(f, "{} ", op)?;
     arg.write(f)
   }

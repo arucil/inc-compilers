@@ -1,5 +1,5 @@
-use std::path::{Path, PathBuf};
 use std::fmt::{self, Write};
+use std::path::{Path, PathBuf};
 
 pub trait WritePretty {
   fn write(&self, f: &mut impl Write) -> fmt::Result;
@@ -41,10 +41,7 @@ pub struct CompileErrorPrinter {
 }
 
 impl CompileErrorPrinter {
-  pub fn new<P: AsRef<Path>, S: ToString>(
-    file: P,
-    input: S,
-  ) -> Self {
+  pub fn new<P: AsRef<Path>, S: ToString>(file: P, input: S) -> Self {
     let input = input.to_string();
     let line_offsets = Self::compute_line_offsets(&input);
     Self {
@@ -78,7 +75,8 @@ impl CompileErrorPrinter {
     } else {
       err.range.end - 1
     });
-    eprintln!("error at {}:{}:{}{}\n    {}",
+    eprintln!(
+      "error at {}:{}:{}{}\n    {}",
       self.path.display(),
       start.0 + 1,
       start.1 + 1,
@@ -87,7 +85,8 @@ impl CompileErrorPrinter {
       } else {
         format!(" - {}:{}", end.0 + 1, end.1 + 2)
       },
-      err.message);
+      err.message
+    );
   }
 
   fn compute_line_offsets(input: &str) -> Vec<usize> {
@@ -109,25 +108,15 @@ mod tests {
   #[test]
   fn line_offsets() {
     let printer = CompileErrorPrinter::new("foo", "abcde\nabc\n\nfoobar 1");
-    assert_eq!(
-      printer.line_offsets,
-      vec![0, 6, 10, 11]);
+    assert_eq!(printer.line_offsets, vec![0, 6, 10, 11]);
   }
 
   #[test]
   fn location() {
     let printer = CompileErrorPrinter::new("foo", "abcde\nabc\n\nfoobar 1");
-    assert_eq!(
-      printer.get_location(3),
-      (0, 3));
-    assert_eq!(
-      printer.get_location(10),
-      (2, 0));
-    assert_eq!(
-      printer.get_location(11),
-      (3, 0));
-    assert_eq!(
-      printer.get_location(12),
-      (3, 1));
+    assert_eq!(printer.get_location(3), (0, 3));
+    assert_eq!(printer.get_location(10), (2, 0));
+    assert_eq!(printer.get_location(11), (3, 0));
+    assert_eq!(printer.get_location(12), (3, 1));
   }
 }

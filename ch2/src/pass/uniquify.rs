@@ -1,13 +1,14 @@
-use ast::{Exp, Program, IdxVar};
+use ast::{Exp, IdxVar, Program};
 use std::collections::HashMap;
-use support::{Range, CompileError};
-
+use support::{CompileError, Range};
 
 pub fn uniquify(prog: Program) -> Result<Program<IdxVar>, CompileError> {
   let mut counter = 0;
   let mut env = HashMap::new();
   Ok(Program {
-    body: prog.body.into_iter()
+    body: prog
+      .body
+      .into_iter()
       .map(|exp| Ok((exp.0, uniquify_exp(exp, &mut env, &mut counter)?)))
       .collect::<Result<_, _>>()?,
   })
@@ -20,24 +21,31 @@ fn uniquify_exp(
 ) -> Result<Exp<IdxVar>, CompileError> {
   match exp {
     Exp::Int(n) => Ok(Exp::Int(n)),
-    Exp::Var(var) => {
-      env.get(&var).map_or_else(
-        || Err(CompileError { range, message: format!("variable {} not found", var) }),
-        |&index| Ok(Exp::Var(IdxVar { name: var.clone(), index })),
-      )
-    }
-    Exp::Prim { op, args } => {
-      Ok(Exp::Prim {
-        op,
-        args: args.into_iter()
-          .map(|exp| Ok((exp.0, uniquify_exp(exp, env, counter)?)))
-          .collect::<Result<_, _>>()?,
-      })
-    }
+    Exp::Var(var) => env.get(&var).map_or_else(
+      || {
+        Err(CompileError {
+          range,
+          message: format!("variable {} not found", var),
+        })
+      },
+      |&index| {
+        Ok(Exp::Var(IdxVar {
+          name: var.clone(),
+          index,
+        }))
+      },
+    ),
+    Exp::Prim { op, args } => Ok(Exp::Prim {
+      op,
+      args: args
+        .into_iter()
+        .map(|exp| Ok((exp.0, uniquify_exp(exp, env, counter)?)))
+        .collect::<Result<_, _>>()?,
+    }),
     Exp::Let {
-      var: var@(var_range, _),
-      init: box init@(init_range, _),
-      body: box body@(body_range, _),
+      var: var @ (var_range, _),
+      init: box init @ (init_range, _),
+      body: box body @ (body_range, _),
     } => {
       let init = uniquify_exp(init, env, counter)?;
       let index = *counter;
@@ -60,8 +68,8 @@ fn uniquify_exp(
 
 #[cfg(test)]
 mod tests {
-  use ast::*;
   use super::*;
+  use ast::*;
   use insta::assert_snapshot;
 
   #[test]
@@ -87,7 +95,9 @@ mod tests {
 
   #[test]
   fn let_form_in_body_shadows() {
-    let prog = parse(r#"(let ([x (let ([x 3]) x)]) (+ (let ([x 3] [y (read)]) (+ x y)) x))"#).unwrap();
+    let prog =
+      parse(r#"(let ([x (let ([x 3]) x)]) (+ (let ([x 3] [y (read)]) (+ x y)) x))"#)
+        .unwrap();
     let result = uniquify(prog).unwrap();
     assert_snapshot!(result.to_string_pretty());
   }

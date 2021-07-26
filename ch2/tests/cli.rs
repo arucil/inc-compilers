@@ -1,6 +1,6 @@
-use std::fs;
 use assert_cmd::Command;
 use scopeguard::defer;
+use std::fs;
 
 #[test]
 fn nested_prims() {
@@ -10,9 +10,12 @@ fn nested_prims() {
 
   run_nasm("tests/fixtures/nested_prims.asm");
   run_nasm("../runtime/runtime.asm");
-  run_ld("nested_prims", &["../runtime/runtime.o", "tests/fixtures/nested_prims.o"]);
+  run_ld(
+    "nested_prims",
+    &["../runtime/runtime.o", "tests/fixtures/nested_prims.o"],
+  );
 
-  defer!{
+  defer! {
     fs::remove_file("nested_prims").unwrap();
   }
 

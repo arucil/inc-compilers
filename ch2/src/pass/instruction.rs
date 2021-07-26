@@ -1,9 +1,9 @@
-use super::control::{CExp, CProgram, CStmt, CTail, CAtom, CPrim};
+use super::control::{CAtom, CExp, CPrim, CProgram, CStmt, CTail};
+use asm::{Arg, Block, Instr, Program, Reg};
 use ast::IdxVar;
-use asm::{Program, Block, Instr, Arg, Reg};
 use indexmap::IndexSet;
-use support::WritePretty;
 use std::fmt::{self, Write};
+use support::WritePretty;
 
 pub struct Info {
   pub locals: IndexSet<IdxVar>,
@@ -20,24 +20,21 @@ pub fn select_instruction(prog: CProgram) -> Program<Info, IdxVar> {
     info: Info {
       locals: prog.info.locals,
     },
-    blocks: prog.body.into_iter()
+    blocks: prog
+      .body
+      .into_iter()
       .map(|(label, tail)| (label, tail_block(tail)))
-      .collect()
+      .collect(),
   }
 }
 
 fn tail_block(tail: CTail) -> Block<IdxVar> {
   let mut code = vec![];
   tail_instructions(tail, &mut code);
-  Block {
-    code,
-  }
+  Block { code }
 }
 
-fn tail_instructions(
-  mut tail: CTail,
-  code: &mut Vec<Instr<IdxVar>>,
-) {
+fn tail_instructions(mut tail: CTail, code: &mut Vec<Instr<IdxVar>>) {
   loop {
     match tail {
       CTail::Return(exp) => {
@@ -53,20 +50,13 @@ fn tail_instructions(
   }
 }
 
-fn stmt_instructions(
-  stmt: CStmt,
-  code: &mut Vec<Instr<IdxVar>>,
-) {
+fn stmt_instructions(stmt: CStmt, code: &mut Vec<Instr<IdxVar>>) {
   match stmt {
     CStmt::Assign { var, exp } => exp_instructions(Arg::Var(var), exp, code),
   }
 }
 
-fn exp_instructions(
-  target: Arg<IdxVar>,
-  exp: CExp,
-  code: &mut Vec<Instr<IdxVar>>,
-) {
+fn exp_instructions(target: Arg<IdxVar>, exp: CExp, code: &mut Vec<Instr<IdxVar>>) {
   match exp {
     CExp::Atom(atom) => {
       atom_instructions(target, atom, code);
@@ -90,11 +80,7 @@ fn exp_instructions(
   }
 }
 
-fn atom_instructions(
-  target: Arg<IdxVar>,
-  atom: CAtom,
-  code: &mut Vec<Instr<IdxVar>>,
-) {
+fn atom_instructions(target: Arg<IdxVar>, atom: CAtom, code: &mut Vec<Instr<IdxVar>>) {
   match atom {
     CAtom::Int(n) => {
       code.push(Instr::Movq(Arg::Imm(n), target));
@@ -113,7 +99,8 @@ mod tests {
 
   #[test]
   fn nested_prims() {
-    let prog = parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#).unwrap();
+    let prog =
+      parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#).unwrap();
     let prog = super::super::uniquify::uniquify(prog).unwrap();
     let prog = super::super::anf::anf(prog);
     let prog = super::super::control::explicate_control(prog);

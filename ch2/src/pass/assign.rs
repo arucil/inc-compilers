@@ -1,8 +1,8 @@
-use std::collections::HashMap;
-use std::fmt::{self, Write};
 use asm::{Arg, Block, Instr, Program, Reg};
 use ast::IdxVar;
 use indexmap::IndexSet;
+use std::collections::HashMap;
+use std::fmt::{self, Write};
 use support::WritePretty;
 
 pub struct Info {
@@ -18,11 +18,11 @@ impl WritePretty for Info {
   }
 }
 
-pub fn assign_home(
-  prog: Program<super::instruction::Info, IdxVar>,
-) -> Program<Info> {
+pub fn assign_home(prog: Program<super::instruction::Info, IdxVar>) -> Program<Info> {
   let mut local_spaces = HashMap::new();
-  let blocks = prog.blocks.into_iter()
+  let blocks = prog
+    .blocks
+    .into_iter()
     .map(|(label, block)| (label, assign_home_block(block, &mut local_spaces)))
     .collect();
   Program {
@@ -38,12 +38,12 @@ fn assign_home_block(
   block: Block<IdxVar>,
   local_spaces: &mut HashMap<IdxVar, usize>,
 ) -> Block {
-  let code = block.code.into_iter()
+  let code = block
+    .code
+    .into_iter()
     .map(|ins| assign_home_instr(ins, local_spaces))
     .collect();
-  Block {
-    code,
-  }
+  Block { code }
 }
 
 fn assign_home_instr(
@@ -65,14 +65,11 @@ fn assign_home_instr(
     Instr::Popq(dest) => Instr::Popq(assign_home_arg(dest, local_spaces)),
     Instr::Pushq(src) => Instr::Pushq(assign_home_arg(src, local_spaces)),
     Instr::Retq => Instr::Retq,
-    instr => unimplemented!("{:?}", instr)
+    instr => unimplemented!("{:?}", instr),
   }
 }
 
-fn assign_home_arg(
-  arg: Arg<IdxVar>,
-  local_spaces: &mut HashMap<IdxVar, usize>,
-) -> Arg {
+fn assign_home_arg(arg: Arg<IdxVar>, local_spaces: &mut HashMap<IdxVar, usize>) -> Arg {
   match arg {
     Arg::Imm(n) => Arg::Imm(n),
     Arg::Var(var) => {
@@ -96,7 +93,8 @@ mod tests {
 
   #[test]
   fn nested_prims() {
-    let prog = parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#).unwrap();
+    let prog =
+      parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#).unwrap();
     let prog = super::super::uniquify::uniquify(prog).unwrap();
     let prog = super::super::anf::anf(prog);
     let prog = super::super::control::explicate_control(prog);

@@ -1,6 +1,6 @@
 #![feature(box_patterns, box_syntax, bindings_after_at)]
 
-use asm::{Program, Block, Instr, Arg, Reg};
+use asm::{Arg, Block, Instr, Program, Reg};
 use support::CompileError;
 
 mod pass;
@@ -28,7 +28,7 @@ fn add_prologue(prog: &mut Program<self::pass::assign::Info>) {
       Instr::Movq(Arg::Reg(Reg::Rsp), Arg::Reg(Reg::Rbp)),
       Instr::Subq(Arg::Imm(stack_space as i64), Arg::Reg(Reg::Rsp)),
       Instr::Jmp("start".to_owned()),
-    ]
+    ],
   };
   prog.blocks.push(("_start".to_owned(), block));
 }
@@ -43,7 +43,7 @@ fn add_epilogue(prog: &mut Program<self::pass::assign::Info>) {
       Instr::Movq(Arg::Imm(60), Arg::Reg(Reg::Rax)),
       Instr::Movq(Arg::Imm(0), Arg::Reg(Reg::Rdi)),
       Instr::Syscall,
-    ]
+    ],
   };
   prog.blocks.push(("conclusion".to_owned(), block));
 }

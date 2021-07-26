@@ -1,7 +1,7 @@
-use ast::{Program, Exp, IdxVar};
-use std::fmt::{self, Write};
+use ast::{Exp, IdxVar, Program};
 use indexmap::IndexSet;
-use support::{WritePretty, Range};
+use std::fmt::{self, Write};
+use support::{Range, WritePretty};
 
 pub struct CProgram {
   pub info: CInfo,
@@ -14,14 +14,11 @@ pub struct CInfo {
 
 pub enum CTail {
   Return(CExp),
-  Seq(CStmt, Box<CTail>)
+  Seq(CStmt, Box<CTail>),
 }
 
 pub enum CStmt {
-  Assign {
-    var: IdxVar,
-    exp: CExp,
-  }
+  Assign { var: IdxVar, exp: CExp },
 }
 
 pub enum CExp {
@@ -37,7 +34,7 @@ pub enum CPrim {
 
 pub enum CAtom {
   Int(i64),
-  Var(IdxVar)
+  Var(IdxVar),
 }
 
 impl CProgram {
@@ -130,18 +127,15 @@ impl WritePretty for CAtom {
 pub fn explicate_control(mut prog: Program<IdxVar>) -> CProgram {
   let locals = collect_locals(&prog);
   CProgram {
-    info: CInfo {
-      locals,
-    },
-    body: vec![
-      ("start".to_owned(), explicate_tail(prog.body.pop().unwrap().1))
-    ]
+    info: CInfo { locals },
+    body: vec![(
+      "start".to_owned(),
+      explicate_tail(prog.body.pop().unwrap().1),
+    )],
   }
 }
 
-fn collect_locals(
-  prog: &Program<IdxVar>,
-) -> IndexSet<IdxVar> {
+fn collect_locals(prog: &Program<IdxVar>) -> IndexSet<IdxVar> {
   let mut locals = IndexSet::new();
   for (_, exp) in &prog.body {
     collect_exp_locals(exp, &mut locals);
@@ -149,10 +143,7 @@ fn collect_locals(
   locals
 }
 
-fn collect_exp_locals(
-  exp: &Exp<IdxVar>,
-  locals: &mut IndexSet<IdxVar>,
-) {
+fn collect_exp_locals(exp: &Exp<IdxVar>, locals: &mut IndexSet<IdxVar>) {
   match exp {
     Exp::Int(_) => {}
     Exp::Var(var) => {
@@ -169,32 +160,24 @@ fn collect_exp_locals(
         collect_exp_locals(arg, locals);
       }
     }
-    _ => unimplemented!()
+    _ => unimplemented!(),
   }
 }
 
 fn explicate_tail(exp: Exp<IdxVar>) -> CTail {
   match exp {
-    exp@(Exp::Int(_) | Exp::Var(_)) => {
-      CTail::Return(CExp::Atom(atom(exp)))
-    }
-    ast::Exp::Prim { op: (_, op), args } => {
-      CTail::Return(CExp::Prim(prim(op, args)))
-    }
+    exp @ (Exp::Int(_) | Exp::Var(_)) => CTail::Return(CExp::Atom(atom(exp))),
+    ast::Exp::Prim { op: (_, op), args } => CTail::Return(CExp::Prim(prim(op, args))),
     ast::Exp::Let { var, init, body } => {
       explicate_assign(var.1, init.1, explicate_tail(body.1))
     }
-    exp => unimplemented!("unsupported form {:?}", exp)
+    exp => unimplemented!("unsupported form {:?}", exp),
   }
 }
 
-fn explicate_assign(
-  var: IdxVar,
-  init: ast::Exp<IdxVar>,
-  cont: CTail,
-) -> CTail {
+fn explicate_assign(var: IdxVar, init: ast::Exp<IdxVar>, cont: CTail) -> CTail {
   match init {
-    exp@(Exp::Int(_) | Exp::Var(_)) => {
+    exp @ (Exp::Int(_) | Exp::Var(_)) => {
       let assign = CStmt::Assign {
         var,
         exp: CExp::Atom(atom(exp)),
@@ -209,10 +192,12 @@ fn explicate_assign(
       };
       CTail::Seq(assign, box cont)
     }
-    Exp::Let { var: (_, var1), init: box (_, init1), body } => {
-      explicate_assign(var1, init1, explicate_assign(var, body.1, cont))
-    }
-    exp => unimplemented!("unsupported form {:?}", exp)
+    Exp::Let {
+      var: (_, var1),
+      init: box (_, init1),
+      body,
+    } => explicate_assign(var1, init1, explicate_assign(var, body.1, cont)),
+    exp => unimplemented!("unsupported form {:?}", exp),
   }
 }
 
@@ -228,11 +213,8 @@ fn prim(op: &str, mut args: Vec<(Range, Exp<IdxVar>)>) -> CPrim {
   match op {
     "read" => CPrim::Read,
     "-" => CPrim::Neg(atom(args.pop().unwrap().1)),
-    "+" => CPrim::Add(
-      atom(args[0].1.clone()),
-      atom(args.pop().unwrap().1),
-    ),
-    _ => unreachable!("{}", op)
+    "+" => CPrim::Add(atom(args[0].1.clone()), atom(args.pop().unwrap().1)),
+    _ => unreachable!("{}", op),
   }
 }
 
@@ -253,7 +235,8 @@ mod tests {
 
   #[test]
   fn nested_prims() {
-    let prog = parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#).unwrap();
+    let prog =
+      parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#).unwrap();
     let prog = super::super::uniquify::uniquify(prog).unwrap();
     let prog = super::super::anf::anf(prog);
     let result = explicate_control(prog);

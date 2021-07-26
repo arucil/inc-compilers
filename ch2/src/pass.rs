@@ -1,7 +1,7 @@
-pub mod partial;
-pub mod uniquify;
 pub mod anf;
+pub mod assign;
 pub mod control;
 pub mod instruction;
-pub mod assign;
+pub mod partial;
 pub mod patch;
+pub mod uniquify;
