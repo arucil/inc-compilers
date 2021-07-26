@@ -20,9 +20,9 @@ section .rodata
 ;;   r8: 1=negative, 0=non-negative
 ;;
 ;; uses:
-;;   rbx, rdx
+;;   r9, rdx
 %macro int_len 0
-    mov rbx, 10
+    mov r9, 10
     xor rcx, rcx
     xor r8, r8
     cmp rax, 0
@@ -33,7 +33,7 @@ section .rodata
 int_len_loop:
     inc rcx
     xor rdx, rdx
-    div rbx
+    div r9
     cmp rax, 0
     jne int_len_loop
 %endmacro
@@ -68,7 +68,7 @@ section .text
 ;;   rcx: length
 ;;
 ;; uses:
-;;   rsi, rbx, r8, rdx
+;;   rsi, r9, r8, rdx
     global int_to_str
 int_to_str:
     mov rsi, rax
@@ -80,10 +80,10 @@ int_to_str:
     mov [rdi], byte '-'
 int_to_str_positive:
     add rdi, rcx
-    mov rbx, 10
+    mov r9, 10
 int_to_str_loop:
     xor rdx, rdx
-    div rbx
+    div r9
     add rdx, 48
     dec rdi
     mov [rdi], dl
@@ -115,12 +115,12 @@ str_len_end:
 ;;   rax: int
 ;;
 ;; uses:
-;;   r8, rbx, rdx
+;;   r8, r9, rdx
     global str_to_int
 str_to_int:
     xor rax, rax
     xor r8, r8
-    mov rbx, 10
+    mov r9, 10
     cmp [rdi], byte '-'
     jne str_to_int_loop
     dec rcx
@@ -129,7 +129,7 @@ str_to_int:
 str_to_int_loop:
     cmp rcx, 0
     je str_to_int_after
-    mul rbx
+    mul r9
     xor rdx, rdx
     mov dl, [rdi]
     cmp dl, 57
@@ -161,7 +161,7 @@ str_to_int_error:
 ;;   rax: int
 ;;
 ;; uses:
-;;   rsi, rdi, rbx, r8, rdx
+;;   rsi, rdi, r9, r8, rdx
     global print_int
 print_int:
     mov rdi, int_buf
