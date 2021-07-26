@@ -1,6 +1,6 @@
 #![feature(never_type)]
 
-use num_derive::FromPrimitive;
+use num_derive::{FromPrimitive, ToPrimitive};
 use std::fmt::{self, Debug, Write};
 use support::WritePretty;
 
@@ -38,7 +38,7 @@ pub enum Arg<VAR = !> {
   Var(VAR),
 }
 
-#[derive(Clone, FromPrimitive)]
+#[derive(Clone, Copy, FromPrimitive, ToPrimitive)]
 pub enum Reg {
   Rsp,
   Rbp,

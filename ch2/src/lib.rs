@@ -3,7 +3,7 @@
 use asm::{Arg, Block, Instr, Program, Reg};
 use support::CompileError;
 
-mod pass;
+pub mod pass;
 
 pub fn compile(input: &str) -> Result<String, CompileError> {
   let prog = ast::parse(input)?;
