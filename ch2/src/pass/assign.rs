@@ -18,7 +18,9 @@ impl WritePretty for Info {
   }
 }
 
-pub fn assign_home(prog: Program<super::instruction::Info, IdxVar>) -> Program<Info> {
+pub fn assign_home(
+  prog: Program<super::instruction::Info, IdxVar>,
+) -> Program<Info> {
   let mut local_spaces = HashMap::new();
   let blocks = prog
     .blocks
@@ -57,19 +59,22 @@ fn assign_home_instr(
   };
 
   match instr {
-    Instr::Addq(src, dest) => binary(src, dest, Instr::Addq),
-    Instr::Callq(label, n) => Instr::Callq(label, n),
+    Instr::Add(src, dest) => binary(src, dest, Instr::Add),
+    Instr::Call(label, n) => Instr::Call(label, n),
     Instr::Jmp(label) => Instr::Jmp(label),
-    Instr::Movq(src, dest) => binary(src, dest, Instr::Movq),
-    Instr::Negq(dest) => Instr::Negq(assign_home_arg(dest, local_spaces)),
-    Instr::Popq(dest) => Instr::Popq(assign_home_arg(dest, local_spaces)),
-    Instr::Pushq(src) => Instr::Pushq(assign_home_arg(src, local_spaces)),
-    Instr::Retq => Instr::Retq,
+    Instr::Mov(src, dest) => binary(src, dest, Instr::Mov),
+    Instr::Neg(dest) => Instr::Neg(assign_home_arg(dest, local_spaces)),
+    Instr::Pop(dest) => Instr::Pop(assign_home_arg(dest, local_spaces)),
+    Instr::Push(src) => Instr::Push(assign_home_arg(src, local_spaces)),
+    Instr::Ret => Instr::Ret,
     instr => unimplemented!("{:?}", instr),
   }
 }
 
-fn assign_home_arg(arg: Arg<IdxVar>, local_spaces: &mut HashMap<IdxVar, usize>) -> Arg {
+fn assign_home_arg(
+  arg: Arg<IdxVar>,
+  local_spaces: &mut HashMap<IdxVar, usize>,
+) -> Arg {
   match arg {
     Arg::Imm(n) => Arg::Imm(n),
     Arg::Var(var) => {
@@ -94,7 +99,8 @@ mod tests {
   #[test]
   fn nested_prims() {
     let prog =
-      parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#).unwrap();
+      parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#)
+        .unwrap();
     let prog = super::super::uniquify::uniquify(prog).unwrap();
     let prog = super::super::anf::anf(prog);
     let prog = super::super::control::explicate_control(prog);

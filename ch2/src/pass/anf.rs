@@ -90,7 +90,8 @@ mod tests {
   #[test]
   fn nested_prims() {
     let prog =
-      parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#).unwrap();
+      parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#)
+        .unwrap();
     let prog = super::super::uniquify::uniquify(prog).unwrap();
     let result = anf(prog);
     assert_snapshot!(result.to_string_pretty());
@@ -106,9 +107,10 @@ mod tests {
 
   #[test]
   fn let_in_init() {
-    let prog =
-      parse(r#"(let ([a (+ (let ([x (read)] [y (- x)]) (+ x (- y))) 7)]) (- a))"#)
-        .unwrap();
+    let prog = parse(
+      r#"(let ([a (+ (let ([x (read)] [y (- x)]) (+ x (- y))) 7)]) (- a))"#,
+    )
+    .unwrap();
     let prog = super::super::uniquify::uniquify(prog).unwrap();
     let result = anf(prog);
     assert_snapshot!(result.to_string_pretty());

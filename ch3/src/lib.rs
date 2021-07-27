@@ -1,2 +1,2 @@
-pub mod pass;
 pub mod location_set;
+pub mod pass;

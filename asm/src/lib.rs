@@ -18,14 +18,14 @@ pub struct Block<VAR = !> {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum Instr<VAR = !> {
-  Addq(Arg<VAR>, Arg<VAR>),
-  Subq(Arg<VAR>, Arg<VAR>),
-  Movq(Arg<VAR>, Arg<VAR>),
-  Negq(Arg<VAR>),
-  Callq(String, usize),
-  Retq,
-  Pushq(Arg<VAR>),
-  Popq(Arg<VAR>),
+  Add(Arg<VAR>, Arg<VAR>),
+  Sub(Arg<VAR>, Arg<VAR>),
+  Mov(Arg<VAR>, Arg<VAR>),
+  Neg(Arg<VAR>),
+  Call(String, usize),
+  Ret,
+  Push(Arg<VAR>),
+  Pop(Arg<VAR>),
   Jmp(String),
   Syscall,
 }
@@ -100,22 +100,27 @@ impl<VAR: Debug> WritePretty for Block<VAR> {
 impl<VAR: Debug> WritePretty for Instr<VAR> {
   fn write(&self, f: &mut impl Write) -> fmt::Result {
     match self {
-      Self::Addq(src, dest) => self.write_binary(f, "add", dest, src),
-      Self::Movq(src, dest) => self.write_binary(f, "mov", dest, src),
-      Self::Callq(label, _) => write!(f, "call {}", label),
+      Self::Add(src, dest) => self.write_binary(f, "add", dest, src),
+      Self::Mov(src, dest) => self.write_binary(f, "mov", dest, src),
+      Self::Call(label, _) => write!(f, "call {}", label),
       Self::Jmp(label) => write!(f, "jmp {}", label),
-      Self::Negq(dest) => self.write_unary(f, "neg", dest),
-      Self::Popq(dest) => self.write_unary(f, "pop", dest),
-      Self::Pushq(src) => self.write_unary(f, "push", src),
-      Self::Retq => write!(f, "ret"),
-      Self::Subq(src, dest) => self.write_binary(f, "sub", dest, src),
+      Self::Neg(dest) => self.write_unary(f, "neg", dest),
+      Self::Pop(dest) => self.write_unary(f, "pop", dest),
+      Self::Push(src) => self.write_unary(f, "push", src),
+      Self::Ret => write!(f, "ret"),
+      Self::Sub(src, dest) => self.write_binary(f, "sub", dest, src),
       Self::Syscall => write!(f, "syscall"),
     }
   }
 }
 
 impl<VAR: Debug> Instr<VAR> {
-  fn write_unary(&self, f: &mut impl Write, op: &str, arg: &Arg<VAR>) -> fmt::Result {
+  fn write_unary(
+    &self,
+    f: &mut impl Write,
+    op: &str,
+    arg: &Arg<VAR>,
+  ) -> fmt::Result {
     write!(f, "{} ", op)?;
     arg.write(f)
   }

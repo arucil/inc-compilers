@@ -52,7 +52,10 @@ impl<VAR: Debug> Program<VAR> {
   }
 
   fn to_doc(&self) -> RcDoc {
-    RcDoc::intersperse(self.body.iter().map(|(_, exp)| exp.to_doc()), Doc::line())
+    RcDoc::intersperse(
+      self.body.iter().map(|(_, exp)| exp.to_doc()),
+      Doc::line(),
+    )
   }
 }
 
@@ -65,7 +68,8 @@ impl<VAR: Debug> Exp<VAR> {
       Exp::Prim { op, args } => RcDoc::text("(")
         .append(
           RcDoc::intersperse(
-            iter::once(RcDoc::text(op.1)).chain(args.iter().map(|(_, arg)| arg.to_doc())),
+            iter::once(RcDoc::text(op.1))
+              .chain(args.iter().map(|(_, arg)| arg.to_doc())),
             Doc::line(),
           )
           .nest(1)

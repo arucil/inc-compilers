@@ -95,9 +95,10 @@ mod tests {
 
   #[test]
   fn let_form_in_body_shadows() {
-    let prog =
-      parse(r#"(let ([x (let ([x 3]) x)]) (+ (let ([x 3] [y (read)]) (+ x y)) x))"#)
-        .unwrap();
+    let prog = parse(
+      r#"(let ([x (let ([x 3]) x)]) (+ (let ([x 3] [y (read)]) (+ x y)) x))"#,
+    )
+    .unwrap();
     let result = uniquify(prog).unwrap();
     assert_snapshot!(result.to_string_pretty());
   }

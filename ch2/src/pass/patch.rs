@@ -16,13 +16,13 @@ fn patch_block(block: Block) -> Block {
   let mut code = vec![];
   for instr in block.code {
     match instr {
-      Instr::Addq(src @ Arg::Deref(..), dest @ Arg::Deref(..)) => {
-        code.push(Instr::Movq(src, Arg::Reg(Reg::Rax)));
-        code.push(Instr::Addq(Arg::Reg(Reg::Rax), dest));
+      Instr::Add(src @ Arg::Deref(..), dest @ Arg::Deref(..)) => {
+        code.push(Instr::Mov(src, Arg::Reg(Reg::Rax)));
+        code.push(Instr::Add(Arg::Reg(Reg::Rax), dest));
       }
-      Instr::Movq(src @ Arg::Deref(..), dest @ Arg::Deref(..)) => {
-        code.push(Instr::Movq(src, Arg::Reg(Reg::Rax)));
-        code.push(Instr::Movq(Arg::Reg(Reg::Rax), dest));
+      Instr::Mov(src @ Arg::Deref(..), dest @ Arg::Deref(..)) => {
+        code.push(Instr::Mov(src, Arg::Reg(Reg::Rax)));
+        code.push(Instr::Mov(Arg::Reg(Reg::Rax), dest));
       }
       instr => {
         code.push(instr);
@@ -41,7 +41,8 @@ mod tests {
   #[test]
   fn nested_prims() {
     let prog =
-      parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#).unwrap();
+      parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#)
+        .unwrap();
     let prog = super::super::uniquify::uniquify(prog).unwrap();
     let prog = super::super::anf::anf(prog);
     let prog = super::super::control::explicate_control(prog);

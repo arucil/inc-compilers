@@ -82,7 +82,8 @@ impl<'a> Parser<'a> {
       Some(c) if !"])".contains(c) => {
         self.advance();
         let mut c = self.peek();
-        while matches!(c, Some(c) if !c.is_whitespace() && !"()[];'\"".contains(c)) {
+        while matches!(c, Some(c) if !c.is_whitespace() && !"()[];'\"".contains(c))
+        {
           self.advance();
           c = self.peek();
         }
@@ -140,7 +141,8 @@ impl<'a> Parser<'a> {
     self.get_token()?;
     if let Err(err) = self.input[range.start..range.end].parse::<i64>() {
       use std::num::IntErrorKind;
-      if let IntErrorKind::PosOverflow | IntErrorKind::NegOverflow = err.kind() {
+      if let IntErrorKind::PosOverflow | IntErrorKind::NegOverflow = err.kind()
+      {
         return Err(CompileError {
           range,
           message: format!("integer overflow"),
@@ -244,7 +246,9 @@ fn build_exp(input: &str, cst: Cst) -> Result<(Range, Exp)> {
         });
       }
     }
-    Cst::Symbol(range) => Ok((range, Exp::Var(input[range.start..range.end].to_owned()))),
+    Cst::Symbol(range) => {
+      Ok((range, Exp::Var(input[range.start..range.end].to_owned())))
+    }
     Cst::String(range) => {
       let mut buf = String::new();
       let mut escape = false;
@@ -277,7 +281,11 @@ fn build_exp(input: &str, cst: Cst) -> Result<(Range, Exp)> {
   }
 }
 
-fn build_let(input: &str, mut xs: Vec<Cst>, range: Range) -> Result<(Range, Exp)> {
+fn build_let(
+  input: &str,
+  mut xs: Vec<Cst>,
+  range: Range,
+) -> Result<(Range, Exp)> {
   if xs.len() == 3 {
     let body = build_exp(input, xs.pop().unwrap())?;
     let inits = if let Cst::List(vars, _) = xs.pop().unwrap() {

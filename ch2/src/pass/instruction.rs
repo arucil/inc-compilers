@@ -56,18 +56,22 @@ fn stmt_instructions(stmt: CStmt, code: &mut Vec<Instr<IdxVar>>) {
   }
 }
 
-fn exp_instructions(target: Arg<IdxVar>, exp: CExp, code: &mut Vec<Instr<IdxVar>>) {
+fn exp_instructions(
+  target: Arg<IdxVar>,
+  exp: CExp,
+  code: &mut Vec<Instr<IdxVar>>,
+) {
   match exp {
     CExp::Atom(atom) => {
       atom_instructions(target, atom, code);
     }
     CExp::Prim(CPrim::Read) => {
-      code.push(Instr::Callq("read_int".to_owned(), 0));
-      code.push(Instr::Movq(Arg::Reg(Reg::Rax), target));
+      code.push(Instr::Call("read_int".to_owned(), 0));
+      code.push(Instr::Mov(Arg::Reg(Reg::Rax), target));
     }
     CExp::Prim(CPrim::Neg(atom)) => {
       atom_instructions(target.clone(), atom, code);
-      code.push(Instr::Negq(target));
+      code.push(Instr::Neg(target));
     }
     CExp::Prim(CPrim::Add(atom1, atom2)) => {
       atom_instructions(target.clone(), atom1, code);
@@ -75,18 +79,22 @@ fn exp_instructions(target: Arg<IdxVar>, exp: CExp, code: &mut Vec<Instr<IdxVar>
         CAtom::Int(n) => Arg::Imm(n),
         CAtom::Var(var) => Arg::Var(var),
       };
-      code.push(Instr::Addq(arg, target));
+      code.push(Instr::Add(arg, target));
     }
   }
 }
 
-fn atom_instructions(target: Arg<IdxVar>, atom: CAtom, code: &mut Vec<Instr<IdxVar>>) {
+fn atom_instructions(
+  target: Arg<IdxVar>,
+  atom: CAtom,
+  code: &mut Vec<Instr<IdxVar>>,
+) {
   match atom {
     CAtom::Int(n) => {
-      code.push(Instr::Movq(Arg::Imm(n), target));
+      code.push(Instr::Mov(Arg::Imm(n), target));
     }
     CAtom::Var(var) => {
-      code.push(Instr::Movq(Arg::Var(var), target));
+      code.push(Instr::Mov(Arg::Var(var), target));
     }
   }
 }
@@ -100,7 +108,8 @@ mod tests {
   #[test]
   fn nested_prims() {
     let prog =
-      parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#).unwrap();
+      parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#)
+        .unwrap();
     let prog = super::super::uniquify::uniquify(prog).unwrap();
     let prog = super::super::anf::anf(prog);
     let prog = super::super::control::explicate_control(prog);

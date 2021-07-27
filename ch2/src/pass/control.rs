@@ -167,7 +167,9 @@ fn collect_exp_locals(exp: &Exp<IdxVar>, locals: &mut IndexSet<IdxVar>) {
 fn explicate_tail(exp: Exp<IdxVar>) -> CTail {
   match exp {
     exp @ (Exp::Int(_) | Exp::Var(_)) => CTail::Return(CExp::Atom(atom(exp))),
-    ast::Exp::Prim { op: (_, op), args } => CTail::Return(CExp::Prim(prim(op, args))),
+    ast::Exp::Prim { op: (_, op), args } => {
+      CTail::Return(CExp::Prim(prim(op, args)))
+    }
     ast::Exp::Let { var, init, body } => {
       explicate_assign(var.1, init.1, explicate_tail(body.1))
     }
@@ -226,7 +228,8 @@ mod tests {
 
   #[test]
   fn let_in_init() {
-    let prog = parse(r#"(let ([y (let ([x 20]) (+ x (let ([x 22]) x)))]) y)"#).unwrap();
+    let prog =
+      parse(r#"(let ([y (let ([x 20]) (+ x (let ([x 22]) x)))]) y)"#).unwrap();
     let prog = super::super::uniquify::uniquify(prog).unwrap();
     let prog = super::super::anf::anf(prog);
     let result = explicate_control(prog);
@@ -236,7 +239,8 @@ mod tests {
   #[test]
   fn nested_prims() {
     let prog =
-      parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#).unwrap();
+      parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#)
+        .unwrap();
     let prog = super::super::uniquify::uniquify(prog).unwrap();
     let prog = super::super::anf::anf(prog);
     let result = explicate_control(prog);

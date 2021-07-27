@@ -20,7 +20,8 @@ fn nested_prims() {
   }
 
   let input = fs::read_to_string("tests/fixtures/nested_prims.input").unwrap();
-  let output = fs::read_to_string("tests/fixtures/nested_prims.output").unwrap();
+  let output =
+    fs::read_to_string("tests/fixtures/nested_prims.output").unwrap();
   Command::new("nested_prims")
     .write_stdin(input)
     .assert()

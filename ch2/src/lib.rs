@@ -24,9 +24,9 @@ fn add_prologue(prog: &mut Program<self::pass::assign::Info>) {
   let stack_space = (prog.info.stack_space + 15) & !15;
   let block = Block {
     code: vec![
-      Instr::Pushq(Arg::Reg(Reg::Rbp)),
-      Instr::Movq(Arg::Reg(Reg::Rsp), Arg::Reg(Reg::Rbp)),
-      Instr::Subq(Arg::Imm(stack_space as i64), Arg::Reg(Reg::Rsp)),
+      Instr::Push(Arg::Reg(Reg::Rbp)),
+      Instr::Mov(Arg::Reg(Reg::Rsp), Arg::Reg(Reg::Rbp)),
+      Instr::Sub(Arg::Imm(stack_space as i64), Arg::Reg(Reg::Rsp)),
       Instr::Jmp("start".to_owned()),
     ],
   };
@@ -36,12 +36,12 @@ fn add_prologue(prog: &mut Program<self::pass::assign::Info>) {
 fn add_epilogue(prog: &mut Program<self::pass::assign::Info>) {
   let block = Block {
     code: vec![
-      Instr::Movq(Arg::Reg(Reg::Rbp), Arg::Reg(Reg::Rsp)),
-      Instr::Popq(Arg::Reg(Reg::Rbp)),
-      Instr::Callq("print_int".to_owned(), 0),
-      Instr::Callq("print_newline".to_owned(), 0),
-      Instr::Movq(Arg::Imm(60), Arg::Reg(Reg::Rax)),
-      Instr::Movq(Arg::Imm(0), Arg::Reg(Reg::Rdi)),
+      Instr::Mov(Arg::Reg(Reg::Rbp), Arg::Reg(Reg::Rsp)),
+      Instr::Pop(Arg::Reg(Reg::Rbp)),
+      Instr::Call("print_int".to_owned(), 0),
+      Instr::Call("print_newline".to_owned(), 0),
+      Instr::Mov(Arg::Imm(60), Arg::Reg(Reg::Rax)),
+      Instr::Mov(Arg::Imm(0), Arg::Reg(Reg::Rdi)),
       Instr::Syscall,
     ],
   };
