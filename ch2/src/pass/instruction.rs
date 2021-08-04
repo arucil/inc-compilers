@@ -2,15 +2,14 @@ use super::control::{CAtom, CExp, CPrim, CProgram, CStmt, CTail};
 use asm::{Arg, Block, Instr, Program, Reg};
 use ast::IdxVar;
 use indexmap::IndexSet;
-use std::fmt::{self, Write};
-use support::WritePretty;
+use std::fmt::{self, Debug, Formatter};
 
 pub struct Info {
   pub locals: IndexSet<IdxVar>,
 }
 
-impl WritePretty for Info {
-  fn write(&self, f: &mut impl Write) -> fmt::Result {
+impl Debug for Info {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     writeln!(f, "locals: {:?}\n", self.locals)
   }
 }

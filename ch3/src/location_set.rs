@@ -4,19 +4,20 @@ use indexmap::map::Entry;
 use indexmap::IndexMap;
 use num_traits::{FromPrimitive, ToPrimitive};
 use smallvec::SmallVec;
-use std::fmt;
-use std::fmt::Write;
+use std::fmt::{self, Debug, Write};
 use std::ops::Deref;
-use support::WritePretty;
 
 #[derive(Debug, Clone)]
 pub struct LocationSet(SmallVec<[u32; 2]>);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Location(usize);
+
 #[derive(Debug, Clone)]
 pub struct VarStore(IndexMap<IdxVar, Var>);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Var(pub usize);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Var(usize);
 
 impl LocationSet {
   pub fn new() -> Self {
@@ -77,32 +78,58 @@ impl LocationSet {
     }
   }
 
-  pub fn write(&self, f: &mut impl Write, var_store: &VarStore) -> fmt::Result {
-    let elems = self.0.iter().enumerate().flat_map(|(i, &(mut k))| {
-      let base = i * 32;
-      let mut elems = vec![];
-      while k != 0 {
-        let i = base + k.trailing_zeros() as usize;
-        elems.push(if i < 16 {
-          Arg::Reg(Reg::from_usize(i).unwrap())
-        } else {
-          Arg::Var(var_store.0.get_index(i - 16).unwrap().0.clone())
-        });
-        k &= k - 1;
-      }
-      elems
-    });
+  pub fn iter(&self) -> LocationIter {
+    let current = if self.0.len() > 0 { self.0[0] } else { 0 };
+    LocationIter {
+      set: self,
+      index: 0,
+      current,
+    }
+  }
 
+  pub fn write(&self, f: &mut impl Write, var_store: &VarStore) -> fmt::Result {
     write!(f, "{{")?;
     let mut comma = false;
-    for elem in elems {
+    for elem in self {
       if comma {
         write!(f, ", ")?;
       }
       comma = true;
-      elem.write(f)?;
+      write!(f, "{:?}", elem.to_arg(var_store))?;
     }
     write!(f, "}}")
+  }
+}
+
+pub struct LocationIter<'a> {
+  set: &'a LocationSet,
+  index: usize,
+  current: u32,
+}
+
+impl<'a> Iterator for LocationIter<'a> {
+  type Item = Location;
+
+  fn next(&mut self) -> Option<Location> {
+    while self.current == 0 {
+      self.index += 1;
+      if self.index >= self.set.0.len() {
+        return None;
+      }
+      self.current = self.set.0[self.index];
+    }
+    let i = self.current.trailing_zeros() as usize + self.index * 32;
+    self.current &= self.current - 1;
+    Some(Location(i))
+  }
+}
+
+impl<'a> IntoIterator for &'a LocationSet {
+  type Item = Location;
+  type IntoIter = LocationIter<'a>;
+
+  fn into_iter(self) -> Self::IntoIter {
+    self.iter()
   }
 }
 
@@ -133,5 +160,21 @@ impl Deref for VarStore {
 
   fn deref(&self) -> &Self::Target {
     &self.0
+  }
+}
+
+impl Var {
+  pub fn to_arg(&self, var_store: &VarStore) -> Arg<IdxVar> {
+    Arg::Var(var_store.get_index(self.0 - 16).unwrap().0.clone())
+  }
+}
+
+impl Location {
+  pub fn to_arg(&self, var_store: &VarStore) -> Arg<IdxVar> {
+    if self.0 < 16 {
+      Arg::Reg(Reg::from_usize(self.0).unwrap())
+    } else {
+      Arg::Var(var_store.0.get_index(self.0 - 16).unwrap().0.clone())
+    }
   }
 }

@@ -4,7 +4,6 @@ use ast::IdxVar;
 use ch2::pass::instruction::Info as OldInfo;
 use indexmap::{IndexMap, IndexSet};
 use std::collections::HashMap;
-use support::WritePretty;
 
 pub struct Info {
   pub locals: IndexSet<IdxVar>,
@@ -115,43 +114,43 @@ impl<'a> AnalysisState<'a> {
   }
 }
 
-trait ShowLiveness {
-  fn show(&self) -> String;
-}
-
-impl ShowLiveness for Program<Info, IdxVar> {
-  fn show(&self) -> String {
-    let mut buf = String::new();
-    for (label, block) in &self.blocks {
-      if label != "start" {
-        continue;
-      }
-      let live = &self.info.live[label];
-      for i in 0..block.code.len() {
-        buf += "                ";
-        live[i].write(&mut buf, &self.info.var_store).unwrap();
-        buf += "\n";
-        block.code[i].write(&mut buf).unwrap();
-        buf += "\n";
-      }
-      buf += "                ";
-      live
-        .last()
-        .unwrap()
-        .write(&mut buf, &self.info.var_store)
-        .unwrap();
-      buf += "\n";
-    }
-    buf
-  }
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
   use asm::Block;
   use insta::assert_snapshot;
   use maplit::hashmap;
+
+  trait ShowLiveness {
+    fn show(&self) -> String;
+  }
+
+  impl ShowLiveness for Program<Info, IdxVar> {
+    fn show(&self) -> String {
+      let mut buf = String::new();
+      for (label, block) in &self.blocks {
+        if label != "start" {
+          continue;
+        }
+        let live = &self.info.live[label];
+        for i in 0..block.code.len() {
+          buf += "                ";
+          live[i].write(&mut buf, &self.info.var_store).unwrap();
+          buf += "\n";
+          buf += &format!("{:?}", block.code[i]);
+          buf += "\n";
+        }
+        buf += "                ";
+        live
+          .last()
+          .unwrap()
+          .write(&mut buf, &self.info.var_store)
+          .unwrap();
+        buf += "\n";
+      }
+      buf
+    }
+  }
 
   fn var(name: &str) -> Arg<IdxVar> {
     Arg::Var(IdxVar {

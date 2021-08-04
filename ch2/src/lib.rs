@@ -1,4 +1,4 @@
-#![feature(box_patterns, box_syntax, bindings_after_at)]
+#![feature(box_patterns, box_syntax)]
 
 use asm::{Arg, Block, Instr, Program, Reg};
 use support::CompileError;

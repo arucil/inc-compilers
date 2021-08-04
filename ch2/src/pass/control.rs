@@ -1,7 +1,7 @@
 use ast::{Exp, IdxVar, Program};
 use indexmap::IndexSet;
-use std::fmt::{self, Write};
-use support::{Range, WritePretty};
+use std::fmt::{self, Write, Debug, Formatter};
+use support::Range;
 
 pub struct CProgram {
   pub info: CInfo,
@@ -40,73 +40,61 @@ pub enum CAtom {
 impl CProgram {
   #[allow(unused)]
   pub fn to_string_pretty(&self) -> String {
-    let mut buf = String::new();
-    self.info.write(&mut buf).unwrap();
+    let mut buf = format!("{:?}", self.info);
     for (label, tail) in &self.body {
       writeln!(&mut buf, "{}:", label).unwrap();
-      tail.write(&mut buf).unwrap();
+      buf += &format!("{:?}", tail);
     }
     buf
   }
 }
 
-impl WritePretty for CInfo {
-  fn write(&self, f: &mut impl Write) -> fmt::Result {
+impl Debug for CInfo {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     writeln!(f, "locals: {:?}\n", self.locals)
   }
 }
 
-impl WritePretty for CTail {
-  fn write(&self, f: &mut impl Write) -> fmt::Result {
+impl Debug for CTail {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     match self {
       Self::Return(exp) => {
-        write!(f, "    return ")?;
-        exp.write(f)
+        write!(f, "    return {:?}", exp)
       }
       Self::Seq(stmt, tail) => {
-        write!(f, "    ")?;
-        stmt.write(f)?;
-        write!(f, "\n")?;
-        tail.write(f)
+        write!(f, "    {:?}\n{:?}", stmt, tail)
       }
     }
   }
 }
 
-impl WritePretty for CStmt {
-  fn write(&self, f: &mut impl Write) -> fmt::Result {
+impl Debug for CStmt {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     match self {
       Self::Assign { var, exp } => {
-        write!(f, "{:?} = ", var)?;
-        exp.write(f)
+        write!(f, "{:?} = {:?}", var, exp)
       }
     }
   }
 }
 
-impl WritePretty for CExp {
-  fn write(&self, f: &mut impl Write) -> fmt::Result {
+impl Debug for CExp {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     match self {
-      Self::Atom(atom) => atom.write(f),
-      Self::Prim(prim) => prim.write(f),
+      Self::Atom(atom) => atom.fmt(f),
+      Self::Prim(prim) => prim.fmt(f),
     }
   }
 }
 
-impl WritePretty for CPrim {
-  fn write(&self, f: &mut impl Write) -> fmt::Result {
+impl Debug for CPrim {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     match self {
       Self::Add(arg1, arg2) => {
-        write!(f, "(+ ")?;
-        arg1.write(f)?;
-        write!(f, " ")?;
-        arg2.write(f)?;
-        write!(f, ")")
+        write!(f, "(+ {:?} {:?})", arg1, arg2)
       }
       Self::Neg(arg) => {
-        write!(f, "(- ")?;
-        arg.write(f)?;
-        write!(f, ")")
+        write!(f, "(- {:?})", arg)
       }
       Self::Read => {
         write!(f, "(read)")
@@ -115,8 +103,8 @@ impl WritePretty for CPrim {
   }
 }
 
-impl WritePretty for CAtom {
-  fn write(&self, f: &mut impl Write) -> fmt::Result {
+impl Debug for CAtom {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     match self {
       Self::Int(n) => write!(f, "{}", n),
       Self::Var(n) => write!(f, "{:?}", n),

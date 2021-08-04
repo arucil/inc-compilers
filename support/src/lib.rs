@@ -1,15 +1,4 @@
-use std::fmt::{self, Write};
 use std::path::{Path, PathBuf};
-
-pub trait WritePretty {
-  fn write(&self, f: &mut impl Write) -> fmt::Result;
-}
-
-impl WritePretty for () {
-  fn write(&self, _f: &mut impl Write) -> fmt::Result {
-    Ok(())
-  }
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Range {
