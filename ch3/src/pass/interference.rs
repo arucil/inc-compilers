@@ -1,11 +1,10 @@
 use super::liveness::Info as OldInfo;
 use crate::location_set::{Location, LocationSet, VarStore};
-use asm::{Arg, Block, Instr, Program, Reg};
+use asm::{Block, Instr, Program, Reg};
 use ast::IdxVar;
 use bimap::BiMap;
 use indexmap::{IndexMap, IndexSet};
 use petgraph::graph::{Graph, NodeIndex, UnGraph};
-use std::ops::{Deref, DerefMut};
 
 pub struct Info {
   pub locals: IndexSet<IdxVar>,
@@ -52,7 +51,6 @@ fn build_graph(
   };
   for (i, instr) in block.code.iter().enumerate() {
     add_instr_edges(instr, &live[i + 1], var_store, &mut graph);
-    println!("{} {:?}\n{:?}\n------\n{:?}\n-----------------------------------", i, instr, graph.graph, var_store);
   }
   graph
 }
@@ -67,8 +65,8 @@ fn add_instr_edges(
     let write_loc_node = graph.get_node(write_loc);
     for after_loc in after {
       if after_loc != write_loc {
-        let after_var_node = graph.get_node(after_loc);
-        graph.add_edge(write_var_node, after_var_node, ());
+        let after_loc_node = graph.get_node(after_loc);
+        graph.add_edge(write_loc_node, after_loc_node);
       }
     }
   };
@@ -78,8 +76,8 @@ fn add_instr_edges(
     | Instr::Sub(_, dest)
     | Instr::Neg(dest)
     | Instr::Pop(dest) => {
-      if let Some(dest_var) = arg_to_var(dest, var_store) {
-        add(dest_var);
+      if let Some(dest_loc) = Location::from_arg(dest.clone(), var_store) {
+        add(dest_loc);
       }
     }
     Instr::Call(_, _) => {
@@ -94,13 +92,13 @@ fn add_instr_edges(
       add(Reg::R11.into());
     }
     Instr::Mov(src, dest) => {
-      if let Some(dest_var) = arg_to_var(dest, var_store) {
-        let src_var = arg_to_var(src, var_store);
-        let write_var_node = graph.get_node(dest_var);
-        for after_var in after {
-          if after_var != dest_var && Some(after_var) != src_var {
-            let after_var_node = graph.get_node(after_var);
-            graph.add_edge(write_var_node, after_var_node, ());
+      if let Some(dest_loc) = Location::from_arg(dest.clone(), var_store) {
+        let src_loc = Location::from_arg(src.clone(), var_store);
+        let dest_loc_node = graph.get_node(dest_loc);
+        for after_loc in after {
+          if after_loc != dest_loc && Some(after_loc) != src_loc {
+            let after_loc_node = graph.get_node(after_loc);
+            graph.add_edge(dest_loc_node, after_loc_node);
           }
         }
       }
@@ -110,44 +108,28 @@ fn add_instr_edges(
   }
 }
 
-fn arg_to_var(arg: &Arg<IdxVar>, var_store: &mut VarStore) -> Option<Var> {
-  match arg {
-    Arg::Deref(reg, _) | Arg::Reg(reg) => Some((*reg).into()),
-    Arg::Var(var) => Some(var_store.get(var.clone())),
-    Arg::Imm(_) => None,
-  }
-}
-
 impl InterferenceGraph {
   fn get_node(&mut self, loc: Location) -> NodeIndex {
-    if let Some(&node) = self.nodes.get_by_left(&var) {
+    if let Some(&node) = self.nodes.get_by_left(&loc) {
       node
     } else {
-      let node = self.graph.add_node(var);
-      self.nodes.insert(var, node);
+      let node = self.graph.add_node(loc);
+      self.nodes.insert(loc, node);
       node
     }
   }
-}
 
-impl Deref for InterferenceGraph {
-  type Target = UnGraph<Var, ()>;
-
-  fn deref(&self) -> &Self::Target {
-    &self.graph
-  }
-}
-
-impl DerefMut for InterferenceGraph {
-  fn deref_mut(&mut self) -> &mut Self::Target {
-    &mut self.graph
+  fn add_edge(&mut self, n1: NodeIndex, n2: NodeIndex) {
+    if !self.graph.contains_edge(n1, n2) {
+      self.graph.add_edge(n1, n2, ());
+    }
   }
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
-  use asm::Block;
+  use asm::{Block, Arg};
   use ch2::pass::instruction::Info as OldOldInfo;
   use insta::assert_snapshot;
   use maplit::hashmap;
@@ -190,6 +172,40 @@ mod tests {
       Neg(var("t")),
       Mov(var("z"), Reg(Rax)),
       Add(var("t"), Reg(Rax)),
+      Jmp("conclusion".to_owned()),
+    ];
+    let label_live = hashmap! {
+      "conclusion".to_owned() => {
+        let mut set = LocationSet::new();
+        set.add_reg(Rax);
+        set.add_reg(Rsp);
+        set
+      }
+    };
+    let prog = Program {
+      info: OldOldInfo {
+        locals: IndexSet::new(),
+      },
+      blocks: vec![("start".to_owned(), Block { code })],
+    };
+    let prog = super::super::liveness::analyze_liveness(prog, label_live);
+    let result = build_interference(prog);
+
+    assert_snapshot!(result.show());
+  }
+
+  #[test]
+  fn call() {
+    use asm::Reg::*;
+    use Arg::*;
+    use Instr::*;
+    let code = vec![
+      Pop(Reg(Rdi)),
+      Pop(Reg(Rsi)),
+      Push(var("x")),
+      Mov(Reg(Rbx), var("w")),
+      Call("foo".to_owned(), 3),
+      Add(Reg(Rax), var("w")),
       Jmp("conclusion".to_owned()),
     ];
     let label_live = hashmap! {

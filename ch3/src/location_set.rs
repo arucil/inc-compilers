@@ -177,4 +177,18 @@ impl Location {
       Arg::Var(var_store.0.get_index(self.0 - 16).unwrap().0.clone())
     }
   }
+
+  pub fn from_arg(arg: Arg<IdxVar>, var_store: &mut VarStore) -> Option<Self> {
+    match arg {
+      Arg::Deref(reg, _) | Arg::Reg(reg) => Some(reg.into()),
+      Arg::Var(var) => Some(Self(var_store.get(var).0 + 16)),
+      Arg::Imm(_) => None,
+    }
+  }
+}
+
+impl From<Reg> for Location {
+  fn from(reg: Reg) -> Self {
+    Self(reg.to_usize().unwrap())
+  }
 }
