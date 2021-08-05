@@ -185,6 +185,10 @@ impl Location {
       Arg::Imm(_) => None,
     }
   }
+
+  pub fn to_reg(&self) -> Option<Reg> {
+    Reg::from_usize(self.0)
+  }
 }
 
 impl From<Reg> for Location {

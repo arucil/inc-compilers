@@ -16,6 +16,8 @@ num-traits = "0.2.14"
 maplit = "1.0.2"
 petgraph = "0.6.0"
 bimap = "0.6.1"
+bittyset = "0.1.0"
+priority-queue = "1.1.1"
 
 [dev-dependencies]
 insta = "1.7.1"

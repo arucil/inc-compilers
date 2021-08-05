@@ -6,7 +6,7 @@ use std::fmt::{self, Debug, Formatter};
 
 pub struct Info {
   pub locals: IndexSet<IdxVar>,
-  // in bytes
+  /// in bytes
   pub stack_space: usize,
 }
 
