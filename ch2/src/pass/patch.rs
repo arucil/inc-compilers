@@ -1,7 +1,6 @@
-use super::assign::Info;
 use asm::{Arg, Block, Instr, Program, Reg};
 
-pub fn patch_instructions(prog: Program<Info>) -> Program<Info> {
+pub fn patch_instructions<T>(prog: Program<T>) -> Program<T> {
   Program {
     info: prog.info,
     blocks: prog
@@ -21,8 +20,10 @@ fn patch_block(block: Block) -> Block {
         code.push(Instr::Add(Arg::Reg(Reg::Rax), dest));
       }
       Instr::Mov(src @ Arg::Deref(..), dest @ Arg::Deref(..)) => {
-        code.push(Instr::Mov(src, Arg::Reg(Reg::Rax)));
-        code.push(Instr::Mov(Arg::Reg(Reg::Rax), dest));
+        if src != dest {
+          code.push(Instr::Mov(src, Arg::Reg(Reg::Rax)));
+          code.push(Instr::Mov(Arg::Reg(Reg::Rax), dest));
+        }
       }
       instr => {
         code.push(instr);

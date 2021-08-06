@@ -189,6 +189,14 @@ impl Location {
   pub fn to_reg(&self) -> Option<Reg> {
     Reg::from_usize(self.0)
   }
+
+  pub fn to_var(&self) -> Option<Var> {
+    if self.0 >= 16 {
+      Some(Var(self.0 - 16))
+    } else {
+      None
+    }
+  }
 }
 
 impl From<Reg> for Location {

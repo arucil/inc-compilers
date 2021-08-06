@@ -1,7 +1,7 @@
 #![feature(never_type)]
 
 use num_derive::{FromPrimitive, ToPrimitive};
-use std::fmt::{self, Debug, Write, Formatter};
+use std::fmt::{self, Debug, Formatter, Write};
 
 #[derive(Debug, Clone)]
 pub struct Program<INFO = (), VAR = !> {
@@ -29,7 +29,7 @@ pub enum Instr<VAR = !> {
   Syscall,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Arg<VAR = !> {
   Imm(i64),
   Reg(Reg),
@@ -37,7 +37,7 @@ pub enum Arg<VAR = !> {
   Var(VAR),
 }
 
-#[derive(Clone, Copy, FromPrimitive, ToPrimitive)]
+#[derive(Clone, Copy, FromPrimitive, ToPrimitive, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Reg {
   Rsp,
   Rbp,
@@ -116,7 +116,7 @@ impl<VAR: Debug> Debug for Arg<VAR> {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     match self {
       Self::Imm(n) => write!(f, "{}", n),
-      Self::Var(var) => write!(f, "{:?}", var),
+      Self::Var(var) => var.fmt(f),
       Self::Deref(r, i) => {
         if *i > 0 {
           write!(f, "qword [{:?} + {}]", r, i)
@@ -126,13 +126,28 @@ impl<VAR: Debug> Debug for Arg<VAR> {
           write!(f, "qword [{:?} - {}]", r, -i)
         }
       }
-      Self::Reg(r) => write!(f, "{:?}", r),
+      Self::Reg(r) => r.fmt(f),
+    }
+  }
+}
+
+impl Reg {
+  pub fn is_callee_saved(&self) -> bool {
+    match self {
+      Reg::Rsp
+      | Reg::Rbp
+      | Reg::Rbx
+      | Reg::R12
+      | Reg::R13
+      | Reg::R14
+      | Reg::R15 => true,
+      _ => false,
     }
   }
 }
 
 impl Debug for Reg {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     use Reg::*;
     let op = match self {
       Rsp => "rsp",
@@ -152,6 +167,6 @@ impl Debug for Reg {
       R14 => "r14",
       R15 => "r15",
     };
-    write!(f, "{}", op)
+    f.write_str(op)
   }
 }

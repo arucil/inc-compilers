@@ -2,9 +2,10 @@ use super::liveness::Info as OldInfo;
 use crate::location_set::{Location, LocationSet, VarStore};
 use asm::{Block, Instr, Program, Reg};
 use ast::IdxVar;
-use bimap::BiMap;
 use indexmap::{IndexMap, IndexSet};
+use petgraph::dot::{Config, Dot};
 use petgraph::graph::{Graph, NodeIndex, UnGraph};
+use std::fmt::{self, Debug, Formatter};
 
 pub struct Info {
   pub locals: IndexSet<IdxVar>,
@@ -14,7 +15,7 @@ pub struct Info {
 
 pub struct InterferenceGraph {
   pub graph: UnGraph<Location, ()>,
-  pub nodes: BiMap<Location, NodeIndex>,
+  pub nodes: IndexMap<Location, NodeIndex>,
 }
 
 pub fn build_interference(
@@ -47,7 +48,7 @@ fn build_graph(
 ) -> InterferenceGraph {
   let mut graph = InterferenceGraph {
     graph: Graph::new_undirected(),
-    nodes: BiMap::new(),
+    nodes: IndexMap::new(),
   };
   for (i, instr) in block.code.iter().enumerate() {
     add_instr_edges(instr, &live[i + 1], var_store, &mut graph);
@@ -110,7 +111,7 @@ fn add_instr_edges(
 
 impl InterferenceGraph {
   fn get_node(&mut self, loc: Location) -> NodeIndex {
-    if let Some(&node) = self.nodes.get_by_left(&loc) {
+    if let Some(&node) = self.nodes.get(&loc) {
       node
     } else {
       let node = self.graph.add_node(loc);
@@ -126,27 +127,22 @@ impl InterferenceGraph {
   }
 }
 
+impl Debug for Info {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    let graph = self.conflicts["start"]
+      .graph
+      .map(|_, var| var.to_arg(&self.var_store), |_, _| ());
+    Dot::with_config(&graph, &[Config::EdgeNoLabel]).fmt(f)
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
-  use asm::{Block, Arg};
+  use asm::{Arg, Block};
   use ch2::pass::instruction::Info as OldOldInfo;
   use insta::assert_snapshot;
   use maplit::hashmap;
-  use petgraph::dot::{Config, Dot};
-
-  trait ShowConflicts {
-    fn show(&self) -> String;
-  }
-
-  impl ShowConflicts for Program<Info, IdxVar> {
-    fn show(&self) -> String {
-      let graph = self.info.conflicts["start"]
-        .graph
-        .map(|_, var| var.to_arg(&self.info.var_store), |_, _| ());
-      format!("{:?}", Dot::with_config(&graph, &[Config::EdgeNoLabel]))
-    }
-  }
 
   fn var(name: &str) -> Arg<IdxVar> {
     Arg::Var(IdxVar {
@@ -191,7 +187,7 @@ mod tests {
     let prog = super::super::liveness::analyze_liveness(prog, label_live);
     let result = build_interference(prog);
 
-    assert_snapshot!(result.show());
+    assert_snapshot!(format!("{:?}", result.info));
   }
 
   #[test]
@@ -225,6 +221,6 @@ mod tests {
     let prog = super::super::liveness::analyze_liveness(prog, label_live);
     let result = build_interference(prog);
 
-    assert_snapshot!(result.show());
+    assert_snapshot!(format!("{:?}", result.info));
   }
 }

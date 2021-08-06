@@ -260,4 +260,30 @@ mod tests {
 
     assert_snapshot!(result.show());
   }
+
+  #[test]
+  fn epilogue() {
+    use asm::Reg::*;
+    use Arg::*;
+    use Instr::*;
+    let code = vec![
+      Mov(Reg(Rbp), Reg(Rsp)),
+      Pop(Reg(Rbp)),
+      Call("print_int".to_owned(), 0),
+      Call("print_newline".to_owned(), 0),
+      Mov(Imm(60), Reg(Rax)),
+      Mov(Imm(0), Reg(Rdi)),
+      Syscall,
+    ];
+    let label_live = HashMap::new();
+    let prog = Program {
+      info: OldInfo {
+        locals: IndexSet::new(),
+      },
+      blocks: vec![("start".to_owned(), Block { code })],
+    };
+    let result = analyze_liveness(prog, label_live);
+
+    assert_snapshot!(result.show());
+  }
 }
