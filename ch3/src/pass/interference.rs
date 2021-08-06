@@ -1,4 +1,4 @@
-use super::liveness::Info as OldInfo;
+use super::liveness_analysis::Info as OldInfo;
 use crate::location_set::{Location, LocationSet, VarStore};
 use asm::{Block, Instr, Program, Reg};
 use ast::IdxVar;
@@ -140,15 +140,12 @@ impl Debug for Info {
 mod tests {
   use super::*;
   use asm::{Arg, Block};
-  use ch2::pass::instruction::Info as OldOldInfo;
+  use ch2::pass::select_instruction::Info as OldOldInfo;
   use insta::assert_snapshot;
   use maplit::hashmap;
 
   fn var(name: &str) -> Arg<IdxVar> {
-    Arg::Var(IdxVar {
-      name: name.to_owned(),
-      index: 0,
-    })
+    Arg::Var(IdxVar::new(name))
   }
 
   #[test]
@@ -184,7 +181,7 @@ mod tests {
       },
       blocks: vec![("start".to_owned(), Block { code })],
     };
-    let prog = super::super::liveness::analyze_liveness(prog, label_live);
+    let prog = super::super::liveness_analysis::analyze_liveness(prog, label_live);
     let result = build_interference(prog);
 
     assert_snapshot!(format!("{:?}", result.info));
@@ -218,7 +215,29 @@ mod tests {
       },
       blocks: vec![("start".to_owned(), Block { code })],
     };
-    let prog = super::super::liveness::analyze_liveness(prog, label_live);
+    let prog = super::super::liveness_analysis::analyze_liveness(prog, label_live);
+    let result = build_interference(prog);
+
+    assert_snapshot!(format!("{:?}", result.info));
+  }
+
+  #[test]
+  fn mov_same_variables() {
+    use Instr::*;
+    let code = vec![
+      Mov(var("x"), var("t")),
+      Add(var("y"), var("t")),
+      Mov(var("t"), var("z")),
+      Add(var("w"), var("z")),
+    ];
+    let label_live = hashmap! {};
+    let prog = Program {
+      info: OldOldInfo {
+        locals: IndexSet::new(),
+      },
+      blocks: vec![("start".to_owned(), Block { code })],
+    };
+    let prog = super::super::liveness_analysis::analyze_liveness(prog, label_live);
     let result = build_interference(prog);
 
     assert_snapshot!(format!("{:?}", result.info));

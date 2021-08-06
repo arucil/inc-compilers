@@ -1,3 +1,3 @@
-pub mod liveness;
+pub mod liveness_analysis;
 pub mod interference;
-pub mod register;
+pub mod register_allocation;

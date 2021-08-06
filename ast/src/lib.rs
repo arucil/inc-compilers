@@ -37,6 +37,15 @@ pub struct IdxVar {
   pub index: usize,
 }
 
+impl IdxVar {
+  pub fn new<S: ToString>(name: S) -> Self {
+    Self {
+      name: name.to_string(),
+      index: 0,
+    }
+  }
+}
+
 impl Debug for IdxVar {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     write!(f, "{}.{}", self.name, self.index)

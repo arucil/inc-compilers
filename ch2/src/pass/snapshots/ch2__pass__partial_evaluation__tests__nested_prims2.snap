@@ -1,0 +1,6 @@
+---
+source: ch2/src/pass/partial_evaluation.rs
+expression: result.to_string_pretty()
+
+---
+(+ 10 (read))

@@ -9,12 +9,12 @@ pub mod pass;
 pub fn compile(input: &str) -> Result<String, CompileError> {
   use Reg::*;
   let prog = ast::parse(input)?;
-  let prog = ch2::pass::partial::partial_evaluate(prog);
+  let prog = ch2::pass::partial_evaluation::partial_evaluate(prog);
   let prog = ch2::pass::uniquify::uniquify(prog)?;
   let prog = ch2::pass::anf::anf(prog);
-  let prog = ch2::pass::control::explicate_control(prog);
-  let prog = ch2::pass::instruction::select_instruction(prog);
-  let prog = self::pass::liveness::analyze_liveness(
+  let prog = ch2::pass::explicate_control::explicate_control(prog);
+  let prog = ch2::pass::select_instruction::select_instruction(prog);
+  let prog = self::pass::liveness_analysis::analyze_liveness(
     prog,
     hashmap! {
       "conclusion".to_owned() => {
@@ -26,20 +26,20 @@ pub fn compile(input: &str) -> Result<String, CompileError> {
     },
   );
   let prog = self::pass::interference::build_interference(prog);
-  let prog = self::pass::register::allocate_registers(
+  let prog = self::pass::register_allocation::allocate_registers(
     prog,
     &[
       Rbx, Rcx, Rdx, Rsi, Rdi, R8, R9, R10, R11, R12, R13, R14, R15,
     ],
   );
-  let mut prog = ch2::pass::patch::patch_instructions(prog);
+  let mut prog = ch2::pass::patch_instructions::patch_instructions(prog);
   add_prologue(&mut prog);
   add_epilogue(&mut prog);
 
   Ok(prog.to_nasm())
 }
 
-fn add_prologue(prog: &mut Program<self::pass::register::Info>) {
+fn add_prologue(prog: &mut Program<self::pass::register_allocation::Info>) {
   use asm::Reg::*;
   use Arg::*;
   use Instr::*;

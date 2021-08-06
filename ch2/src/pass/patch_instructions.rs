@@ -46,9 +46,9 @@ mod tests {
         .unwrap();
     let prog = super::super::uniquify::uniquify(prog).unwrap();
     let prog = super::super::anf::anf(prog);
-    let prog = super::super::control::explicate_control(prog);
-    let prog = super::super::instruction::select_instruction(prog);
-    let prog = super::super::assign::assign_home(prog);
+    let prog = super::super::explicate_control::explicate_control(prog);
+    let prog = super::super::select_instruction::select_instruction(prog);
+    let prog = super::super::assign_home::assign_home(prog);
     let result = patch_instructions(prog);
     assert_snapshot!(result.to_string_pretty());
   }

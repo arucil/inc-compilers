@@ -7,20 +7,20 @@ pub mod pass;
 
 pub fn compile(input: &str) -> Result<String, CompileError> {
   let prog = ast::parse(input)?;
-  let prog = self::pass::partial::partial_evaluate(prog);
+  let prog = self::pass::partial_evaluation::partial_evaluate(prog);
   let prog = self::pass::uniquify::uniquify(prog)?;
   let prog = self::pass::anf::anf(prog);
-  let prog = self::pass::control::explicate_control(prog);
-  let prog = self::pass::instruction::select_instruction(prog);
-  let prog = self::pass::assign::assign_home(prog);
-  let mut prog = self::pass::patch::patch_instructions(prog);
+  let prog = self::pass::explicate_control::explicate_control(prog);
+  let prog = self::pass::select_instruction::select_instruction(prog);
+  let prog = self::pass::assign_home::assign_home(prog);
+  let mut prog = self::pass::patch_instructions::patch_instructions(prog);
   add_prologue(&mut prog);
   add_epilogue(&mut prog);
 
   Ok(prog.to_nasm())
 }
 
-fn add_prologue(prog: &mut Program<self::pass::assign::Info>) {
+fn add_prologue(prog: &mut Program<self::pass::assign_home::Info>) {
   use asm::Reg::*;
   use Arg::*;
   use Instr::*;
@@ -36,7 +36,7 @@ fn add_prologue(prog: &mut Program<self::pass::assign::Info>) {
   prog.blocks.push(("_start".to_owned(), block));
 }
 
-fn add_epilogue(prog: &mut Program<self::pass::assign::Info>) {
+fn add_epilogue(prog: &mut Program<self::pass::assign_home::Info>) {
   use asm::Reg::*;
   use Arg::*;
   use Instr::*;

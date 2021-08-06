@@ -18,7 +18,7 @@ impl Debug for Info {
 }
 
 pub fn assign_home(
-  prog: Program<super::instruction::Info, IdxVar>,
+  prog: Program<super::select_instruction::Info, IdxVar>,
 ) -> Program<Info> {
   let mut local_spaces = HashMap::new();
   let blocks = prog
@@ -102,8 +102,8 @@ mod tests {
         .unwrap();
     let prog = super::super::uniquify::uniquify(prog).unwrap();
     let prog = super::super::anf::anf(prog);
-    let prog = super::super::control::explicate_control(prog);
-    let prog = super::super::instruction::select_instruction(prog);
+    let prog = super::super::explicate_control::explicate_control(prog);
+    let prog = super::super::select_instruction::select_instruction(prog);
     let result = assign_home(prog);
     assert_snapshot!(result.to_string_pretty());
   }

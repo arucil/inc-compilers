@@ -1,4 +1,4 @@
-use super::control::{CAtom, CExp, CPrim, CProgram, CStmt, CTail};
+use super::explicate_control::{CAtom, CExp, CPrim, CProgram, CStmt, CTail};
 use asm::{Arg, Block, Instr, Program, Reg};
 use ast::IdxVar;
 use indexmap::IndexSet;
@@ -111,7 +111,7 @@ mod tests {
         .unwrap();
     let prog = super::super::uniquify::uniquify(prog).unwrap();
     let prog = super::super::anf::anf(prog);
-    let prog = super::super::control::explicate_control(prog);
+    let prog = super::super::explicate_control::explicate_control(prog);
     let result = select_instruction(prog);
     assert_snapshot!(result.to_string_pretty());
   }

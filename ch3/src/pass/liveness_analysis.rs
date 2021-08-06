@@ -1,7 +1,7 @@
 use crate::location_set::{LocationSet, VarStore};
 use asm::{Arg, Instr, Program};
 use ast::IdxVar;
-use ch2::pass::instruction::Info as OldInfo;
+use ch2::pass::select_instruction::Info as OldInfo;
 use indexmap::{IndexMap, IndexSet};
 use std::collections::HashMap;
 
@@ -153,10 +153,7 @@ mod tests {
   }
 
   fn var(name: &str) -> Arg<IdxVar> {
-    Arg::Var(IdxVar {
-      name: name.to_owned(),
-      index: 0,
-    })
+    Arg::Var(IdxVar::new(name))
   }
 
   #[test]
