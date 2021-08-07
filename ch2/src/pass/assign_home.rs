@@ -1,28 +1,29 @@
-use std::collections::HashMap;
-use std::fmt::{self, Write};
 use asm::{Arg, Block, Instr, Program, Reg};
 use ast::IdxVar;
 use indexmap::IndexSet;
-use support::WritePretty;
+use std::collections::HashMap;
+use std::fmt::{self, Debug, Formatter};
 
 pub struct Info {
   pub locals: IndexSet<IdxVar>,
-  // in bytes
+  /// in bytes
   pub stack_space: usize,
 }
 
-impl WritePretty for Info {
-  fn write(&self, f: &mut impl Write) -> fmt::Result {
+impl Debug for Info {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     writeln!(f, "locals: {:?}", self.locals)?;
     writeln!(f, "stack_space: {} bytes", self.stack_space)
   }
 }
 
 pub fn assign_home(
-  prog: Program<super::instruction::Info, IdxVar>,
+  prog: Program<super::select_instruction::Info, IdxVar>,
 ) -> Program<Info> {
   let mut local_spaces = HashMap::new();
-  let blocks = prog.blocks.into_iter()
+  let blocks = prog
+    .blocks
+    .into_iter()
     .map(|(label, block)| (label, assign_home_block(block, &mut local_spaces)))
     .collect();
   Program {
@@ -38,12 +39,12 @@ fn assign_home_block(
   block: Block<IdxVar>,
   local_spaces: &mut HashMap<IdxVar, usize>,
 ) -> Block {
-  let code = block.code.into_iter()
+  let code = block
+    .code
+    .into_iter()
     .map(|ins| assign_home_instr(ins, local_spaces))
     .collect();
-  Block {
-    code,
-  }
+  Block { code }
 }
 
 fn assign_home_instr(
@@ -57,15 +58,15 @@ fn assign_home_instr(
   };
 
   match instr {
-    Instr::Addq(src, dest) => binary(src, dest, Instr::Addq),
-    Instr::Callq(label, n) => Instr::Callq(label, n),
+    Instr::Add(src, dest) => binary(src, dest, Instr::Add),
+    Instr::Call(label, n) => Instr::Call(label, n),
     Instr::Jmp(label) => Instr::Jmp(label),
-    Instr::Movq(src, dest) => binary(src, dest, Instr::Movq),
-    Instr::Negq(dest) => Instr::Negq(assign_home_arg(dest, local_spaces)),
-    Instr::Popq(dest) => Instr::Popq(assign_home_arg(dest, local_spaces)),
-    Instr::Pushq(src) => Instr::Pushq(assign_home_arg(src, local_spaces)),
-    Instr::Retq => Instr::Retq,
-    instr => unimplemented!("{:?}", instr)
+    Instr::Mov(src, dest) => binary(src, dest, Instr::Mov),
+    Instr::Neg(dest) => Instr::Neg(assign_home_arg(dest, local_spaces)),
+    Instr::Pop(dest) => Instr::Pop(assign_home_arg(dest, local_spaces)),
+    Instr::Push(src) => Instr::Push(assign_home_arg(src, local_spaces)),
+    Instr::Ret => Instr::Ret,
+    instr => unimplemented!("{:?}", instr),
   }
 }
 
@@ -96,11 +97,13 @@ mod tests {
 
   #[test]
   fn nested_prims() {
-    let prog = parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#).unwrap();
+    let prog =
+      parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#)
+        .unwrap();
     let prog = super::super::uniquify::uniquify(prog).unwrap();
     let prog = super::super::anf::anf(prog);
-    let prog = super::super::control::explicate_control(prog);
-    let prog = super::super::instruction::select_instruction(prog);
+    let prog = super::super::explicate_control::explicate_control(prog);
+    let prog = super::super::select_instruction::select_instruction(prog);
     let result = assign_home(prog);
     assert_snapshot!(result.to_string_pretty());
   }

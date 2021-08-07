@@ -1,0 +1,40 @@
+---
+source: ch2/src/lib.rs
+expression: prog
+
+---
+extern read_int, print_int, print_newline
+section .text
+
+start:
+    call read_int
+    mov qword [rbp - 8], rax
+    mov qword [rbp - 16], 5
+    call read_int
+    mov qword [rbp - 24], rax
+    mov rax, qword [rbp - 24]
+    mov qword [rbp - 32], rax
+    neg qword [rbp - 32]
+    mov qword [rbp - 40], -2
+    mov rax, qword [rbp - 16]
+    add qword [rbp - 40], rax
+    mov rax, qword [rbp - 32]
+    add rax, qword [rbp - 40]
+    jmp conclusion
+
+    global _start
+_start:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 48
+    jmp start
+
+conclusion:
+    mov rsp, rbp
+    pop rbp
+    call print_int
+    call print_newline
+    mov rax, 60
+    mov rdi, 0
+    syscall
+

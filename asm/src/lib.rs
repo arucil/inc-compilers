@@ -1,44 +1,43 @@
 #![feature(never_type)]
 
-use num_derive::FromPrimitive;
-use std::fmt::{self, Debug, Write};
-use support::WritePretty;
+use num_derive::{FromPrimitive, ToPrimitive};
+use std::fmt::{self, Debug, Formatter, Write};
 
 #[derive(Debug, Clone)]
-pub struct Program<INFO=(),VAR=!> {
+pub struct Program<INFO = (), VAR = !> {
   pub info: INFO,
   pub blocks: Vec<(String, Block<VAR>)>,
 }
 
-#[derive(Debug, Clone)]
-pub struct Block<VAR=!> {
+#[derive(Clone)]
+pub struct Block<VAR = !> {
   pub code: Vec<Instr<VAR>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 #[non_exhaustive]
-pub enum Instr<VAR=!> {
-  Addq(Arg<VAR>, Arg<VAR>),
-  Subq(Arg<VAR>, Arg<VAR>),
-  Movq(Arg<VAR>, Arg<VAR>),
-  Negq(Arg<VAR>),
-  Callq(String, usize),
-  Retq,
-  Pushq(Arg<VAR>),
-  Popq(Arg<VAR>),
+pub enum Instr<VAR = !> {
+  Add(Arg<VAR>, Arg<VAR>),
+  Sub(Arg<VAR>, Arg<VAR>),
+  Mov(Arg<VAR>, Arg<VAR>),
+  Neg(Arg<VAR>),
+  Call(String, usize),
+  Ret,
+  Push(Arg<VAR>),
+  Pop(Arg<VAR>),
   Jmp(String),
   Syscall,
 }
 
-#[derive(Debug, Clone)]
-pub enum Arg<VAR=!> {
+#[derive(Clone, PartialEq, Eq)]
+pub enum Arg<VAR = !> {
   Imm(i64),
   Reg(Reg),
   Deref(Reg, i32),
   Var(VAR),
 }
 
-#[derive(Clone, FromPrimitive)]
+#[derive(Clone, Copy, FromPrimitive, ToPrimitive, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Reg {
   Rsp,
   Rbp,
@@ -58,90 +57,66 @@ pub enum Reg {
   R15,
 }
 
-impl<INFO: WritePretty, VAR: Debug> Program<INFO, VAR> {
+impl<INFO: Debug, VAR: Debug> Program<INFO, VAR> {
   pub fn to_string_pretty(&self) -> String {
-    let mut buf = String::new();
-    self.info.write(&mut buf).unwrap();
+    let mut buf = format!("{:?}", self.info);
     for (label, block) in &self.blocks {
       writeln!(&mut buf, "{}:", label).unwrap();
-      block.write(&mut buf).unwrap();
+      buf += &format!("{:?}", block);
     }
     buf
   }
 
   pub fn to_nasm(&self) -> String {
-    let mut buf = format!("extern read_int, print_int, print_newline\n\
-      section .text\n");
+    let mut buf = format!(
+      "extern read_int, print_int, print_newline\n\
+      section .text\n"
+    );
     for (label, block) in &self.blocks {
       buf += "\n";
       if label == "_start" {
         buf += "    global _start\n";
       }
       writeln!(&mut buf, "{}:", label).unwrap();
-      block.write(&mut buf).unwrap();
+      buf += &format!("{:?}", block);
     }
     buf
   }
 }
 
-impl<VAR: Debug> WritePretty for Block<VAR> {
-  fn write(&self, f: &mut impl Write) -> fmt::Result {
+impl<VAR: Debug> Debug for Block<VAR> {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     for instr in &self.code {
       write!(f, "    ")?;
-      instr.write(f)?;
+      instr.fmt(f)?;
       writeln!(f)?;
     }
     Ok(())
   }
 }
 
-impl<VAR: Debug> WritePretty for Instr<VAR> {
-  fn write(&self, f: &mut impl Write) -> fmt::Result {
+impl<VAR: Debug> Debug for Instr<VAR> {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     match self {
-      Self::Addq(src, dest) => self.write_binary(f, "add", dest, src),
-      Self::Movq(src, dest) => self.write_binary(f, "mov", dest, src),
-      Self::Callq(label, _) => write!(f, "call {}", label),
+      Self::Add(src, dest) => write!(f, "add {:?}, {:?}", dest, src),
+      Self::Mov(src, dest) => write!(f, "mov {:?}, {:?}", dest, src),
+      Self::Call(label, _) => write!(f, "call {}", label),
       Self::Jmp(label) => write!(f, "jmp {}", label),
-      Self::Negq(dest) => self.write_unary(f, "neg", dest),
-      Self::Popq(dest) => self.write_unary(f, "pop", dest),
-      Self::Pushq(src) => self.write_unary(f, "push", src),
-      Self::Retq => write!(f, "ret"),
-      Self::Subq(src, dest) => self.write_binary(f, "sub", dest, src),
+      Self::Neg(dest) => write!(f, "neg {:?}", dest),
+      Self::Pop(dest) => write!(f, "pop {:?}", dest),
+      Self::Push(src) => write!(f, "push {:?}", src),
+      Self::Ret => write!(f, "ret"),
+      Self::Sub(src, dest) => write!(f, "sub {:?}, {:?}", dest, src),
       Self::Syscall => write!(f, "syscall"),
     }
   }
 }
 
-impl<VAR: Debug> Instr<VAR> {
-  fn write_unary(
-    &self,
-    f: &mut impl Write,
-    op: &str,
-    arg: &Arg<VAR>,
-  ) -> fmt::Result {
-    write!(f, "{} ", op)?;
-    arg.write(f)
-  }
-
-  fn write_binary(
-    &self,
-    f: &mut impl Write,
-    op: &str,
-    arg1: &Arg<VAR>,
-    arg2: &Arg<VAR>,
-  ) -> fmt::Result {
-    write!(f, "{} ", op)?;
-    arg1.write(f)?;
-    write!(f, ", ")?;
-    arg2.write(f)
-  }
-}
-
-impl<VAR: Debug> WritePretty for Arg<VAR> {
-  fn write(&self, f: &mut impl Write) -> fmt::Result {
+impl<VAR: Debug> Debug for Arg<VAR> {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     match self {
       Self::Imm(n) => write!(f, "{}", n),
-      Self::Var(var) => write!(f, "{:?}", var),
+      Self::Var(var) => var.fmt(f),
       Self::Deref(r, i) => {
         if *i > 0 {
           write!(f, "qword [{:?} + {}]", r, i)
@@ -151,13 +126,28 @@ impl<VAR: Debug> WritePretty for Arg<VAR> {
           write!(f, "qword [{:?} - {}]", r, -i)
         }
       }
-      Self::Reg(r) => write!(f, "{:?}", r),
+      Self::Reg(r) => r.fmt(f),
+    }
+  }
+}
+
+impl Reg {
+  pub fn is_callee_saved(&self) -> bool {
+    match self {
+      Reg::Rsp
+      | Reg::Rbp
+      | Reg::Rbx
+      | Reg::R12
+      | Reg::R13
+      | Reg::R14
+      | Reg::R15 => true,
+      _ => false,
     }
   }
 }
 
 impl Debug for Reg {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     use Reg::*;
     let op = match self {
       Rsp => "rsp",
@@ -177,6 +167,6 @@ impl Debug for Reg {
       R14 => "r14",
       R15 => "r15",
     };
-    write!(f, "{}", op)
+    f.write_str(op)
   }
 }

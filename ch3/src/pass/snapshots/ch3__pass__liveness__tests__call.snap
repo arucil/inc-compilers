@@ -1,0 +1,21 @@
+---
+source: ch3/src/pass/liveness.rs
+expression: result.show()
+
+---
+                {rsp, rbx, rdx, x.0}
+pop rdi
+                {rsp, rbx, rdx, rdi, x.0}
+pop rsi
+                {rsp, rbx, rdx, rsi, rdi, x.0}
+push x.0
+                {rsp, rbx, rdx, rsi, rdi}
+mov w.0, rbx
+                {rsp, rdx, rsi, rdi, w.0}
+call foo
+                {rsp, rax, w.0}
+add w.0, rax
+                {rsp, rax}
+jmp conclusion
+                {}
+

@@ -1,0 +1,24 @@
+---
+source: ch2/src/pass/select_instruction.rs
+expression: result.to_string_pretty()
+
+---
+locals: {x.0, y.1, tmp.0, tmp.1, tmp.2, tmp.3}
+
+start:
+    call read_int
+    mov x.0, rax
+    mov y.1, 2
+    add y.1, 3
+    call read_int
+    mov tmp.0, rax
+    mov tmp.1, tmp.0
+    neg tmp.1
+    mov tmp.2, 2
+    neg tmp.2
+    mov tmp.3, y.1
+    add tmp.3, tmp.2
+    mov rax, tmp.1
+    add rax, tmp.3
+    jmp conclusion
+

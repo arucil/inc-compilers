@@ -1,16 +1,15 @@
-use super::control::{CExp, CProgram, CStmt, CTail, CAtom, CPrim};
+use super::explicate_control::{CAtom, CExp, CPrim, CProgram, CStmt, CTail};
+use asm::{Arg, Block, Instr, Program, Reg};
 use ast::IdxVar;
-use asm::{Program, Block, Instr, Arg, Reg};
 use indexmap::IndexSet;
-use support::WritePretty;
-use std::fmt::{self, Write};
+use std::fmt::{self, Debug, Formatter};
 
 pub struct Info {
   pub locals: IndexSet<IdxVar>,
 }
 
-impl WritePretty for Info {
-  fn write(&self, f: &mut impl Write) -> fmt::Result {
+impl Debug for Info {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     writeln!(f, "locals: {:?}\n", self.locals)
   }
 }
@@ -20,24 +19,21 @@ pub fn select_instruction(prog: CProgram) -> Program<Info, IdxVar> {
     info: Info {
       locals: prog.info.locals,
     },
-    blocks: prog.body.into_iter()
+    blocks: prog
+      .body
+      .into_iter()
       .map(|(label, tail)| (label, tail_block(tail)))
-      .collect()
+      .collect(),
   }
 }
 
 fn tail_block(tail: CTail) -> Block<IdxVar> {
   let mut code = vec![];
   tail_instructions(tail, &mut code);
-  Block {
-    code,
-  }
+  Block { code }
 }
 
-fn tail_instructions(
-  mut tail: CTail,
-  code: &mut Vec<Instr<IdxVar>>,
-) {
+fn tail_instructions(mut tail: CTail, code: &mut Vec<Instr<IdxVar>>) {
   loop {
     match tail {
       CTail::Return(exp) => {
@@ -53,10 +49,7 @@ fn tail_instructions(
   }
 }
 
-fn stmt_instructions(
-  stmt: CStmt,
-  code: &mut Vec<Instr<IdxVar>>,
-) {
+fn stmt_instructions(stmt: CStmt, code: &mut Vec<Instr<IdxVar>>) {
   match stmt {
     CStmt::Assign { var, exp } => exp_instructions(Arg::Var(var), exp, code),
   }
@@ -72,12 +65,12 @@ fn exp_instructions(
       atom_instructions(target, atom, code);
     }
     CExp::Prim(CPrim::Read) => {
-      code.push(Instr::Callq("read_int".to_owned(), 0));
-      code.push(Instr::Movq(Arg::Reg(Reg::Rax), target));
+      code.push(Instr::Call("read_int".to_owned(), 0));
+      code.push(Instr::Mov(Arg::Reg(Reg::Rax), target));
     }
     CExp::Prim(CPrim::Neg(atom)) => {
       atom_instructions(target.clone(), atom, code);
-      code.push(Instr::Negq(target));
+      code.push(Instr::Neg(target));
     }
     CExp::Prim(CPrim::Add(atom1, atom2)) => {
       atom_instructions(target.clone(), atom1, code);
@@ -85,7 +78,7 @@ fn exp_instructions(
         CAtom::Int(n) => Arg::Imm(n),
         CAtom::Var(var) => Arg::Var(var),
       };
-      code.push(Instr::Addq(arg, target));
+      code.push(Instr::Add(arg, target));
     }
   }
 }
@@ -97,10 +90,10 @@ fn atom_instructions(
 ) {
   match atom {
     CAtom::Int(n) => {
-      code.push(Instr::Movq(Arg::Imm(n), target));
+      code.push(Instr::Mov(Arg::Imm(n), target));
     }
     CAtom::Var(var) => {
-      code.push(Instr::Movq(Arg::Var(var), target));
+      code.push(Instr::Mov(Arg::Var(var), target));
     }
   }
 }
@@ -113,10 +106,12 @@ mod tests {
 
   #[test]
   fn nested_prims() {
-    let prog = parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#).unwrap();
+    let prog =
+      parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#)
+        .unwrap();
     let prog = super::super::uniquify::uniquify(prog).unwrap();
     let prog = super::super::anf::anf(prog);
-    let prog = super::super::control::explicate_control(prog);
+    let prog = super::super::explicate_control::explicate_control(prog);
     let result = select_instruction(prog);
     assert_snapshot!(result.to_string_pretty());
   }

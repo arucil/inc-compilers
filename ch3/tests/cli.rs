@@ -1,15 +1,19 @@
 use assert_cmd::Command;
 use scopeguard::defer;
 use std::fs;
-use std::ffi;
 
 #[test]
 fn nested_prims() {
   test_program("nested_prims");
 }
 
+#[test]
+fn spilled() {
+  test_program("spilled");
+}
+
 fn test_program(prog: &str) {
-  let mut cmd = Command::cargo_bin("ch2").unwrap();
+  let mut cmd = Command::cargo_bin("ch3").unwrap();
   cmd.arg(format!("tests/fixtures/{}.prog", prog));
   cmd.assert().success();
 
@@ -34,7 +38,7 @@ fn test_program(prog: &str) {
     .stdout(predicates::str::diff(output));
 }
 
-fn run_nasm<S: AsRef<ffi::OsStr>>(file: S) {
+fn run_nasm(file: &str) {
   Command::new("nasm")
     .arg("-f")
     .arg("elf64")

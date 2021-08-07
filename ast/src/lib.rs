@@ -9,15 +9,14 @@ pub mod parser;
 
 pub use parser::{parse, Result};
 
-
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Program<VAR=String> {
+pub struct Program<VAR = String> {
   pub body: Vec<(Range, Exp<VAR>)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum Exp<VAR=String> {
+pub enum Exp<VAR = String> {
   Int(i64),
   Prim {
     op: (Range, &'static str),
@@ -29,13 +28,22 @@ pub enum Exp<VAR=String> {
     var: (Range, VAR),
     init: Box<(Range, Exp<VAR>)>,
     body: Box<(Range, Exp<VAR>)>,
-  }
+  },
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct IdxVar {
   pub name: String,
   pub index: usize,
+}
+
+impl IdxVar {
+  pub fn new<S: ToString>(name: S) -> Self {
+    Self {
+      name: name.to_string(),
+      index: 0,
+    }
+  }
 }
 
 impl Debug for IdxVar {
@@ -53,7 +61,10 @@ impl<VAR: Debug> Program<VAR> {
   }
 
   fn to_doc(&self) -> RcDoc {
-    RcDoc::intersperse(self.body.iter().map(|(_, exp)| exp.to_doc()), Doc::line())
+    RcDoc::intersperse(
+      self.body.iter().map(|(_, exp)| exp.to_doc()),
+      Doc::line(),
+    )
   }
 }
 
@@ -63,35 +74,38 @@ impl<VAR: Debug> Exp<VAR> {
       Exp::Int(n) => RcDoc::text(format!("{}", n)),
       Exp::Str(s) => RcDoc::text(format!("{:?}", s)),
       Exp::Var(var) => RcDoc::text(format!("{:?}", var)),
-      Exp::Prim { op, args } => {
-        RcDoc::text("(")
-          .append(
-            RcDoc::intersperse(
-              iter::once(RcDoc::text(op.1))
-                .chain(args.iter().map(|(_, arg)| arg.to_doc())),
-              Doc::line())
+      Exp::Prim { op, args } => RcDoc::text("(")
+        .append(
+          RcDoc::intersperse(
+            iter::once(RcDoc::text(op.1))
+              .chain(args.iter().map(|(_, arg)| arg.to_doc())),
+            Doc::line(),
+          )
+          .nest(1)
+          .group(),
+        )
+        .append(RcDoc::text(")")),
+      Exp::Let { var, init, body } => RcDoc::text("(")
+        .append(
+          RcDoc::text("let")
+            .append(Doc::line())
+            .append(
+              RcDoc::text("[")
+                .append(
+                  RcDoc::text(format!("{:?}", var.1))
+                    .append(Doc::line())
+                    .append(init.1.to_doc())
+                    .nest(1)
+                    .group(),
+                )
+                .append(RcDoc::text("]")),
+            )
+            .append(Doc::line())
+            .append(body.1.to_doc())
             .nest(1)
-            .group())
-          .append(RcDoc::text(")"))
-      }
-      Exp::Let { var, init, body } => {
-        RcDoc::text("(")
-          .append(
-            RcDoc::text("let")
-              .append(Doc::line())
-              .append(RcDoc::text("[")
-                .append(RcDoc::text(format!("{:?}", var.1))
-                  .append(Doc::line())
-                  .append(init.1.to_doc())
-                  .nest(1)
-                  .group())
-                .append(RcDoc::text("]")))
-              .append(Doc::line())
-              .append(body.1.to_doc())
-              .nest(1)
-              .group())
-          .append(RcDoc::text(")"))
-      }
+            .group(),
+        )
+        .append(RcDoc::text(")")),
     }
   }
 }

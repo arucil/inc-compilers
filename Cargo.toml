@@ -2,6 +2,7 @@
 [workspace]
 members = [
     "ch2",
+    "ch3",
     "ast",
     "asm",
     "support"

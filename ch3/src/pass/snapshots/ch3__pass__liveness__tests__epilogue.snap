@@ -1,0 +1,21 @@
+---
+source: ch3/src/pass/liveness.rs
+expression: result.show()
+
+---
+                {rbp}
+mov rsp, rbp
+                {}
+pop rbp
+                {}
+call print_int
+                {}
+call print_newline
+                {}
+mov rax, 60
+                {}
+mov rdi, 0
+                {}
+syscall
+                {}
+

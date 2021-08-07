@@ -1,7 +1,7 @@
-pub mod partial;
-pub mod uniquify;
 pub mod anf;
-pub mod control;
-pub mod instruction;
-pub mod assign;
-pub mod patch;
+pub mod assign_home;
+pub mod explicate_control;
+pub mod select_instruction;
+pub mod partial_evaluation;
+pub mod patch_instructions;
+pub mod uniquify;
