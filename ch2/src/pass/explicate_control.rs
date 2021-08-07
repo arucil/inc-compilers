@@ -1,6 +1,6 @@
 use ast::{Exp, IdxVar, Program};
 use indexmap::IndexSet;
-use std::fmt::{self, Write, Debug, Formatter};
+use std::fmt::{self, Debug, Formatter, Write};
 use support::Range;
 
 pub struct CProgram {

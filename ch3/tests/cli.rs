@@ -21,14 +21,18 @@ fn test_program(prog: &str) {
   run_nasm("../runtime/runtime.asm");
   run_ld(
     prog,
-    &["../runtime/runtime.o", &format!("tests/fixtures/{}.o", prog)],
+    &[
+      "../runtime/runtime.o",
+      &format!("tests/fixtures/{}.o", prog),
+    ],
   );
 
   defer! {
     fs::remove_file(prog).unwrap();
   }
 
-  let input = fs::read_to_string(format!("tests/fixtures/{}.input", prog)).unwrap();
+  let input =
+    fs::read_to_string(format!("tests/fixtures/{}.input", prog)).unwrap();
   let output =
     fs::read_to_string(format!("tests/fixtures/{}.output", prog)).unwrap();
   Command::new(prog)

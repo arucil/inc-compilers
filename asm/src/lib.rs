@@ -37,7 +37,9 @@ pub enum Arg<VAR = !> {
   Var(VAR),
 }
 
-#[derive(Clone, Copy, FromPrimitive, ToPrimitive, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+  Clone, Copy, FromPrimitive, ToPrimitive, PartialEq, Eq, PartialOrd, Ord, Hash,
+)]
 pub enum Reg {
   Rsp,
   Rbp,

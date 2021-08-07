@@ -181,7 +181,8 @@ mod tests {
       },
       blocks: vec![("start".to_owned(), Block { code })],
     };
-    let prog = super::super::liveness_analysis::analyze_liveness(prog, label_live);
+    let prog =
+      super::super::liveness_analysis::analyze_liveness(prog, label_live);
     let result = build_interference(prog);
 
     assert_snapshot!(format!("{:?}", result.info));
@@ -215,7 +216,8 @@ mod tests {
       },
       blocks: vec![("start".to_owned(), Block { code })],
     };
-    let prog = super::super::liveness_analysis::analyze_liveness(prog, label_live);
+    let prog =
+      super::super::liveness_analysis::analyze_liveness(prog, label_live);
     let result = build_interference(prog);
 
     assert_snapshot!(format!("{:?}", result.info));
@@ -237,7 +239,8 @@ mod tests {
       },
       blocks: vec![("start".to_owned(), Block { code })],
     };
-    let prog = super::super::liveness_analysis::analyze_liveness(prog, label_live);
+    let prog =
+      super::super::liveness_analysis::analyze_liveness(prog, label_live);
     let result = build_interference(prog);
 
     assert_snapshot!(format!("{:?}", result.info));

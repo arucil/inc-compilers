@@ -61,12 +61,15 @@ mod tests {
 
   #[test]
   fn nested_prims() {
-    let prog = compile(r#"
+    let prog = compile(
+      r#"
 (let
   ([x (read)]
    [y (+ 2 3)])
   (+ (- (read)) (+ y (- 2))))
-    "#).unwrap();
+    "#,
+    )
+    .unwrap();
     assert_snapshot!(prog);
   }
 }

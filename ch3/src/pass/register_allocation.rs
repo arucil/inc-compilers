@@ -294,7 +294,8 @@ mod tests {
       },
       blocks: vec![("start".to_owned(), Block { code })],
     };
-    let prog = super::super::liveness_analysis::analyze_liveness(prog, label_live);
+    let prog =
+      super::super::liveness_analysis::analyze_liveness(prog, label_live);
     let prog = super::super::interference::build_interference(prog);
     let result = allocate_registers(prog, &[Rcx]);
 
@@ -329,7 +330,8 @@ mod tests {
       },
       blocks: vec![("start".to_owned(), Block { code })],
     };
-    let prog = super::super::liveness_analysis::analyze_liveness(prog, label_live);
+    let prog =
+      super::super::liveness_analysis::analyze_liveness(prog, label_live);
     let prog = super::super::interference::build_interference(prog);
     let result = allocate_registers(prog, &[Rdx, Rdi, Rsi, R8, R12]);
 
@@ -364,7 +366,8 @@ mod tests {
       },
       blocks: vec![("start".to_owned(), Block { code })],
     };
-    let prog = super::super::liveness_analysis::analyze_liveness(prog, label_live);
+    let prog =
+      super::super::liveness_analysis::analyze_liveness(prog, label_live);
     let prog = super::super::interference::build_interference(prog);
     let result = allocate_registers(prog, &[Rdx, Rdi, Rsi, R8]);
 
@@ -398,7 +401,8 @@ mod tests {
       },
       blocks: vec![("start".to_owned(), Block { code })],
     };
-    let prog = super::super::liveness_analysis::analyze_liveness(prog, label_live);
+    let prog =
+      super::super::liveness_analysis::analyze_liveness(prog, label_live);
     let prog = super::super::interference::build_interference(prog);
     let result = allocate_registers(prog, &[Rdx, Rdi, Rsi, R8]);
 
