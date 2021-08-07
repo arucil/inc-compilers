@@ -11,6 +11,7 @@ pub struct Program<INFO = (), VAR = !> {
 
 #[derive(Clone)]
 pub struct Block<VAR = !> {
+  pub global: bool,
   pub code: Vec<Instr<VAR>>,
 }
 
@@ -76,8 +77,10 @@ impl<INFO: Debug, VAR: Debug> Program<INFO, VAR> {
     );
     for (label, block) in &self.blocks {
       buf += "\n";
-      if label == "_start" {
-        buf += "    global _start\n";
+      if block.global {
+        buf += "    global ";
+        buf += label;
+        buf += "\n";
       }
       writeln!(&mut buf, "{}:", label).unwrap();
       buf += &format!("{:?}", block);

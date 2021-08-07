@@ -1,21 +1,17 @@
 use super::liveness_analysis::Info as OldInfo;
+use crate::location_graph::LocationGraph;
 use crate::location_set::{Location, LocationSet, VarStore};
 use asm::{Block, Instr, Program, Reg};
 use ast::IdxVar;
 use indexmap::{IndexMap, IndexSet};
 use petgraph::dot::{Config, Dot};
-use petgraph::graph::{Graph, NodeIndex, UnGraph};
 use std::fmt::{self, Debug, Formatter};
 
 pub struct Info {
   pub locals: IndexSet<IdxVar>,
-  pub conflicts: IndexMap<String, InterferenceGraph>,
+  pub conflicts: IndexMap<String, LocationGraph>,
+  pub moves: IndexMap<String, LocationGraph>,
   pub var_store: VarStore,
-}
-
-pub struct InterferenceGraph {
-  pub graph: UnGraph<Location, ()>,
-  pub nodes: IndexMap<Location, NodeIndex>,
 }
 
 pub fn build_interference(
@@ -35,6 +31,7 @@ pub fn build_interference(
     info: Info {
       locals: prog.info.locals,
       conflicts,
+      moves: IndexMap::new(),
       var_store: prog.info.var_store,
     },
     blocks: prog.blocks,
@@ -45,11 +42,8 @@ fn build_graph(
   block: &Block<IdxVar>,
   live: &[LocationSet],
   var_store: &mut VarStore,
-) -> InterferenceGraph {
-  let mut graph = InterferenceGraph {
-    graph: Graph::new_undirected(),
-    nodes: IndexMap::new(),
-  };
+) -> LocationGraph {
+  let mut graph = LocationGraph::new();
   for (i, instr) in block.code.iter().enumerate() {
     add_instr_edges(instr, &live[i + 1], var_store, &mut graph);
   }
@@ -60,13 +54,13 @@ fn add_instr_edges(
   instr: &Instr<IdxVar>,
   after: &LocationSet,
   var_store: &mut VarStore,
-  graph: &mut InterferenceGraph,
+  graph: &mut LocationGraph,
 ) {
   let mut add = |write_loc: Location| {
-    let write_loc_node = graph.get_node(write_loc);
+    let write_loc_node = graph.insert_node(write_loc);
     for after_loc in after {
       if after_loc != write_loc {
-        let after_loc_node = graph.get_node(after_loc);
+        let after_loc_node = graph.insert_node(after_loc);
         graph.add_edge(write_loc_node, after_loc_node);
       }
     }
@@ -95,10 +89,10 @@ fn add_instr_edges(
     Instr::Mov(src, dest) => {
       if let Some(dest_loc) = Location::from_arg(dest.clone(), var_store) {
         let src_loc = Location::from_arg(src.clone(), var_store);
-        let dest_loc_node = graph.get_node(dest_loc);
+        let dest_loc_node = graph.insert_node(dest_loc);
         for after_loc in after {
           if after_loc != dest_loc && Some(after_loc) != src_loc {
-            let after_loc_node = graph.get_node(after_loc);
+            let after_loc_node = graph.insert_node(after_loc);
             graph.add_edge(dest_loc_node, after_loc_node);
           }
         }
@@ -106,24 +100,6 @@ fn add_instr_edges(
     }
     Instr::Push(_) | Instr::Ret | Instr::Syscall | Instr::Jmp(_) => {}
     _ => {}
-  }
-}
-
-impl InterferenceGraph {
-  fn get_node(&mut self, loc: Location) -> NodeIndex {
-    if let Some(&node) = self.nodes.get(&loc) {
-      node
-    } else {
-      let node = self.graph.add_node(loc);
-      self.nodes.insert(loc, node);
-      node
-    }
-  }
-
-  fn add_edge(&mut self, n1: NodeIndex, n2: NodeIndex) {
-    if !self.graph.contains_edge(n1, n2) {
-      self.graph.add_edge(n1, n2, ());
-    }
   }
 }
 
@@ -179,7 +155,7 @@ mod tests {
       info: OldOldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![("start".to_owned(), Block { code })],
+      blocks: vec![("start".to_owned(), Block { global: false, code })],
     };
     let prog =
       super::super::liveness_analysis::analyze_liveness(prog, label_live);
@@ -214,7 +190,7 @@ mod tests {
       info: OldOldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![("start".to_owned(), Block { code })],
+      blocks: vec![("start".to_owned(), Block { global: false, code })],
     };
     let prog =
       super::super::liveness_analysis::analyze_liveness(prog, label_live);
@@ -237,7 +213,7 @@ mod tests {
       info: OldOldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![("start".to_owned(), Block { code })],
+      blocks: vec![("start".to_owned(), Block { global: false, code })],
     };
     let prog =
       super::super::liveness_analysis::analyze_liveness(prog, label_live);

@@ -30,7 +30,7 @@ fn patch_block(block: Block) -> Block {
       }
     }
   }
-  Block { code }
+  Block { global: block.global, code }
 }
 
 #[cfg(test)]

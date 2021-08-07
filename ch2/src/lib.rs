@@ -26,6 +26,7 @@ fn add_prologue(prog: &mut Program<self::pass::assign_home::Info>) {
   use Instr::*;
   let stack_space = (prog.info.stack_space + 15) & !15;
   let block = Block {
+    global: true,
     code: vec![
       Push(Reg(Rbp)),
       Mov(Reg(Rsp), Reg(Rbp)),
@@ -41,6 +42,7 @@ fn add_epilogue(prog: &mut Program<self::pass::assign_home::Info>) {
   use Arg::*;
   use Instr::*;
   let block = Block {
+    global: false,
     code: vec![
       Mov(Reg(Rbp), Reg(Rsp)),
       Pop(Reg(Rbp)),

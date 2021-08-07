@@ -44,7 +44,7 @@ fn assign_home_block(
     .into_iter()
     .map(|ins| assign_home_instr(ins, local_spaces))
     .collect();
-  Block { code }
+  Block { global: block.global, code }
 }
 
 fn assign_home_instr(

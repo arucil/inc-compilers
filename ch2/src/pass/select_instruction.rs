@@ -30,7 +30,7 @@ pub fn select_instruction(prog: CProgram) -> Program<Info, IdxVar> {
 fn tail_block(tail: CTail) -> Block<IdxVar> {
   let mut code = vec![];
   tail_instructions(tail, &mut code);
-  Block { code }
+  Block { global: false, code }
 }
 
 fn tail_instructions(mut tail: CTail, code: &mut Vec<Instr<IdxVar>>) {

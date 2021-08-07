@@ -1,0 +1,22 @@
+---
+source: ch3/src/pass/register_allocation.rs
+expression: result.to_string_pretty()
+
+---
+locals: {}
+used_callee_saved_regs: {}
+stack_space: 0 bytes
+start:
+    mov rcx, 1
+    mov rsi, 42
+    mov rcx, rcx
+    add rcx, 7
+    mov rcx, rcx
+    mov rdx, rcx
+    add rdx, rsi
+    mov rcx, rcx
+    neg rcx
+    mov rax, rdx
+    add rax, rcx
+    jmp conclusion
+

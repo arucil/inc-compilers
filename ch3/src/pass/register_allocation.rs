@@ -1,4 +1,5 @@
-use super::interference::{Info as OldInfo, InterferenceGraph};
+use super::interference::Info as OldInfo;
+use crate::location_graph::LocationGraph;
 use crate::location_set::{Location, Var, VarStore};
 use asm::{Arg, Block, Instr, Program, Reg};
 use ast::IdxVar;
@@ -7,7 +8,7 @@ use num_traits::ToPrimitive;
 use petgraph::graph::NodeIndex;
 use priority_queue::PriorityQueue;
 use std::cmp::Ordering;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::{self, Debug, Formatter};
 
 pub struct Info {
@@ -40,6 +41,7 @@ pub fn allocate_registers(
     .collect();
   let mut var_store = prog.info.var_store;
   let conflicts = prog.info.conflicts;
+  let moves = prog.info.moves;
   let locals: Vec<_> = prog
     .info
     .locals
@@ -48,17 +50,20 @@ pub fn allocate_registers(
     .collect();
   let mut max_locals = 0;
   let mut used_callee_saved_regs = IndexSet::new();
+  let tmp_moves = LocationGraph::new();
 
   let blocks = prog
     .blocks
     .into_iter()
     .map(|(label, block)| {
       let conflicts = &conflicts[&label];
+      let moves = moves.get(&label).unwrap_or(&tmp_moves);
       let (block, locals) = allocate_registers_block(
         block,
         &locals,
         &mut var_store,
         conflicts,
+        moves,
         &reg_colors,
         available_regs,
         &mut used_callee_saved_regs,
@@ -84,13 +89,13 @@ fn allocate_registers_block(
   block: Block<IdxVar>,
   locals: &[Var],
   var_store: &mut VarStore,
-  conflicts: &InterferenceGraph,
+  conflicts: &LocationGraph,
+  moves: &LocationGraph,
   reg_colors: &HashMap<Reg, i32>,
   available_regs: &[Reg],
   used_callee_saved_regs: &mut IndexSet<Reg>,
 ) -> (Block, usize) {
-  let var_colors = color_graph(conflicts, locals, reg_colors);
-  let mut max_locals = 0;
+  let var_colors = color_graph(conflicts, moves, locals, reg_colors);
 
   for (_, c) in &var_colors {
     if let Some(&reg) = available_regs.get(c.0 as usize) {
@@ -101,20 +106,23 @@ fn allocate_registers_block(
   }
 
   let block = Block {
+    global: block.global,
     code: block
       .code
       .into_iter()
       .map(|instr| {
-        let (instr, locals) =
-          assign_instr_var(instr, var_store, &var_colors, available_regs);
-        if locals > max_locals {
-          max_locals = locals;
-        }
-        instr
+        assign_instr_var(instr, var_store, &var_colors, available_regs)
       })
       .collect(),
   };
-  (block, max_locals)
+
+  let num_locals = var_colors
+    .values()
+    .filter(|c| c.0 as usize >= reg_colors.len())
+    .collect::<HashSet<_>>()
+    .len();
+
+  (block, num_locals)
 }
 
 fn assign_instr_var(
@@ -122,8 +130,7 @@ fn assign_instr_var(
   var_store: &mut VarStore,
   var_colors: &IndexMap<Var, Color>,
   available_regs: &[Reg],
-) -> (Instr, usize) {
-  let mut max_locals = 0;
+) -> Instr {
   let mut assign = |arg: Arg<IdxVar>| match arg {
     Arg::Deref(reg, i) => Arg::Deref(reg, i),
     Arg::Reg(reg) => Arg::Reg(reg),
@@ -134,9 +141,6 @@ fn assign_instr_var(
         Arg::Reg(reg)
       } else {
         let local = i - available_regs.len() + 1;
-        if local + 1 > max_locals {
-          max_locals = local;
-        }
         Arg::Deref(Reg::Rbp, -8 * local as i32)
       }
     }
@@ -155,7 +159,7 @@ fn assign_instr_var(
     Instr::Syscall => Instr::Syscall,
     _ => unreachable!("{:?}", instr),
   };
-  (instr, max_locals)
+  instr
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -166,32 +170,45 @@ struct NodeState {
   location: Location,
   color: Option<Color>,
   saturation: BTreeSet<i32>,
+  num_moves: usize,
 }
 
 impl NodeState {
-  fn new(location: Location) -> Self {
+  fn new(location: Location, num_moves: usize) -> Self {
     Self {
       location,
       color: None,
       saturation: BTreeSet::new(),
+      num_moves,
     }
   }
 }
 
 impl PartialOrd for NodeState {
   fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-    self.saturation.len().partial_cmp(&other.saturation.len())
+    match self.saturation.len().partial_cmp(&other.saturation.len()) {
+      Some(Ordering::Equal) => self.num_moves.partial_cmp(&other.num_moves),
+      x => x,
+    }
   }
 }
 
 impl Ord for NodeState {
   fn cmp(&self, other: &Self) -> Ordering {
-    self.saturation.len().cmp(&other.saturation.len())
+    match self.saturation.len().cmp(&other.saturation.len()) {
+      Ordering::Equal => self.num_moves.cmp(&other.num_moves),
+      x => x,
+    }
   }
 }
 
+/// * `graph` - interference graph
+/// * `moves` - move graph
+/// * `locals` - a slice of all local variables in this block
+/// * `reg_colors` - a map of colors of all available registers
 fn color_graph(
-  graph: &InterferenceGraph,
+  graph: &LocationGraph,
+  moves: &LocationGraph,
   locals: &[Var],
   reg_colors: &HashMap<Reg, i32>,
 ) -> IndexMap<Var, Color> {
@@ -199,7 +216,10 @@ fn color_graph(
 
   for node in graph.graph.node_indices() {
     let location = graph.graph[node];
-    queue.push(node, NodeState::new(location));
+    let move_node = moves.get_node(location);
+    let num_moves =
+      move_node.map_or(0, |node| moves.graph.neighbors(node).count());
+    queue.push(node, NodeState::new(location, num_moves));
   }
 
   for node in graph.graph.node_indices() {
@@ -220,7 +240,7 @@ fn color_graph(
 
   while let Some((node, state)) = queue.pop() {
     let mut last_color_ix = -1;
-    for ix in state.saturation {
+    for &ix in &state.saturation {
       if ix < 0 {
         continue;
       }
@@ -230,7 +250,26 @@ fn color_graph(
         break;
       }
     }
-    let color = Color(last_color_ix + 1);
+    let mut color = Color(last_color_ix + 1);
+
+    // move biasing
+    let color_is_reg = (color.0 as usize) < reg_colors.len();
+    for neighbor in moves.graph.neighbors(node) {
+      if let Some(neighbor) = queue.get(&neighbor) {
+        if let Some(neighbor_color) = neighbor.1.color {
+          let ok = if color_is_reg {
+            (neighbor_color.0 as usize) < reg_colors.len()
+          } else {
+            (neighbor_color.0 as usize) >= reg_colors.len()
+          };
+          if ok && !state.saturation.contains(&neighbor_color.0) {
+            color = neighbor_color;
+            break;
+          }
+        }
+      }
+    }
+
     for neighbor in graph.graph.neighbors(node) {
       queue.change_priority_by(&neighbor, |v| {
         v.saturation.insert(color.0);
@@ -292,7 +331,13 @@ mod tests {
       info: OldOldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![("start".to_owned(), Block { code })],
+      blocks: vec![(
+        "start".to_owned(),
+        Block {
+          global: false,
+          code,
+        },
+      )],
     };
     let prog =
       super::super::liveness_analysis::analyze_liveness(prog, label_live);
@@ -328,7 +373,13 @@ mod tests {
       info: OldOldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![("start".to_owned(), Block { code })],
+      blocks: vec![(
+        "start".to_owned(),
+        Block {
+          global: false,
+          code,
+        },
+      )],
     };
     let prog =
       super::super::liveness_analysis::analyze_liveness(prog, label_live);
@@ -364,7 +415,13 @@ mod tests {
       info: OldOldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![("start".to_owned(), Block { code })],
+      blocks: vec![(
+        "start".to_owned(),
+        Block {
+          global: false,
+          code,
+        },
+      )],
     };
     let prog =
       super::super::liveness_analysis::analyze_liveness(prog, label_live);
@@ -399,12 +456,66 @@ mod tests {
           IdxVar::new("w"),
         },
       },
-      blocks: vec![("start".to_owned(), Block { code })],
+      blocks: vec![(
+        "start".to_owned(),
+        Block {
+          global: false,
+          code,
+        },
+      )],
     };
     let prog =
       super::super::liveness_analysis::analyze_liveness(prog, label_live);
     let prog = super::super::interference::build_interference(prog);
     let result = allocate_registers(prog, &[Rdx, Rdi, Rsi, R8]);
+
+    assert_snapshot!(result.to_string_pretty());
+  }
+
+  #[test]
+  fn move_biasing_example_in_book() {
+    use asm::Reg::*;
+    use Arg::*;
+    use Instr::*;
+    let code = vec![
+      Mov(Imm(1), var("v")),
+      Mov(Imm(42), var("w")),
+      Mov(var("v"), var("x")),
+      Add(Imm(7), var("x")),
+      Mov(var("x"), var("y")),
+      Mov(var("x"), var("z")),
+      Add(var("w"), var("z")),
+      Mov(var("y"), var("t")),
+      Neg(var("t")),
+      Mov(var("z"), Reg(Rax)),
+      Add(var("t"), Reg(Rax)),
+      Jmp("conclusion".to_owned()),
+    ];
+    let label_live = hashmap! {
+      "conclusion".to_owned() => {
+        let mut set = LocationSet::new();
+        set.add_reg(Rax);
+        set.add_reg(Rsp);
+        set
+      }
+    };
+    let prog = Program {
+      info: OldOldInfo {
+        locals: IndexSet::new(),
+      },
+      blocks: vec![(
+        "start".to_owned(),
+        Block {
+          global: false,
+          code,
+        },
+      )],
+    };
+    let prog =
+      super::super::liveness_analysis::analyze_liveness(prog, label_live);
+    let prog = super::super::interference::build_interference(prog);
+    let prog = super::super::move_biasing::build_move_graph(prog);
+    let result = allocate_registers(prog, &[Rcx, Rdx, Rsi]);
 
     assert_snapshot!(result.to_string_pretty());
   }

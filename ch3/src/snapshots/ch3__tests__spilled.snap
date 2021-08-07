@@ -66,7 +66,7 @@ start:
 _start:
     push rbp
     mov rbp, rsp
-    sub rsp, 32
+    sub rsp, 24
     push rbx
     push r12
     push r13
@@ -75,6 +75,11 @@ _start:
     jmp start
 
 conclusion:
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
     mov rsp, rbp
     pop rbp
     call print_int

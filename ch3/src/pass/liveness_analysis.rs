@@ -187,7 +187,7 @@ mod tests {
       info: OldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![("start".to_owned(), Block { code })],
+      blocks: vec![("start".to_owned(), Block { global: false, code })],
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -218,7 +218,7 @@ mod tests {
       info: OldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![("start".to_owned(), Block { code })],
+      blocks: vec![("start".to_owned(), Block { global: false, code })],
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -251,7 +251,7 @@ mod tests {
       info: OldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![("start".to_owned(), Block { code })],
+      blocks: vec![("start".to_owned(), Block { global: false, code })],
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -277,7 +277,7 @@ mod tests {
       info: OldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![("start".to_owned(), Block { code })],
+      blocks: vec![("start".to_owned(), Block { global: false, code })],
     };
     let result = analyze_liveness(prog, label_live);
 

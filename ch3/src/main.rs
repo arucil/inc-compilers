@@ -18,7 +18,7 @@ fn main() {
     process::exit(1);
   });
 
-  match ch3::compile(&input) {
+  match ch3::compile(&input, None) {
     Ok(output) => {
       let new_path = Path::new(path).with_extension("asm");
       let binary_path = new_path.with_extension("");
