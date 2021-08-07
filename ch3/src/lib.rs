@@ -30,6 +30,7 @@ pub fn compile(
     },
   );
   let prog = self::pass::interference::build_interference(prog);
+  let prog = self::pass::move_biasing::build_move_graph(prog);
   let regs = regs.unwrap_or(&[
     Rbx, Rcx, Rdx, Rsi, Rdi, R8, R9, R10, R11, R12, R13, R14, R15,
   ]);
@@ -74,10 +75,10 @@ fn add_epilogue(prog: &mut Program<self::pass::register_allocation::Info>) {
     .map(|&reg| Pop(Reg(reg)))
     .collect();
   code.extend_from_slice(&[
-    Mov(Reg(Rbp), Reg(Rsp)),
-    Pop(Reg(Rbp)),
     Call("print_int".to_owned(), 0),
     Call("print_newline".to_owned(), 0),
+    Mov(Reg(Rbp), Reg(Rsp)),
+    Pop(Reg(Rbp)),
     Mov(Imm(60), Reg(Rax)),
     Mov(Imm(0), Reg(Rdi)),
     Syscall,
@@ -131,6 +132,23 @@ mod tests {
    [p 1000])
   (+ (- a) (+ b (+ (+ c d) (+ e (+ (+ f (+ g (+ h (+ i (+ j (+ k (+ l (+ m (+ n o))))))))) p))))))
     "#, None).unwrap();
+    assert_snapshot!(prog);
+  }
+
+  #[test]
+  fn move_biasing() {
+    let prog = compile(
+      r#"
+(let ([v 1])
+  (let ([w 42])
+    (let ([x (+ v 7)])
+      (let ([y x])
+        (let ([z (+ x w)])
+          (+ z (- y)))))))
+    "#,
+      Some(&[Reg::Rbx, Reg::Rcx]),
+    )
+    .unwrap();
     assert_snapshot!(prog);
   }
 }

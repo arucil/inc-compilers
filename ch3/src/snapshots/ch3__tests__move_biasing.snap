@@ -7,13 +7,12 @@ extern read_int, print_int, print_newline
 section .text
 
 start:
-    call read_int
-    mov rbx, rax
-    mov rbx, 5
-    call read_int
-    mov rcx, rax
-    neg rcx
-    add rbx, -2
+    mov rbx, 1
+    mov qword [rbp - 8], 42
+    add rbx, 7
+    mov rcx, rbx
+    add rcx, qword [rbp - 8]
+    neg rbx
     mov rax, rcx
     add rax, rbx
     jmp conclusion

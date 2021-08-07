@@ -25,6 +25,11 @@ fn patch_block(block: Block) -> Block {
           code.push(Instr::Mov(Arg::Reg(Reg::Rax), dest));
         }
       }
+      Instr::Mov(Arg::Reg(ref src), Arg::Reg(ref dest)) => {
+        if src != dest {
+          code.push(instr);
+        }
+      }
       instr => {
         code.push(instr);
       }
