@@ -15,9 +15,9 @@ start:
     mov rax, qword [rbp - 24]
     mov qword [rbp - 32], rax
     neg qword [rbp - 32]
+    mov qword [rbp - 40], -2
     mov rax, qword [rbp - 16]
-    mov qword [rbp - 40], rax
-    add qword [rbp - 40], -2
+    add qword [rbp - 40], rax
     mov rax, qword [rbp - 32]
     add rax, qword [rbp - 40]
     jmp conclusion

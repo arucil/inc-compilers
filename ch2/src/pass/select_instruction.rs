@@ -72,10 +72,6 @@ fn exp_instructions(
       atom_instructions(target.clone(), atom, code);
       code.push(Instr::Neg(target));
     }
-    CExp::Prim(CPrim::Add(CAtom::Int(n), atom2)) => {
-      atom_instructions(target.clone(), atom2, code);
-      code.push(Instr::Add(Arg::Imm(n), target));
-    }
     CExp::Prim(CPrim::Add(atom1, atom2)) => {
       atom_instructions(target.clone(), atom1, code);
       let arg = match atom2 {

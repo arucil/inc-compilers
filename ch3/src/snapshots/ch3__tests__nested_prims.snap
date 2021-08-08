@@ -12,10 +12,12 @@ start:
     mov rbx, 5
     call read_int
     mov rcx, rax
-    neg rcx
-    add rbx, -2
-    mov rax, rcx
-    add rax, rbx
+    mov rdx, rcx
+    neg rdx
+    mov rcx, -2
+    add rcx, rbx
+    mov rax, rdx
+    add rax, rcx
     jmp conclusion
 
     global _start

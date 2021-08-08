@@ -7,9 +7,10 @@ extern read_int, print_int, print_newline
 section .text
 
 start:
-    mov rbx, 1
+    mov rcx, 1
     mov qword [rbp - 8], 42
-    add rbx, 7
+    mov rbx, 7
+    add rbx, rcx
     mov rcx, rbx
     add rcx, qword [rbp - 8]
     neg rbx

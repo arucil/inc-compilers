@@ -8,8 +8,8 @@ stack_space: 48 bytes
 start:
     call read_int
     mov qword [rbp - 8], rax
-    mov qword [rbp - 16], 3
-    add qword [rbp - 16], 2
+    mov qword [rbp - 16], 2
+    add qword [rbp - 16], 3
     call read_int
     mov qword [rbp - 24], rax
     mov rax, qword [rbp - 24]
