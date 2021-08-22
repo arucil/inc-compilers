@@ -20,6 +20,3 @@ priority-queue = "1.1.1"
 [dev-dependencies]
 insta = "1.7.1"
 pretty_assertions = "0.7.2"
-assert_cmd = "1.0.7"
-predicates = "2.0.0"
-scopeguard = "1.1.0"

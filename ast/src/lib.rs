@@ -29,6 +29,12 @@ pub enum Exp<VAR = String> {
     init: Box<(Range, Exp<VAR>)>,
     body: Box<(Range, Exp<VAR>)>,
   },
+  Bool(bool),
+  If {
+    cond: Box<(Range, Exp<VAR>)>,
+    conseq: Box<(Range, Exp<VAR>)>,
+    alt: Box<(Range, Exp<VAR>)>,
+  },
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -104,6 +110,19 @@ impl<VAR: Debug> Exp<VAR> {
             .append(body.1.to_doc())
             .nest(1)
             .group(),
+        )
+        .append(RcDoc::text(")")),
+      Exp::Bool(true) => RcDoc::text("#t"),
+      Exp::Bool(false) => RcDoc::text("#f"),
+      Exp::If { cond, conseq, alt } => RcDoc::text("(")
+        .append(
+          RcDoc::text("if")
+            .append(Doc::space())
+            .append(cond.1.to_doc())
+            .append(Doc::line())
+            .append(conseq.1.to_doc())
+            .append(Doc::line())
+            .append(alt.1.to_doc()),
         )
         .append(RcDoc::text(")")),
     }

@@ -3,6 +3,15 @@ use scopeguard::defer;
 use std::ffi;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Once;
+
+static INIT: Once = Once::new();
+
+fn compile_runtime() {
+  INIT.call_once(|| {
+    run_nasm("../runtime/runtime.asm");
+  });
+}
 
 pub struct TestCli {
   base_dir: PathBuf,
@@ -24,7 +33,7 @@ impl TestCli {
     cmd.assert().success();
 
     run_nasm(self.base_dir.join(format!("{}.asm", prog)));
-    run_nasm("../runtime/runtime.asm");
+    compile_runtime();
     run_ld(
       prog,
       &[

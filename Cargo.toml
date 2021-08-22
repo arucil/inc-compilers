@@ -3,6 +3,7 @@
 members = [
     "ch2",
     "ch3",
+    "ch4",
     "ast",
     "asm",
     "support"

@@ -9,6 +9,7 @@ enum Cst {
   Symbol(Range),
   String(Range),
   Number(Range),
+  Boolean(bool, Range),
 }
 
 struct Parser<'a> {
@@ -24,6 +25,7 @@ enum Token {
   SymOrNum,
   Punc(char),
   Str,
+  Bool(bool),
 }
 
 impl<'a> Parser<'a> {
@@ -78,6 +80,24 @@ impl<'a> Parser<'a> {
         self.advance();
         self.token = ((start, self.i).into(), Token::Str);
         Ok(Token::Str)
+      }
+      Some('#') => {
+        self.advance();
+        while self.peek().map_or(false, |c| c.is_ascii_alphanumeric()) {
+          self.advance();
+        }
+        let kind = match &self.input[start..self.i] {
+          "#t" => Token::Bool(true),
+          "#f" => Token::Bool(false),
+          _ => {
+            return Err(CompileError {
+              range: (start, self.i).into(),
+              message: format!("unrecognized hashtag"),
+            })
+          }
+        };
+        self.token = ((start, self.i).into(), kind);
+        Ok(kind)
       }
       Some(c) if !"])".contains(c) => {
         self.advance();
@@ -134,6 +154,11 @@ impl<'a> Parser<'a> {
         range: self.token.0,
         message: format!("unexpected char '{}'", c),
       }),
+      Token::Bool(b) => {
+        let range = self.token.0;
+        self.get_token()?;
+        Ok(Cst::Boolean(b, range))
+      }
     }
   }
 
@@ -182,62 +207,32 @@ fn build_prog(input: &str, cst: Vec<Cst>) -> Result<Program> {
 }
 
 fn build_exp(input: &str, cst: Cst) -> Result<(Range, Exp)> {
-  fn make_prim(
-    input: &str,
-    range: Range,
-    sym_range: Range,
-    op: &'static str,
-    xs: Vec<Cst>,
-  ) -> Result<(Range, Exp)> {
-    let op = (sym_range, op);
-    let args = xs
-      .into_iter()
-      .skip(1)
-      .map(|c| build_exp(input, c))
-      .collect::<Result<_>>()?;
-    Ok((range, Exp::Prim { op, args }))
-  }
-
   match cst {
     Cst::List(xs, range) => {
       if let Some(&Cst::Symbol(sym_range)) = xs.get(0) {
         let op = &input[sym_range.start..sym_range.end];
         match op {
-          "read" => {
-            if xs.len() == 1 {
-              make_prim(input, range, sym_range, "read", xs)
-            } else {
-              Err(CompileError {
-                range,
-                message: format!("read does not take arguments"),
-              })
-            }
-          }
-          "-" => {
-            if xs.len() == 2 {
-              make_prim(input, range, sym_range, "-", xs)
-            } else {
-              Err(CompileError {
-                range,
-                message: format!("- expects one argument"),
-              })
-            }
-          }
-          "+" => {
-            if xs.len() == 3 {
-              make_prim(input, range, sym_range, "+", xs)
-            } else {
-              Err(CompileError {
-                range,
-                message: format!("+ expects two arguments"),
-              })
-            }
-          }
           "let" => build_let(input, xs, range),
-          _ => Err(CompileError {
-            range,
-            message: format!("unrecognized form"),
-          }),
+          "if" => build_if(input, xs, range),
+          _ => {
+            const OPERATORS: &[&'static str] = &[
+              "read", "+", "-", "and", "or", "not", "eq?", ">", "<", ">=", "<=",
+            ];
+            if let Some(&op) = OPERATORS.iter().find(|&&s| s == op) {
+              let op = (sym_range, op);
+              let args = xs
+                .into_iter()
+                .skip(1)
+                .map(|c| build_exp(input, c))
+                .collect::<Result<_>>()?;
+              Ok((range, Exp::Prim { op, args }))
+            } else {
+              Err(CompileError {
+                range,
+                message: format!("unrecognized form"),
+              })
+            }
+          }
         }
       } else {
         return Err(CompileError {
@@ -278,6 +273,7 @@ fn build_exp(input: &str, cst: Cst) -> Result<(Range, Exp)> {
       range,
       Exp::Int(input[range.start..range.end].parse().unwrap()),
     )),
+    Cst::Boolean(b, range) => Ok((range, Exp::Bool(b))),
   }
 }
 
@@ -338,6 +334,31 @@ fn build_let(
     Err(CompileError {
       range,
       message: format!("invalid let form"),
+    })
+  }
+}
+
+fn build_if(
+  input: &str,
+  mut xs: Vec<Cst>,
+  range: Range,
+) -> Result<(Range, Exp)> {
+  if xs.len() == 4 {
+    let alt = build_exp(input, xs.pop().unwrap())?;
+    let conseq = build_exp(input, xs.pop().unwrap())?;
+    let cond = build_exp(input, xs.pop().unwrap())?;
+    Ok((
+      range,
+      Exp::If {
+        cond: box cond,
+        conseq: box conseq,
+        alt: box alt,
+      },
+    ))
+  } else {
+    Err(CompileError {
+      range,
+      message: format!("invalid if form"),
     })
   }
 }
@@ -481,5 +502,13 @@ mod tests {
     let prog2 = Cst::Number((5, 6).into());
     let prog3 = Cst::List(vec![Cst::Symbol((8, 9).into())], (7, 10).into());
     assert_eq!(result, Result::Ok(vec![prog1, prog2, prog3]));
+  }
+
+  #[test]
+  fn boolean() {
+    let result = Parser::new(r#" #t   #f "#).parse();
+    let prog1 = Cst::Boolean(true, (1, 3).into());
+    let prog2 = Cst::Boolean(false, (6, 8).into());
+    assert_eq!(result, Result::Ok(vec![prog1, prog2]));
   }
 }
