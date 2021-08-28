@@ -143,7 +143,7 @@ fn typecheck_op(range: Range, op: &str, arg_types: &[Type]) -> Result<Type> {
         Err(CompileError {
           range,
           message: format!(
-            "type mistmatch in eq? form, {:?} != {:?}",
+            "type mismatch in eq? form, {:?} != {:?}",
             arg_types[0], arg_types[1]
           ),
         })
@@ -180,6 +180,7 @@ mod tests {
   use super::*;
   use ast::*;
   use pretty_assertions::assert_eq;
+  use support::Range;
 
   #[test]
   fn nested_prims() {
@@ -204,10 +205,74 @@ mod tests {
   }
 
   #[test]
+  fn eq() {
+    let prog =
+      parse(r#"(if (eq? #t (not (eq? 3 (read)))) 1 2)"#).unwrap();
+    let result = typecheck_prog(prog);
+    assert_eq!(result.map(|_| ()), Ok(()));
+  }
+
+  #[test]
   fn r#let() {
     let prog =
       parse(r#"(let ([a (+ 7 2)]) (if (< a (read)) 13 (+ a 10)))"#).unwrap();
     let result = typecheck_prog(prog);
     assert_eq!(result.map(|_| ()), Ok(()));
+  }
+
+  #[test]
+  fn if_mismatch() {
+    let prog =
+      parse(r#"(if #t (+ 7 3) (not (> 3 2)))"#).unwrap();
+    let result = typecheck_prog(prog);
+    assert_eq!(result, Err(CompileError {
+      range: Range {
+        start: 0,
+        end: 29,
+      },
+      message: format!("type mismatch in if form, Int != Bool"),
+    }));
+  }
+
+  #[test]
+  fn if_cond_not_bool() {
+    let prog =
+      parse(r#"(if (read) (+ 7 3) (- (> 3 2)))"#).unwrap();
+    let result = typecheck_prog(prog);
+    assert_eq!(result, Err(CompileError {
+      range: Range {
+        start: 0,
+        end: 31,
+      },
+      message: format!("expected Bool, found Int"),
+    }));
+  }
+
+  #[test]
+  fn var_not_found() {
+    let prog =
+      parse(r#"x1"#).unwrap();
+    let result = typecheck_prog(prog);
+    assert_eq!(result, Err(CompileError {
+      range: Range {
+        start: 0,
+        end: 2,
+      },
+      message: format!("variable x1 not found"),
+    }));
+  }
+
+  #[test]
+  fn eq_type_mismatch() {
+    let prog =
+      parse(r#"(eq? #t (+ 3 7))"#).unwrap();
+    let result = typecheck_prog(prog);
+    assert_eq!(result, Err(CompileError {
+      range: Range {
+        start: 0,
+        end: 16,
+      },
+      message: format!("type mismatch in eq? form, Bool != Int"),
+    }));
   }
 }
