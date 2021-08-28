@@ -30,7 +30,10 @@ pub fn select_instruction(prog: CProgram) -> Program<Info, IdxVar> {
 fn tail_block(tail: CTail) -> Block<IdxVar> {
   let mut code = vec![];
   tail_instructions(tail, &mut code);
-  Block { global: false, code }
+  Block {
+    global: false,
+    code,
+  }
 }
 
 fn tail_instructions(mut tail: CTail, code: &mut Vec<Instr<IdxVar>>) {
@@ -66,7 +69,10 @@ fn exp_instructions(
     }
     CExp::Prim(CPrim::Read) => {
       code.push(Instr::Call("read_int".to_owned(), 0));
-      code.push(Instr::Mov(Arg::Reg(Reg::Rax), target));
+      code.push(Instr::Mov {
+        src: Arg::Reg(Reg::Rax),
+        dest: target,
+      });
     }
     CExp::Prim(CPrim::Neg(atom)) => {
       atom_instructions(target.clone(), atom, code);
@@ -78,7 +84,10 @@ fn exp_instructions(
         CAtom::Int(n) => Arg::Imm(n),
         CAtom::Var(var) => Arg::Var(var),
       };
-      code.push(Instr::Add(arg, target));
+      code.push(Instr::Add {
+        src: arg,
+        dest: target,
+      });
     }
   }
 }
@@ -90,10 +99,16 @@ fn atom_instructions(
 ) {
   match atom {
     CAtom::Int(n) => {
-      code.push(Instr::Mov(Arg::Imm(n), target));
+      code.push(Instr::Mov {
+        src: Arg::Imm(n),
+        dest: target,
+      });
     }
     CAtom::Var(var) => {
-      code.push(Instr::Mov(Arg::Var(var), target));
+      code.push(Instr::Mov {
+        src: Arg::Var(var),
+        dest: target,
+      });
     }
   }
 }

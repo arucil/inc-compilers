@@ -44,24 +44,29 @@ fn assign_home_block(
     .into_iter()
     .map(|ins| assign_home_instr(ins, local_spaces))
     .collect();
-  Block { global: block.global, code }
+  Block {
+    global: block.global,
+    code,
+  }
 }
 
 fn assign_home_instr(
   instr: Instr<IdxVar>,
   local_spaces: &mut HashMap<IdxVar, usize>,
 ) -> Instr {
-  let mut binary = |arg1, arg2, op: fn(_, _) -> _| -> Instr {
-    let arg1 = assign_home_arg(arg1, local_spaces);
-    let arg2 = assign_home_arg(arg2, local_spaces);
-    op(arg1, arg2)
-  };
-
   match instr {
-    Instr::Add(src, dest) => binary(src, dest, Instr::Add),
+    Instr::Add { src, dest } => {
+      let src = assign_home_arg(src, local_spaces);
+      let dest = assign_home_arg(dest, local_spaces);
+      Instr::Add { src, dest }
+    }
     Instr::Call(label, n) => Instr::Call(label, n),
     Instr::Jmp(label) => Instr::Jmp(label),
-    Instr::Mov(src, dest) => binary(src, dest, Instr::Mov),
+    Instr::Mov { src, dest } => {
+      let src = assign_home_arg(src, local_spaces);
+      let dest = assign_home_arg(dest, local_spaces);
+      Instr::Mov { src, dest }
+    }
     Instr::Neg(dest) => Instr::Neg(assign_home_arg(dest, local_spaces)),
     Instr::Pop(dest) => Instr::Pop(assign_home_arg(dest, local_spaces)),
     Instr::Push(src) => Instr::Push(assign_home_arg(src, local_spaces)),
@@ -86,6 +91,7 @@ fn assign_home_arg(
     }
     Arg::Reg(r) => Arg::Reg(r),
     Arg::Deref(r, i) => Arg::Deref(r, i),
+    Arg::ByteReg(_) => unimplemented!(),
   }
 }
 

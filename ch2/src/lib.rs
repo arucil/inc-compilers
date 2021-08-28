@@ -29,8 +29,14 @@ fn add_prologue(prog: &mut Program<self::pass::assign_home::Info>) {
     global: true,
     code: vec![
       Push(Reg(Rbp)),
-      Mov(Reg(Rsp), Reg(Rbp)),
-      Sub(Imm(stack_space as i64), Reg(Rsp)),
+      Mov {
+        src: Reg(Rsp),
+        dest: Reg(Rbp),
+      },
+      Sub {
+        src: Imm(stack_space as i64),
+        dest: Reg(Rsp),
+      },
       Jmp("start".to_owned()),
     ],
   };
@@ -44,12 +50,21 @@ fn add_epilogue(prog: &mut Program<self::pass::assign_home::Info>) {
   let block = Block {
     global: false,
     code: vec![
-      Mov(Reg(Rbp), Reg(Rsp)),
+      Mov {
+        src: Reg(Rbp),
+        dest: Reg(Rsp),
+      },
       Pop(Reg(Rbp)),
       Call("print_int".to_owned(), 0),
       Call("print_newline".to_owned(), 0),
-      Mov(Imm(60), Reg(Rax)),
-      Mov(Imm(0), Reg(Rdi)),
+      Mov {
+        src: Imm(60),
+        dest: Reg(Rax),
+      },
+      Mov {
+        src: Imm(0),
+        dest: Reg(Rdi),
+      },
       Syscall,
     ],
   };

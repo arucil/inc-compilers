@@ -67,8 +67,8 @@ fn add_instr_edges(
   };
 
   match instr {
-    Instr::Add(_, dest)
-    | Instr::Sub(_, dest)
+    Instr::Add { dest, .. }
+    | Instr::Sub { dest, .. }
     | Instr::Neg(dest)
     | Instr::Pop(dest) => {
       if let Some(dest_loc) = Location::from_arg(dest.clone(), var_store) {
@@ -86,7 +86,7 @@ fn add_instr_edges(
       add(Reg::R10.into());
       add(Reg::R11.into());
     }
-    Instr::Mov(src, dest) => {
+    Instr::Mov { src, dest } => {
       if let Some(dest_loc) = Location::from_arg(dest.clone(), var_store) {
         let src_loc = Location::from_arg(src.clone(), var_store);
         let dest_loc_node = graph.insert_node(dest_loc);
@@ -130,17 +130,47 @@ mod tests {
     use Arg::*;
     use Instr::*;
     let code = vec![
-      Mov(Imm(1), var("v")),
-      Mov(Imm(42), var("w")),
-      Mov(var("v"), var("x")),
-      Add(Imm(7), var("x")),
-      Mov(var("x"), var("y")),
-      Mov(var("x"), var("z")),
-      Add(var("w"), var("z")),
-      Mov(var("y"), var("t")),
+      Mov {
+        src: Imm(1),
+        dest: var("v"),
+      },
+      Mov {
+        src: Imm(42),
+        dest: var("w"),
+      },
+      Mov {
+        src: var("v"),
+        dest: var("x"),
+      },
+      Add {
+        src: Imm(7),
+        dest: var("x"),
+      },
+      Mov {
+        src: var("x"),
+        dest: var("y"),
+      },
+      Mov {
+        src: var("x"),
+        dest: var("z"),
+      },
+      Add {
+        src: var("w"),
+        dest: var("z"),
+      },
+      Mov {
+        src: var("y"),
+        dest: var("t"),
+      },
       Neg(var("t")),
-      Mov(var("z"), Reg(Rax)),
-      Add(var("t"), Reg(Rax)),
+      Mov {
+        src: var("z"),
+        dest: Reg(Rax),
+      },
+      Add {
+        src: var("t"),
+        dest: Reg(Rax),
+      },
       Jmp("conclusion".to_owned()),
     ];
     let label_live = hashmap! {
@@ -155,7 +185,13 @@ mod tests {
       info: OldOldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![("start".to_owned(), Block { global: false, code })],
+      blocks: vec![(
+        "start".to_owned(),
+        Block {
+          global: false,
+          code,
+        },
+      )],
     };
     let prog =
       super::super::liveness_analysis::analyze_liveness(prog, label_live);
@@ -173,9 +209,15 @@ mod tests {
       Pop(Reg(Rdi)),
       Pop(Reg(Rsi)),
       Push(var("x")),
-      Mov(Reg(Rbx), var("w")),
+      Mov {
+        src: Reg(Rbx),
+        dest: var("w"),
+      },
       Call("foo".to_owned(), 3),
-      Add(Reg(Rax), var("w")),
+      Add {
+        src: Reg(Rax),
+        dest: var("w"),
+      },
       Jmp("conclusion".to_owned()),
     ];
     let label_live = hashmap! {
@@ -190,7 +232,13 @@ mod tests {
       info: OldOldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![("start".to_owned(), Block { global: false, code })],
+      blocks: vec![(
+        "start".to_owned(),
+        Block {
+          global: false,
+          code,
+        },
+      )],
     };
     let prog =
       super::super::liveness_analysis::analyze_liveness(prog, label_live);
@@ -203,17 +251,35 @@ mod tests {
   fn mov_same_variables() {
     use Instr::*;
     let code = vec![
-      Mov(var("x"), var("t")),
-      Add(var("y"), var("t")),
-      Mov(var("t"), var("z")),
-      Add(var("w"), var("z")),
+      Mov {
+        src: var("x"),
+        dest: var("t"),
+      },
+      Add {
+        src: var("y"),
+        dest: var("t"),
+      },
+      Mov {
+        src: var("t"),
+        dest: var("z"),
+      },
+      Add {
+        src: var("w"),
+        dest: var("z"),
+      },
     ];
     let label_live = hashmap! {};
     let prog = Program {
       info: OldOldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![("start".to_owned(), Block { global: false, code })],
+      blocks: vec![(
+        "start".to_owned(),
+        Block {
+          global: false,
+          code,
+        },
+      )],
     };
     let prog =
       super::super::liveness_analysis::analyze_liveness(prog, label_live);

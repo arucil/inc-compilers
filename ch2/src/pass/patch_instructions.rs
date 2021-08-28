@@ -15,17 +15,38 @@ fn patch_block(block: Block) -> Block {
   let mut code = vec![];
   for instr in block.code {
     match instr {
-      Instr::Add(src @ Arg::Deref(..), dest @ Arg::Deref(..)) => {
-        code.push(Instr::Mov(src, Arg::Reg(Reg::Rax)));
-        code.push(Instr::Add(Arg::Reg(Reg::Rax), dest));
+      Instr::Add {
+        src: src @ Arg::Deref(..),
+        dest: dest @ Arg::Deref(..),
+      } => {
+        code.push(Instr::Mov {
+          src,
+          dest: Arg::Reg(Reg::Rax),
+        });
+        code.push(Instr::Add {
+          src: Arg::Reg(Reg::Rax),
+          dest,
+        });
       }
-      Instr::Mov(src @ Arg::Deref(..), dest @ Arg::Deref(..)) => {
+      Instr::Mov {
+        src: src @ Arg::Deref(..),
+        dest: dest @ Arg::Deref(..),
+      } => {
         if src != dest {
-          code.push(Instr::Mov(src, Arg::Reg(Reg::Rax)));
-          code.push(Instr::Mov(Arg::Reg(Reg::Rax), dest));
+          code.push(Instr::Mov {
+            src,
+            dest: Arg::Reg(Reg::Rax),
+          });
+          code.push(Instr::Mov {
+            src: Arg::Reg(Reg::Rax),
+            dest,
+          });
         }
       }
-      Instr::Mov(Arg::Reg(ref src), Arg::Reg(ref dest)) => {
+      Instr::Mov {
+        src: Arg::Reg(ref src),
+        dest: Arg::Reg(ref dest),
+      } => {
         if src != dest {
           code.push(instr);
         }
@@ -35,7 +56,10 @@ fn patch_block(block: Block) -> Block {
       }
     }
   }
-  Block { global: block.global, code }
+  Block {
+    global: block.global,
+    code,
+  }
 }
 
 #[cfg(test)]

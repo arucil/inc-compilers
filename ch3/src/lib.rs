@@ -52,8 +52,14 @@ fn add_prologue(prog: &mut Program<self::pass::register_allocation::Info>) {
     ((stack_space + 15) & !15) - prog.info.used_callee_saved_regs.len() * 8;
   let mut code = vec![
     Push(Reg(Rbp)),
-    Mov(Reg(Rsp), Reg(Rbp)),
-    Sub(Imm(stack_space as i64), Reg(Rsp)),
+    Mov {
+      src: Reg(Rsp),
+      dest: Reg(Rbp),
+    },
+    Sub {
+      src: Imm(stack_space as i64),
+      dest: Reg(Rsp),
+    },
   ];
   for &reg in &prog.info.used_callee_saved_regs {
     code.push(Push(Reg(reg)));
@@ -77,10 +83,19 @@ fn add_epilogue(prog: &mut Program<self::pass::register_allocation::Info>) {
   code.extend_from_slice(&[
     Call("print_int".to_owned(), 0),
     Call("print_newline".to_owned(), 0),
-    Mov(Reg(Rbp), Reg(Rsp)),
+    Mov {
+      src: Reg(Rbp),
+      dest: Reg(Rsp),
+    },
     Pop(Reg(Rbp)),
-    Mov(Imm(60), Reg(Rax)),
-    Mov(Imm(0), Reg(Rdi)),
+    Mov {
+      src: Imm(60),
+      dest: Reg(Rax),
+    },
+    Mov {
+      src: Imm(0),
+      dest: Reg(Rdi),
+    },
     Syscall,
   ]);
   let block = Block {

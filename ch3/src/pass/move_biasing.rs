@@ -27,7 +27,10 @@ fn build_block_move_graph(
 ) {
   for instr in &block.code {
     match instr {
-      Instr::Mov(src @ Arg::Var(_), dest @ Arg::Var(_)) => {
+      Instr::Mov {
+        src: src @ Arg::Var(_),
+        dest: dest @ Arg::Var(_),
+      } => {
         let src = moves
           .insert_node(Location::from_arg(src.clone(), var_store).unwrap());
         let dest = moves

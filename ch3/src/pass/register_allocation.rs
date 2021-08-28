@@ -144,18 +144,28 @@ fn assign_instr_var(
         Arg::Deref(Reg::Rbp, -8 * local as i32)
       }
     }
+    Arg::ByteReg(_) => unimplemented!(),
   };
 
   let instr = match instr {
-    Instr::Add(src, dest) => Instr::Add(assign(src), assign(dest)),
+    Instr::Add { src, dest } => Instr::Add {
+      src: assign(src),
+      dest: assign(dest),
+    },
     Instr::Call(label, arity) => Instr::Call(label, arity),
     Instr::Jmp(label) => Instr::Jmp(label),
-    Instr::Mov(src, dest) => Instr::Mov(assign(src), assign(dest)),
+    Instr::Mov { src, dest } => Instr::Mov {
+      src: assign(src),
+      dest: assign(dest),
+    },
     Instr::Neg(dest) => Instr::Neg(assign(dest)),
     Instr::Pop(dest) => Instr::Pop(assign(dest)),
     Instr::Push(src) => Instr::Push(assign(src)),
     Instr::Ret => Instr::Ret,
-    Instr::Sub(src, dest) => Instr::Sub(assign(src), assign(dest)),
+    Instr::Sub { src, dest } => Instr::Sub {
+      src: assign(src),
+      dest: assign(dest),
+    },
     Instr::Syscall => Instr::Syscall,
     _ => unreachable!("{:?}", instr),
   };
@@ -306,17 +316,47 @@ mod tests {
     use Arg::*;
     use Instr::*;
     let code = vec![
-      Mov(Imm(1), var("v")),
-      Mov(Imm(42), var("w")),
-      Mov(var("v"), var("x")),
-      Add(Imm(7), var("x")),
-      Mov(var("x"), var("y")),
-      Mov(var("x"), var("z")),
-      Add(var("w"), var("z")),
-      Mov(var("y"), var("t")),
+      Mov {
+        src: Imm(1),
+        dest: var("v"),
+      },
+      Mov {
+        src: Imm(42),
+        dest: var("w"),
+      },
+      Mov {
+        src: var("v"),
+        dest: var("x"),
+      },
+      Add {
+        src: Imm(7),
+        dest: var("x"),
+      },
+      Mov {
+        src: var("x"),
+        dest: var("y"),
+      },
+      Mov {
+        src: var("x"),
+        dest: var("z"),
+      },
+      Add {
+        src: var("w"),
+        dest: var("z"),
+      },
+      Mov {
+        src: var("y"),
+        dest: var("t"),
+      },
       Neg(var("t")),
-      Mov(var("z"), Reg(Rax)),
-      Add(var("t"), Reg(Rax)),
+      Mov {
+        src: var("z"),
+        dest: Reg(Rax),
+      },
+      Add {
+        src: var("t"),
+        dest: Reg(Rax),
+      },
       Jmp("conclusion".to_owned()),
     ];
     let label_live = hashmap! {
@@ -356,9 +396,15 @@ mod tests {
       Pop(Reg(Rdi)),
       Pop(Reg(Rsi)),
       Push(var("x")),
-      Mov(Reg(Rbx), var("w")),
+      Mov {
+        src: Reg(Rbx),
+        dest: var("w"),
+      },
       Call("foo".to_owned(), 3),
-      Add(Reg(Rax), var("w")),
+      Add {
+        src: Reg(Rax),
+        dest: var("w"),
+      },
       Jmp("conclusion".to_owned()),
     ];
     let label_live = hashmap! {
@@ -398,9 +444,15 @@ mod tests {
       Pop(Reg(Rdi)),
       Pop(Reg(Rsi)),
       Push(var("x")),
-      Mov(Reg(Rbx), var("w")),
+      Mov {
+        src: Reg(Rbx),
+        dest: var("w"),
+      },
       Call("foo".to_owned(), 3),
-      Add(Reg(Rax), var("w")),
+      Add {
+        src: Reg(Rax),
+        dest: var("w"),
+      },
       Jmp("conclusion".to_owned()),
     ];
     let label_live = hashmap! {
@@ -436,10 +488,22 @@ mod tests {
     use asm::Reg::*;
     use Instr::*;
     let code = vec![
-      Mov(var("x"), var("t")),
-      Add(var("y"), var("t")),
-      Mov(var("t"), var("z")),
-      Add(var("w"), var("z")),
+      Mov {
+        src: var("x"),
+        dest: var("t"),
+      },
+      Add {
+        src: var("y"),
+        dest: var("t"),
+      },
+      Mov {
+        src: var("t"),
+        dest: var("z"),
+      },
+      Add {
+        src: var("w"),
+        dest: var("z"),
+      },
       Neg(var("x")),
       Neg(var("y")),
       Neg(var("z")),
@@ -478,17 +542,47 @@ mod tests {
     use Arg::*;
     use Instr::*;
     let code = vec![
-      Mov(Imm(1), var("v")),
-      Mov(Imm(42), var("w")),
-      Mov(var("v"), var("x")),
-      Add(Imm(7), var("x")),
-      Mov(var("x"), var("y")),
-      Mov(var("x"), var("z")),
-      Add(var("w"), var("z")),
-      Mov(var("y"), var("t")),
+      Mov {
+        src: Imm(1),
+        dest: var("v"),
+      },
+      Mov {
+        src: Imm(42),
+        dest: var("w"),
+      },
+      Mov {
+        src: var("v"),
+        dest: var("x"),
+      },
+      Add {
+        src: Imm(7),
+        dest: var("x"),
+      },
+      Mov {
+        src: var("x"),
+        dest: var("y"),
+      },
+      Mov {
+        src: var("x"),
+        dest: var("z"),
+      },
+      Add {
+        src: var("w"),
+        dest: var("z"),
+      },
+      Mov {
+        src: var("y"),
+        dest: var("t"),
+      },
       Neg(var("t")),
-      Mov(var("z"), Reg(Rax)),
-      Add(var("t"), Reg(Rax)),
+      Mov {
+        src: var("z"),
+        dest: Reg(Rax),
+      },
+      Add {
+        src: var("t"),
+        dest: Reg(Rax),
+      },
       Jmp("conclusion".to_owned()),
     ];
     let label_live = hashmap! {

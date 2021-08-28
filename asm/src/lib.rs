@@ -18,9 +18,9 @@ pub struct Block<VAR = !> {
 #[derive(Clone)]
 #[non_exhaustive]
 pub enum Instr<VAR = !> {
-  Add(Arg<VAR>, Arg<VAR>),
-  Sub(Arg<VAR>, Arg<VAR>),
-  Mov(Arg<VAR>, Arg<VAR>),
+  Add { src: Arg<VAR>, dest: Arg<VAR> },
+  Sub { src: Arg<VAR>, dest: Arg<VAR> },
+  Mov { src: Arg<VAR>, dest: Arg<VAR> },
   Neg(Arg<VAR>),
   Call(String, usize),
   Ret,
@@ -28,12 +28,27 @@ pub enum Instr<VAR = !> {
   Pop(Arg<VAR>),
   Jmp(String),
   Syscall,
+  Xor { src: Arg<VAR>, dest: Arg<VAR> },
+  Cmp { src: Arg<VAR>, dest: Arg<VAR> },
+  SetIf(CmpResult, Arg<VAR>),
+  Movzb { src: Arg<VAR>, dest: Arg<VAR> },
+  JumpIf(CmpResult, String),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum CmpResult {
+  Eq,
+  Lt,
+  Le,
+  Gt,
+  Ge,
 }
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum Arg<VAR = !> {
   Imm(i64),
   Reg(Reg),
+  ByteReg(ByteReg),
   Deref(Reg, i32),
   Var(VAR),
 }
@@ -58,6 +73,18 @@ pub enum Reg {
   R13,
   R14,
   R15,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum ByteReg {
+  Al,
+  Ah,
+  Bl,
+  Bh,
+  Cl,
+  Ch,
+  Dl,
+  Dh,
 }
 
 impl<INFO: Debug, VAR: Debug> Program<INFO, VAR> {
@@ -103,16 +130,21 @@ impl<VAR: Debug> Debug for Block<VAR> {
 impl<VAR: Debug> Debug for Instr<VAR> {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     match self {
-      Self::Add(src, dest) => write!(f, "add {:?}, {:?}", dest, src),
-      Self::Mov(src, dest) => write!(f, "mov {:?}, {:?}", dest, src),
+      Self::Add { src, dest } => write!(f, "add {:?}, {:?}", dest, src),
+      Self::Mov { src, dest } => write!(f, "mov {:?}, {:?}", dest, src),
       Self::Call(label, _) => write!(f, "call {}", label),
       Self::Jmp(label) => write!(f, "jmp {}", label),
       Self::Neg(dest) => write!(f, "neg {:?}", dest),
       Self::Pop(dest) => write!(f, "pop {:?}", dest),
       Self::Push(src) => write!(f, "push {:?}", src),
       Self::Ret => write!(f, "ret"),
-      Self::Sub(src, dest) => write!(f, "sub {:?}, {:?}", dest, src),
+      Self::Sub { src, dest } => write!(f, "sub {:?}, {:?}", dest, src),
       Self::Syscall => write!(f, "syscall"),
+      Self::Xor { src, dest } => write!(f, "xor {:?}, {:?}", dest, src),
+      Self::Cmp { src, dest } => write!(f, "cmp {:?}, {:?}", src, dest),
+      Self::Movzb { src, dest } => write!(f, "movzb {:?}, {:?}", dest, src),
+      Self::SetIf(cmp, dest) => write!(f, "set{:?} {:?}", cmp, dest),
+      Self::JumpIf(cmp, label) => write!(f, "j{:?} {}", cmp, label),
     }
   }
 }
@@ -132,6 +164,7 @@ impl<VAR: Debug> Debug for Arg<VAR> {
         }
       }
       Self::Reg(r) => r.fmt(f),
+      Self::ByteReg(r) => r.fmt(f),
     }
   }
 }
@@ -171,6 +204,37 @@ impl Debug for Reg {
       R13 => "r13",
       R14 => "r14",
       R15 => "r15",
+    };
+    f.write_str(op)
+  }
+}
+
+impl Debug for ByteReg {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    use ByteReg::*;
+    let op = match self {
+      Al => "al",
+      Ah => "ah",
+      Bl => "bl",
+      Bh => "bh",
+      Cl => "cl",
+      Ch => "ch",
+      Dl => "dl",
+      Dh => "dh",
+    };
+    f.write_str(op)
+  }
+}
+
+impl Debug for CmpResult {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    use CmpResult::*;
+    let op = match self {
+      Eq => "q",
+      Lt => "l",
+      Le => "le",
+      Gt => "g",
+      Ge => "ge",
     };
     f.write_str(op)
   }
