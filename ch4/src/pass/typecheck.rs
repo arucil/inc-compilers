@@ -15,20 +15,21 @@ enum Type {
 
 static PRIM_TYPES: Lazy<HashMap<&'static str, Vec<(Vec<Type>, Type)>>> =
   Lazy::new(|| {
+    use Type::*;
     hashmap! {
-      "+" => vec![(vec![Type::Int, Type::Int], Type::Int)],
+      "+" => vec![(vec![Int, Int], Int)],
       "-" => vec![
-        (vec![Type::Int], Type::Int),
-        (vec![Type::Int, Type::Int], Type::Int)
+        (vec![Int], Int),
+        (vec![Int, Int], Int)
       ],
-      "read" => vec![(vec![], Type::Int)],
-      "and" => vec![(vec![Type::Bool, Type::Bool], Type::Bool)],
-      "or" => vec![(vec![Type::Bool, Type::Bool], Type::Bool)],
-      "not" => vec![(vec![Type::Bool], Type::Bool)],
-      ">" => vec![(vec![Type::Int, Type::Int], Type::Bool)],
-      ">=" => vec![(vec![Type::Int, Type::Int], Type::Bool)],
-      "<" => vec![(vec![Type::Int, Type::Int], Type::Bool)],
-      "<=" => vec![(vec![Type::Int, Type::Int], Type::Bool)],
+      "read" => vec![(vec![], Int)],
+      "and" => vec![(vec![Bool, Bool], Bool)],
+      "or" => vec![(vec![Bool, Bool], Bool)],
+      "not" => vec![(vec![Bool], Bool)],
+      ">" => vec![(vec![Int, Int], Bool)],
+      ">=" => vec![(vec![Int, Int], Bool)],
+      "<" => vec![(vec![Int, Int], Bool)],
+      "<=" => vec![(vec![Int, Int], Bool)],
     }
   });
 

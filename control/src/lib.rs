@@ -31,12 +31,24 @@ pub enum CPrim {
   Read,
   Neg(CAtom),
   Add(CAtom, CAtom),
+  Sub(CAtom, CAtom),
+  Not(CAtom),
+  Cmp(CCmpOp, CAtom, CAtom),
+}
+
+pub enum CCmpOp {
+  Eq,
+  Lt,
+  Le,
+  Gt,
+  Ge,
 }
 
 #[non_exhaustive]
 pub enum CAtom {
   Int(i64),
   Var(IdxVar),
+  Bool(bool),
 }
 
 impl<INFO: Debug> CProgram<INFO> {
@@ -95,12 +107,33 @@ impl Debug for CPrim {
       Self::Add(arg1, arg2) => {
         write!(f, "(+ {:?} {:?})", arg1, arg2)
       }
+      Self::Sub(arg1, arg2) => {
+        write!(f, "(- {:?} {:?})", arg1, arg2)
+      }
       Self::Neg(arg) => {
         write!(f, "(- {:?})", arg)
       }
       Self::Read => {
         write!(f, "(read)")
       }
+      Self::Not(arg) => {
+        write!(f, "(not {:?})", arg)
+      }
+      Self::Cmp(op, arg1, arg2) => {
+        write!(f, "({:?} {:?} {:?})", op, arg1, arg2)
+      }
+    }
+  }
+}
+
+impl Debug for CCmpOp {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    match self {
+      Self::Eq => write!(f, "eq?"),
+      Self::Lt => write!(f, "<"),
+      Self::Le => write!(f, "<="),
+      Self::Gt => write!(f, ">"),
+      Self::Ge => write!(f, ">="),
     }
   }
 }
@@ -110,6 +143,8 @@ impl Debug for CAtom {
     match self {
       Self::Int(n) => write!(f, "{}", n),
       Self::Var(n) => write!(f, "{:?}", n),
+      Self::Bool(true) => write!(f, "#t"),
+      Self::Bool(false) => write!(f, "#f"),
     }
   }
 }
