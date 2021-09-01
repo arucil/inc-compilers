@@ -300,7 +300,7 @@ fn color_graph(
 mod tests {
   use super::*;
   use crate::location_set::LocationSet;
-  use asm::{Arg, Block};
+  use asm::{Arg, Block, Label};
   use ch2::pass::select_instruction::Info as OldOldInfo;
   use indexmap::indexset;
   use insta::assert_snapshot;
@@ -357,10 +357,10 @@ mod tests {
         src: var("t"),
         dest: Reg(Rax),
       },
-      Jmp("conclusion".to_owned()),
+      Jmp(Label::Conclusion),
     ];
     let label_live = hashmap! {
-      "conclusion".to_owned() => {
+      Label::Conclusion => {
         let mut set = LocationSet::new();
         set.add_reg(Rax);
         set.add_reg(Rsp);
@@ -405,10 +405,10 @@ mod tests {
         src: Reg(Rax),
         dest: var("w"),
       },
-      Jmp("conclusion".to_owned()),
+      Jmp(Label::Conclusion)
     ];
     let label_live = hashmap! {
-      "conclusion".to_owned() => {
+      Label::Conclusion => {
         let mut set = LocationSet::new();
         set.add_reg(Rax);
         set.add_reg(Rsp);
@@ -453,10 +453,10 @@ mod tests {
         src: Reg(Rax),
         dest: var("w"),
       },
-      Jmp("conclusion".to_owned()),
+      Jmp(Label::Conclusion)
     ];
     let label_live = hashmap! {
-      "conclusion".to_owned() => {
+      Label::Conclusion => {
         let mut set = LocationSet::new();
         set.add_reg(Rax);
         set.add_reg(Rsp);
@@ -583,10 +583,10 @@ mod tests {
         src: var("t"),
         dest: Reg(Rax),
       },
-      Jmp("conclusion".to_owned()),
+      Jmp(Label::Conclusion),
     ];
     let label_live = hashmap! {
-      "conclusion".to_owned() => {
+      Label::Conclusion => {
         let mut set = LocationSet::new();
         set.add_reg(Rax);
         set.add_reg(Rsp);

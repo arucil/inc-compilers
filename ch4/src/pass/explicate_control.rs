@@ -142,7 +142,7 @@ mod tests {
     let prog =
       ast::parse(r#"(let ([y (let ([x 20]) (+ x (let ([x 22]) x)))]) y)"#)
         .unwrap();
-    let prog = super::super::uniquify::uniquify(prog).unwrap();
+    let prog = super::super::uniquify::uniquify(prog);
     let prog = super::super::anf::anf(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
@@ -154,7 +154,7 @@ mod tests {
       r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#,
     )
     .unwrap();
-    let prog = super::super::uniquify::uniquify(prog).unwrap();
+    let prog = super::super::uniquify::uniquify(prog);
     let prog = super::super::anf::anf(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());

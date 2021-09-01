@@ -1,5 +1,5 @@
 use crate::location_set::{LocationSet, VarStore};
-use asm::{Arg, Instr, Program};
+use asm::{Arg, Instr, Program, Label};
 use ast::IdxVar;
 use ch2::pass::select_instruction::Info as OldInfo;
 use indexmap::{IndexMap, IndexSet};
@@ -13,7 +13,7 @@ pub struct Info {
 
 pub fn analyze_liveness(
   prog: Program<OldInfo, IdxVar>,
-  label_live: HashMap<String, LocationSet>,
+  label_live: HashMap<Label, LocationSet>,
 ) -> Program<Info, IdxVar> {
   let mut state = AnalysisState {
     var_store: VarStore::new(),
@@ -41,7 +41,7 @@ pub fn analyze_liveness(
 
 struct AnalysisState<'a> {
   var_store: VarStore,
-  label_live: &'a HashMap<String, LocationSet>,
+  label_live: &'a HashMap<Label, LocationSet>,
 }
 
 impl<'a> AnalysisState<'a> {
@@ -159,6 +159,7 @@ mod tests {
   #[test]
   fn example_in_book() {
     use asm::Reg::*;
+    use asm::Label;
     use Arg::*;
     use Instr::*;
     let code = vec![
@@ -203,10 +204,10 @@ mod tests {
         src: var("t"),
         dest: Reg(Rax),
       },
-      Jmp("conclusion".to_owned()),
+      Jmp(Label::Conclusion)
     ];
     let label_live = hashmap! {
-      "conclusion".to_owned() => {
+      Label::Conclusion => {
         let mut set = LocationSet::new();
         set.add_reg(Rax);
         set.add_reg(Rsp);
@@ -246,10 +247,10 @@ mod tests {
         src: var("w"),
         dest: var("x"),
       },
-      Jmp("conclusion".to_owned()),
+      Jmp(Label::Conclusion)
     ];
     let label_live = hashmap! {
-      "conclusion".to_owned() => {
+      Label::Conclusion => {
         let mut set = LocationSet::new();
         set.add_reg(Rax);
         set.add_reg(Rsp);
@@ -291,10 +292,10 @@ mod tests {
         src: Reg(Rax),
         dest: var("w"),
       },
-      Jmp("conclusion".to_owned()),
+      Jmp(Label::Conclusion)
     ];
     let label_live = hashmap! {
-      "conclusion".to_owned() => {
+      Label::Conclusion => {
         let mut set = LocationSet::new();
         set.add_reg(Rax);
         set.add_reg(Rsp);

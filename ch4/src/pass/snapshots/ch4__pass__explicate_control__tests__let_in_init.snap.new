@@ -1,0 +1,13 @@
+---
+source: ch4/src/pass/explicate_control.rs
+expression: result.to_string_pretty()
+
+---
+locals: {y.2, x.0, tmp.0, x.1}
+
+start:
+    x.0 = 20
+    x.1 = 22
+    tmp.0 = x.1
+    y.2 = (+ x.0 tmp.0)
+    return y.2

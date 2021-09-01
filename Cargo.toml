@@ -6,5 +6,6 @@ members = [
     "ch4",
     "ast",
     "asm",
+    "control",
     "support"
 ]

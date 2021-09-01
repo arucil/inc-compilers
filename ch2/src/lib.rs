@@ -22,6 +22,7 @@ pub fn compile(input: &str) -> Result<String, CompileError> {
 
 fn add_prologue(prog: &mut Program<self::pass::assign_home::Info>) {
   use asm::Reg::*;
+  use asm::Label;
   use Arg::*;
   use Instr::*;
   let stack_space = (prog.info.stack_space + 15) & !15;
@@ -37,7 +38,7 @@ fn add_prologue(prog: &mut Program<self::pass::assign_home::Info>) {
         src: Imm(stack_space as i64),
         dest: Reg(Rsp),
       },
-      Jmp("start".to_owned()),
+      Jmp(Label::Start),
     ],
   };
   prog.blocks.push(("_start".to_owned(), block));

@@ -1,0 +1,22 @@
+---
+source: ch4/src/pass/anf.rs
+expression: result.to_string_pretty()
+
+---
+(let
+ [tmp.0 (- 3 2)]
+ (let
+  [tmp.5
+   (if
+    (let
+     [tmp.1 (eq? 2 3)]
+     (not tmp.1))
+    (let
+     [tmp.2 (read)]
+     (- tmp.2))
+    (let
+     [tmp.3 (read)]
+     (let
+      [tmp.4 (not #t)]
+      (> tmp.3 tmp.4))))]
+  (+ tmp.0 tmp.5)))

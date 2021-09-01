@@ -1,6 +1,7 @@
-use super::explicate_control::{CAtom, CExp, CPrim, CProgram, CStmt, CTail};
-use asm::{Arg, Block, Instr, Program, Reg};
+use super::explicate_control::CInfo;
+use asm::{Arg, Block, Instr, Program, Reg, Label};
 use ast::IdxVar;
+use control::*;
 use indexmap::IndexSet;
 use std::fmt::{self, Debug, Formatter};
 
@@ -14,7 +15,7 @@ impl Debug for Info {
   }
 }
 
-pub fn select_instruction(prog: CProgram) -> Program<Info, IdxVar> {
+pub fn select_instruction(prog: CProgram<CInfo>) -> Program<Info, IdxVar> {
   Program {
     info: Info {
       locals: prog.info.locals,
@@ -22,39 +23,37 @@ pub fn select_instruction(prog: CProgram) -> Program<Info, IdxVar> {
     blocks: prog
       .body
       .into_iter()
-      .map(|(label, tail)| (label, tail_block(tail)))
+      .map(|(label, tail)| (label, build_block(tail)))
       .collect(),
   }
 }
 
-fn tail_block(tail: CTail) -> Block<IdxVar> {
+fn build_block(block: CBlock) -> Block<IdxVar> {
   let mut code = vec![];
-  tail_instructions(tail, &mut code);
+  for stmt in block.stmts {
+    stmt_instructions(stmt, &mut code);
+  }
+  tail_instructions(block.tail, &mut code);
   Block {
     global: false,
     code,
   }
 }
 
-fn tail_instructions(mut tail: CTail, code: &mut Vec<Instr<IdxVar>>) {
-  loop {
-    match tail {
-      CTail::Return(exp) => {
-        exp_instructions(Arg::Reg(Reg::Rax), exp, code);
-        code.push(Instr::Jmp("conclusion".to_owned()));
-        return;
-      }
-      CTail::Seq(stmt, new_tail) => {
-        stmt_instructions(stmt, code);
-        tail = *new_tail;
-      }
+fn tail_instructions(tail: CTail, code: &mut Vec<Instr<IdxVar>>) {
+  match tail {
+    CTail::Return(exp) => {
+      exp_instructions(Arg::Reg(Reg::Rax), exp, code);
+      code.push(Instr::Jmp(Label::Conclusion));
     }
+    _ => unimplemented!(),
   }
 }
 
 fn stmt_instructions(stmt: CStmt, code: &mut Vec<Instr<IdxVar>>) {
   match stmt {
     CStmt::Assign { var, exp } => exp_instructions(Arg::Var(var), exp, code),
+    _ => unimplemented!(),
   }
 }
 
@@ -83,12 +82,14 @@ fn exp_instructions(
       let arg = match atom2 {
         CAtom::Int(n) => Arg::Imm(n),
         CAtom::Var(var) => Arg::Var(var),
+        _ => unimplemented!(),
       };
       code.push(Instr::Add {
         src: arg,
         dest: target,
       });
     }
+    _ => unimplemented!(),
   }
 }
 
@@ -110,6 +111,7 @@ fn atom_instructions(
         dest: target,
       });
     }
+    _ => unimplemented!(),
   }
 }
 

@@ -32,7 +32,7 @@ static PRIM_TYPES: Lazy<HashMap<&'static str, Vec<(Vec<Type>, Type)>>> =
     }
   });
 
-pub fn typecheck_prog(prog: Program) -> Result<Program> {
+pub fn typecheck(prog: Program) -> Result<Program> {
   let body = prog
     .body
     .into_iter()
@@ -113,7 +113,7 @@ fn typecheck_exp(
       if ty1 != ty2 {
         return Err(CompileError {
           range,
-          message: format!("type mismatch in if form, {:?} != {:?}", ty1, ty2),
+          message: format!("type mismatch, {:?} != {:?}", ty1, ty2),
         });
       }
       Ok((
@@ -143,7 +143,7 @@ fn typecheck_op(range: Range, op: &str, arg_types: &[Type]) -> Result<Type> {
         Err(CompileError {
           range,
           message: format!(
-            "type mismatch in eq? form, {:?} != {:?}",
+            "type mismatch, {:?} != {:?}",
             arg_types[0], arg_types[1]
           ),
         })
@@ -151,25 +151,33 @@ fn typecheck_op(range: Range, op: &str, arg_types: &[Type]) -> Result<Type> {
     } else {
       Err(CompileError {
         range,
-        message: format!("arity mismatch in eq?"),
+        message: format!("arity mismatch"),
       })
     }
   } else if let Some(tys) = PRIM_TYPES.get(&op) {
+    let mut arity_matched = false;
+    let mut matched_arg_tys = Vec::<&[Type]>::new();
     for (arg_tys, ret_ty) in tys {
-      if arg_types.len() == arg_tys.len()
-        && arg_tys
-          .iter()
-          .zip(arg_types.iter())
-          .map(|(x, y)| x == y)
-          .all(|x| x)
-      {
-        return Ok(*ret_ty);
+      if arg_types.len() == arg_tys.len() {
+        arity_matched = true;
+        if arg_tys.iter().zip(arg_types.iter()).all(|(x, y)| x == y) {
+          return Ok(*ret_ty);
+        }
+      } else {
+        matched_arg_tys.push(arg_tys);
       }
     }
-    Err(CompileError {
-      range,
-      message: format!("invalid {:?} operation", op),
-    })
+    if arity_matched {
+      Err(CompileError {
+        range,
+        message: format!("invalid {:?} operation", op),
+      })
+    } else {
+      Err(CompileError {
+        range,
+        message: format!("arity mismatch"),
+      })
+    }
   } else {
     panic!("unimplemented op {:?}", op)
   }
@@ -185,30 +193,30 @@ mod tests {
   #[test]
   fn nested_prims() {
     let prog = parse(r#"(+ 1 (+ (read) (- 7)))"#).unwrap();
-    let result = typecheck_prog(prog);
+    let result = typecheck(prog);
     assert_eq!(result.map(|_| ()), Ok(()));
   }
 
   #[test]
   fn r#if() {
     let prog = parse(r#"(if (> (read) (- 2 7)) (- 7) (+ (read) 30))"#).unwrap();
-    let result = typecheck_prog(prog);
+    let result = typecheck(prog);
     assert_eq!(result.map(|_| ()), Ok(()));
   }
 
   #[test]
   fn logical() {
     let prog =
-      parse(r#"(if (and (or #f (>= (- 12) (read))) (not (<= 7 2))) 1 2)"#).unwrap();
-    let result = typecheck_prog(prog);
+      parse(r#"(if (and (or #f (>= (- 12) (read))) (not (<= 7 2))) 1 2)"#)
+        .unwrap();
+    let result = typecheck(prog);
     assert_eq!(result.map(|_| ()), Ok(()));
   }
 
   #[test]
   fn eq() {
-    let prog =
-      parse(r#"(if (eq? #t (not (eq? 3 (read)))) 1 2)"#).unwrap();
-    let result = typecheck_prog(prog);
+    let prog = parse(r#"(if (eq? #t (not (eq? 3 (read)))) 1 2)"#).unwrap();
+    let result = typecheck(prog);
     assert_eq!(result.map(|_| ()), Ok(()));
   }
 
@@ -216,63 +224,85 @@ mod tests {
   fn r#let() {
     let prog =
       parse(r#"(let ([a (+ 7 2)]) (if (< a (read)) 13 (+ a 10)))"#).unwrap();
-    let result = typecheck_prog(prog);
+    let result = typecheck(prog);
     assert_eq!(result.map(|_| ()), Ok(()));
   }
 
   #[test]
   fn if_mismatch() {
-    let prog =
-      parse(r#"(if #t (+ 7 3) (not (> 3 2)))"#).unwrap();
-    let result = typecheck_prog(prog);
-    assert_eq!(result, Err(CompileError {
-      range: Range {
-        start: 0,
-        end: 29,
-      },
-      message: format!("type mismatch in if form, Int != Bool"),
-    }));
+    let prog = parse(r#"(if #t (+ 7 3) (not (> 3 2)))"#).unwrap();
+    let result = typecheck(prog);
+    assert_eq!(
+      result,
+      Err(CompileError {
+        range: Range { start: 0, end: 29 },
+        message: format!("type mismatch, Int != Bool"),
+      })
+    );
   }
 
   #[test]
   fn if_cond_not_bool() {
-    let prog =
-      parse(r#"(if (read) (+ 7 3) (- (> 3 2)))"#).unwrap();
-    let result = typecheck_prog(prog);
-    assert_eq!(result, Err(CompileError {
-      range: Range {
-        start: 0,
-        end: 31,
-      },
-      message: format!("expected Bool, found Int"),
-    }));
+    let prog = parse(r#"(if (read) (+ 7 3) (- (> 3 2)))"#).unwrap();
+    let result = typecheck(prog);
+    assert_eq!(
+      result,
+      Err(CompileError {
+        range: Range { start: 0, end: 31 },
+        message: format!("expected Bool, found Int"),
+      })
+    );
   }
 
   #[test]
   fn var_not_found() {
-    let prog =
-      parse(r#"x1"#).unwrap();
-    let result = typecheck_prog(prog);
-    assert_eq!(result, Err(CompileError {
-      range: Range {
-        start: 0,
-        end: 2,
-      },
-      message: format!("variable x1 not found"),
-    }));
+    let prog = parse(r#"x1"#).unwrap();
+    let result = typecheck(prog);
+    assert_eq!(
+      result,
+      Err(CompileError {
+        range: Range { start: 0, end: 2 },
+        message: format!("variable x1 not found"),
+      })
+    );
   }
 
   #[test]
   fn eq_type_mismatch() {
-    let prog =
-      parse(r#"(eq? #t (+ 3 7))"#).unwrap();
-    let result = typecheck_prog(prog);
-    assert_eq!(result, Err(CompileError {
-      range: Range {
-        start: 0,
-        end: 16,
-      },
-      message: format!("type mismatch in eq? form, Bool != Int"),
-    }));
+    let prog = parse(r#"(eq? #t (+ 3 7))"#).unwrap();
+    let result = typecheck(prog);
+    assert_eq!(
+      result,
+      Err(CompileError {
+        range: Range { start: 0, end: 16 },
+        message: format!("type mismatch, Bool != Int"),
+      })
+    );
+  }
+
+  #[test]
+  fn arity_mismatch() {
+    let prog = parse(r#"(eq? 3 (+ 3 7 2))"#).unwrap();
+    let result = typecheck(prog);
+    assert_eq!(
+      result,
+      Err(CompileError {
+        range: Range { start: 7, end: 16 },
+        message: format!("arity mismatch"),
+      })
+    );
+  }
+
+  #[test]
+  fn type_mismatch_in_addition() {
+    let prog = parse(r#"(+ 3 (not #t))"#).unwrap();
+    let result = typecheck(prog);
+    assert_eq!(
+      result,
+      Err(CompileError {
+        range: Range { start: 0, end: 14 },
+        message: format!("invalid \"+\" operation"),
+      })
+    );
   }
 }

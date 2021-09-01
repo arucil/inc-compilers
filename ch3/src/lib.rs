@@ -1,5 +1,5 @@
 use self::location_set::LocationSet;
-use asm::{Arg, Block, Instr, Program, Reg};
+use asm::{Arg, Block, Instr, Program, Reg, Label};
 use maplit::hashmap;
 use support::CompileError;
 
@@ -21,7 +21,7 @@ pub fn compile(
   let prog = self::pass::liveness_analysis::analyze_liveness(
     prog,
     hashmap! {
-      "conclusion".to_owned() => {
+      Label::Conclusion => {
         let mut set = LocationSet::new();
         set.add_reg(Rax);
         set.add_reg(Rbp);
@@ -64,7 +64,7 @@ fn add_prologue(prog: &mut Program<self::pass::register_allocation::Info>) {
   for &reg in &prog.info.used_callee_saved_regs {
     code.push(Push(Reg(reg)));
   }
-  code.push(Jmp("start".to_owned()));
+  code.push(Jmp(Label::Start));
   let block = Block { global: true, code };
   prog.blocks.push(("_start".to_owned(), block));
 }

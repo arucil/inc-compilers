@@ -117,12 +117,15 @@ impl<VAR: Debug> Exp<VAR> {
       Exp::If { cond, conseq, alt } => RcDoc::text("(")
         .append(
           RcDoc::text("if")
-            .append(Doc::space())
+            .append(Doc::line())
             .append(cond.1.to_doc())
+            .group()
             .append(Doc::line())
-            .append(conseq.1.to_doc())
-            .append(Doc::line())
-            .append(alt.1.to_doc()),
+            .append(
+              conseq.1.to_doc().append(Doc::line()).append(alt.1.to_doc()),
+            )
+            .nest(1)
+            .group(),
         )
         .append(RcDoc::text(")")),
     }

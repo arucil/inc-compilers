@@ -1,0 +1,10 @@
+---
+source: ch4/src/pass/uniquify.rs
+expression: result.to_string_pretty()
+
+---
+(let
+ [x.0 (read)]
+ (if (eq? x.0 3)
+  (> 2 1)
+  (not x.0)))

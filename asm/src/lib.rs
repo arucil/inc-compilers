@@ -26,13 +26,20 @@ pub enum Instr<VAR = !> {
   Ret,
   Push(Arg<VAR>),
   Pop(Arg<VAR>),
-  Jmp(String),
+  Jmp(Label),
   Syscall,
   Xor { src: Arg<VAR>, dest: Arg<VAR> },
   Cmp { src: Arg<VAR>, dest: Arg<VAR> },
   SetIf(CmpResult, Arg<VAR>),
   Movzb { src: Arg<VAR>, dest: Arg<VAR> },
-  JumpIf(CmpResult, String),
+  JumpIf(CmpResult, Label),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Label {
+  Tmp(u32),
+  Start,
+  Conclusion,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -133,7 +140,7 @@ impl<VAR: Debug> Debug for Instr<VAR> {
       Self::Add { src, dest } => write!(f, "add {:?}, {:?}", dest, src),
       Self::Mov { src, dest } => write!(f, "mov {:?}, {:?}", dest, src),
       Self::Call(label, _) => write!(f, "call {}", label),
-      Self::Jmp(label) => write!(f, "jmp {}", label),
+      Self::Jmp(label) => write!(f, "jmp {:?}", label),
       Self::Neg(dest) => write!(f, "neg {:?}", dest),
       Self::Pop(dest) => write!(f, "pop {:?}", dest),
       Self::Push(src) => write!(f, "push {:?}", src),
@@ -144,7 +151,7 @@ impl<VAR: Debug> Debug for Instr<VAR> {
       Self::Cmp { src, dest } => write!(f, "cmp {:?}, {:?}", src, dest),
       Self::Movzb { src, dest } => write!(f, "movzb {:?}, {:?}", dest, src),
       Self::SetIf(cmp, dest) => write!(f, "set{:?} {:?}", cmp, dest),
-      Self::JumpIf(cmp, label) => write!(f, "j{:?} {}", cmp, label),
+      Self::JumpIf(cmp, label) => write!(f, "j{:?} {:?}", cmp, label),
     }
   }
 }
@@ -237,5 +244,15 @@ impl Debug for CmpResult {
       Ge => "ge",
     };
     f.write_str(op)
+  }
+}
+
+impl Debug for Label {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    match self {
+      Self::Start => write!(f, "start"),
+      Self::Conclusion => write!(f, "conclusion"),
+      Self::Tmp(n) => write!(f, "block{}", n),
+    }
   }
 }

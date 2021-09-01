@@ -1,5 +1,5 @@
-use std::path::{Path, PathBuf};
 use crate::Range;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompileError {

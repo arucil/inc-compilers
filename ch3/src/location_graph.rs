@@ -1,7 +1,6 @@
-use petgraph::graph::{Graph, NodeIndex, UnGraph};
 use crate::location_set::Location;
 use indexmap::IndexMap;
-
+use petgraph::graph::{Graph, NodeIndex, UnGraph};
 
 pub struct LocationGraph {
   pub graph: UnGraph<Location, ()>,

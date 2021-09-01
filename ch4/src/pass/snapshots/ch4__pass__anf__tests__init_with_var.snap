@@ -1,0 +1,8 @@
+---
+source: ch4/src/pass/anf.rs
+expression: result.to_string_pretty()
+
+---
+(let
+ [a.0 42]
+ (let [b.1 a.0] b.1))
