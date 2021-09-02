@@ -23,30 +23,34 @@ pub fn select_instruction(prog: CProgram<CInfo>) -> Program<Info, IdxVar> {
     blocks: prog
       .body
       .into_iter()
-      .map(|(label, tail)| (label, build_block(tail)))
+      .map(|(label, tail)| (label, tail_block(tail)))
       .collect(),
   }
 }
 
-fn build_block(block: CBlock) -> Block<IdxVar> {
+fn tail_block(tail: CTail) -> Block<IdxVar> {
   let mut code = vec![];
-  for stmt in block.stmts {
-    stmt_instructions(stmt, &mut code);
-  }
-  tail_instructions(block.tail, &mut code);
+  tail_instructions(tail, &mut code);
   Block {
     global: false,
     code,
   }
 }
 
-fn tail_instructions(tail: CTail, code: &mut Vec<Instr<IdxVar>>) {
-  match tail {
-    CTail::Return(exp) => {
-      exp_instructions(Arg::Reg(Reg::Rax), exp, code);
-      code.push(Instr::Jmp(Label::Conclusion));
+fn tail_instructions(mut tail: CTail, code: &mut Vec<Instr<IdxVar>>) {
+  loop {
+    match tail {
+      CTail::Return(exp) => {
+        exp_instructions(Arg::Reg(Reg::Rax), exp, code);
+        code.push(Instr::Jmp(Label::Conclusion));
+        return;
+      }
+      CTail::Seq(stmt, new_tail) => {
+        stmt_instructions(stmt, code);
+        tail = *new_tail;
+      }
+      _ => unimplemented!()
     }
-    _ => unimplemented!(),
   }
 }
 

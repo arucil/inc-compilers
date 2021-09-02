@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 pub struct Info {
   pub locals: IndexSet<IdxVar>,
-  pub live: IndexMap<String, Vec<LocationSet>>,
+  pub live: IndexMap<Label, Vec<LocationSet>>,
   pub var_store: VarStore,
 }
 
@@ -129,7 +129,7 @@ mod tests {
     fn show(&self) -> String {
       let mut buf = String::new();
       for (label, block) in &self.blocks {
-        if label != "start" {
+        if *label != Label::Start {
           continue;
         }
         let live = &self.info.live[label];
@@ -219,7 +219,7 @@ mod tests {
         locals: IndexSet::new(),
       },
       blocks: vec![(
-        "start".to_owned(),
+        Label::Start,
         Block {
           global: false,
           code,
@@ -262,7 +262,7 @@ mod tests {
         locals: IndexSet::new(),
       },
       blocks: vec![(
-        "start".to_owned(),
+        Label::Start,
         Block {
           global: false,
           code,
@@ -307,7 +307,7 @@ mod tests {
         locals: IndexSet::new(),
       },
       blocks: vec![(
-        "start".to_owned(),
+        Label::Start,
         Block {
           global: false,
           code,
@@ -348,7 +348,7 @@ mod tests {
         locals: IndexSet::new(),
       },
       blocks: vec![(
-        "start".to_owned(),
+        Label::Start,
         Block {
           global: false,
           code,

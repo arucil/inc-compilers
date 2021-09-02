@@ -1,32 +1,35 @@
+use asm::Label;
 use ast::IdxVar;
 use std::fmt::{self, Debug, Formatter, Write};
 
 pub struct CProgram<INFO> {
   pub info: INFO,
-  pub body: Vec<(String, CBlock)>,
-}
-
-pub struct CBlock {
-  pub stmts: Vec<CStmt>,
-  pub tail: CTail,
+  pub body: Vec<(Label, CTail)>,
 }
 
 #[non_exhaustive]
+#[derive(Clone)]
 pub enum CTail {
+  Seq(CStmt, Box<CTail>),
   Return(CExp),
+  Goto(Label),
+  If(CExp, Label, Label),
 }
 
 #[non_exhaustive]
+#[derive(Clone)]
 pub enum CStmt {
   Assign { var: IdxVar, exp: CExp },
 }
 
+#[derive(Clone)]
 pub enum CExp {
   Atom(CAtom),
   Prim(CPrim),
 }
 
 #[non_exhaustive]
+#[derive(Clone)]
 pub enum CPrim {
   Read,
   Neg(CAtom),
@@ -36,6 +39,7 @@ pub enum CPrim {
   Cmp(CCmpOp, CAtom, CAtom),
 }
 
+#[derive(Clone, Copy)]
 pub enum CCmpOp {
   Eq,
   Lt,
@@ -45,6 +49,7 @@ pub enum CCmpOp {
 }
 
 #[non_exhaustive]
+#[derive(Clone)]
 pub enum CAtom {
   Int(i64),
   Var(IdxVar),
@@ -56,27 +61,31 @@ impl<INFO: Debug> CProgram<INFO> {
   pub fn to_string_pretty(&self) -> String {
     let mut buf = format!("{:?}", self.info);
     for (label, block) in &self.body {
-      writeln!(&mut buf, "{}:", label).unwrap();
-      buf += &format!("{:?}", block);
+      writeln!(&mut buf, "{:?}:", label).unwrap();
+      buf += &format!("{:?}\n", block);
     }
     buf
   }
 }
 
-impl Debug for CBlock {
-  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-    for stmt in &self.stmts {
-      writeln!(f, "    {:?}", stmt)?;
-    }
-    self.tail.fmt(f)
-  }
-}
-
 impl Debug for CTail {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-    match self {
-      Self::Return(exp) => {
-        write!(f, "    return {:?}", exp)
+    let mut tail = self;
+    loop {
+      match tail {
+        Self::Seq(stmt, tail1) => {
+          writeln!(f, "    {:?}", stmt)?;
+          tail = tail1;
+        }
+        Self::Return(exp) => return write!(f, "    return {:?}", exp),
+        Self::Goto(label) => return write!(f, "    goto {:?}", label),
+        Self::If(exp, conseq, alt) => {
+          return write!(
+            f,
+            "    if {:?} goto {:?} else goto {:?}",
+            exp, conseq, alt
+          )
+        }
       }
     }
   }
@@ -145,6 +154,19 @@ impl Debug for CAtom {
       Self::Var(n) => write!(f, "{:?}", n),
       Self::Bool(true) => write!(f, "#t"),
       Self::Bool(false) => write!(f, "#f"),
+    }
+  }
+}
+
+impl CCmpOp {
+  pub fn from_str(str: &str) -> Option<Self> {
+    match str {
+      "eq?" => Some(Self::Eq),
+      ">" => Some(Self::Gt),
+      ">=" => Some(Self::Ge),
+      "<" => Some(Self::Lt),
+      "<=" => Some(Self::Le),
+      _ => None,
     }
   }
 }

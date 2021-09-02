@@ -1,5 +1,6 @@
+use asm::Label;
 use ast::{Exp, IdxVar, Program};
-use control::{CAtom, CBlock, CExp, CPrim, CProgram, CStmt, CTail};
+use control::{CAtom, CExp, CPrim, CProgram, CStmt, CTail};
 use indexmap::IndexSet;
 use std::fmt::{self, Debug, Formatter};
 use support::Range;
@@ -18,10 +19,7 @@ pub fn explicate_control(mut prog: Program<IdxVar>) -> CProgram<CInfo> {
   let locals = collect_locals(&prog);
   CProgram {
     info: CInfo { locals },
-    body: vec![(
-      "start".to_owned(),
-      explicate_block(prog.body.pop().unwrap().1),
-    )],
+    body: vec![(Label::Start, explicate_tail(prog.body.pop().unwrap().1))],
   }
 }
 
@@ -54,64 +52,42 @@ fn collect_exp_locals(exp: &Exp<IdxVar>, locals: &mut IndexSet<IdxVar>) {
   }
 }
 
-fn explicate_block(exp: Exp<IdxVar>) -> CBlock {
-  let mut stmts: Vec<CStmt> = vec![];
-  let tail = explicate_tail(exp, &mut stmts);
-  CBlock { stmts, tail }
-}
-
-fn explicate_tail(mut exp: Exp<IdxVar>, stmts: &mut Vec<CStmt>) -> CTail {
-  loop {
-    match exp {
-      exp @ (Exp::Int(_) | Exp::Var(_)) => {
-        return CTail::Return(CExp::Atom(atom(exp)))
-      }
-      Exp::Prim { op: (_, op), args } => {
-        return CTail::Return(CExp::Prim(prim(op, args)))
-      }
-      Exp::Let { var, init, body } => {
-        explicate_assign(var.1, init.1, stmts);
-        exp = body.1;
-      }
-      exp => unimplemented!("unsupported form {:?}", exp),
+fn explicate_tail(exp: Exp<IdxVar>) -> CTail {
+  match exp {
+    exp @ (Exp::Int(_) | Exp::Var(_)) => CTail::Return(CExp::Atom(atom(exp))),
+    Exp::Prim { op: (_, op), args } => {
+      CTail::Return(CExp::Prim(prim(op, args)))
     }
+    Exp::Let { var, init, body } => {
+      explicate_assign(var.1, init.1, explicate_tail(body.1))
+    }
+    exp => unimplemented!("unsupported form {:?}", exp),
   }
 }
 
-fn explicate_assign(
-  var: IdxVar,
-  mut init: Exp<IdxVar>,
-  stmts: &mut Vec<CStmt>,
-) {
-  loop {
-    match init {
-      exp @ (Exp::Int(_) | Exp::Var(_)) => {
-        let assign = CStmt::Assign {
-          var,
-          exp: CExp::Atom(atom(exp)),
-        };
-        stmts.push(assign);
-        return;
-      }
-      Exp::Prim { op: (_, op), args } => {
-        let prim = prim(op, args);
-        let assign = CStmt::Assign {
-          var,
-          exp: CExp::Prim(prim),
-        };
-        stmts.push(assign);
-        return;
-      }
-      Exp::Let {
-        var: (_, var1),
-        init: box (_, init1),
-        body,
-      } => {
-        explicate_assign(var1, init1, stmts);
-        init = body.1;
-      }
-      exp => unimplemented!("unsupported form {:?}", exp),
+fn explicate_assign(var: IdxVar, init: ast::Exp<IdxVar>, cont: CTail) -> CTail {
+  match init {
+    Exp::Int(_) | Exp::Var(_) => {
+      let assign = CStmt::Assign {
+        var,
+        exp: CExp::Atom(atom(init)),
+      };
+      CTail::Seq(assign, box cont)
     }
+    Exp::Prim { op: (_, op), args } => {
+      let prim = prim(op, args);
+      let assign = CStmt::Assign {
+        var,
+        exp: CExp::Prim(prim),
+      };
+      CTail::Seq(assign, box cont)
+    }
+    Exp::Let {
+      var: (_, var1),
+      init: box (_, init1),
+      body,
+    } => explicate_assign(var1, init1, explicate_assign(var, body.1, cont)),
+    exp => unimplemented!("unsupported form {:?}", exp),
   }
 }
 

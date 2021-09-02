@@ -1,7 +1,7 @@
 use super::liveness_analysis::Info as OldInfo;
 use crate::location_graph::LocationGraph;
 use crate::location_set::{Location, LocationSet, VarStore};
-use asm::{Block, Instr, Program, Reg};
+use asm::{Block, Instr, Program, Reg, Label};
 use ast::IdxVar;
 use indexmap::{IndexMap, IndexSet};
 use petgraph::dot::{Config, Dot};
@@ -9,8 +9,8 @@ use std::fmt::{self, Debug, Formatter};
 
 pub struct Info {
   pub locals: IndexSet<IdxVar>,
-  pub conflicts: IndexMap<String, LocationGraph>,
-  pub moves: IndexMap<String, LocationGraph>,
+  pub conflicts: IndexMap<Label, LocationGraph>,
+  pub moves: IndexMap<Label, LocationGraph>,
   pub var_store: VarStore,
 }
 
@@ -105,7 +105,7 @@ fn add_instr_edges(
 
 impl Debug for Info {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-    let graph = self.conflicts["start"]
+    let graph = self.conflicts[&Label::Start]
       .graph
       .map(|_, var| var.to_arg(&self.var_store), |_, _| ());
     Dot::with_config(&graph, &[Config::EdgeNoLabel]).fmt(f)
@@ -187,7 +187,7 @@ mod tests {
         locals: IndexSet::new(),
       },
       blocks: vec![(
-        "start".to_owned(),
+        Label::Start,
         Block {
           global: false,
           code,
@@ -234,7 +234,7 @@ mod tests {
         locals: IndexSet::new(),
       },
       blocks: vec![(
-        "start".to_owned(),
+        Label::Start,
         Block {
           global: false,
           code,
@@ -275,7 +275,7 @@ mod tests {
         locals: IndexSet::new(),
       },
       blocks: vec![(
-        "start".to_owned(),
+        Label::Start,
         Block {
           global: false,
           code,

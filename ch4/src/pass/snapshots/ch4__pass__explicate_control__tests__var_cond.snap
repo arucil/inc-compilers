@@ -1,0 +1,16 @@
+---
+source: ch4/src/pass/explicate_control.rs
+expression: result.to_string_pretty()
+
+---
+locals: {x.0, tmp.0}
+
+start:
+    tmp.0 = (read)
+    x.0 = (eq? tmp.0 20)
+    if (eq? x.0 #f) goto block1 else goto block0
+block0:
+    return 42
+block1:
+    return 89
+

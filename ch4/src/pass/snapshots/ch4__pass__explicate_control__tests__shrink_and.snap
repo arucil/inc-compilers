@@ -1,0 +1,18 @@
+---
+source: ch4/src/pass/explicate_control.rs
+expression: result.to_string_pretty()
+
+---
+locals: {tmp.0, tmp.1}
+
+start:
+    tmp.0 = (read)
+    if (eq? tmp.0 0) goto block2 else goto block1
+block0:
+    return 0
+block1:
+    return 42
+block2:
+    tmp.1 = (read)
+    if (eq? tmp.1 2) goto block0 else goto block1
+

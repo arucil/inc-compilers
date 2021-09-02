@@ -1,0 +1,10 @@
+---
+source: ch4/src/pass/explicate_control.rs
+expression: result.to_string_pretty()
+
+---
+locals: {}
+
+start:
+    return 2
+

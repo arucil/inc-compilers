@@ -66,7 +66,7 @@ fn add_prologue(prog: &mut Program<self::pass::register_allocation::Info>) {
   }
   code.push(Jmp(Label::Start));
   let block = Block { global: true, code };
-  prog.blocks.push(("_start".to_owned(), block));
+  prog.blocks.push((Label::EntryPoint, block));
 }
 
 fn add_epilogue(prog: &mut Program<self::pass::register_allocation::Info>) {
@@ -102,7 +102,7 @@ fn add_epilogue(prog: &mut Program<self::pass::register_allocation::Info>) {
     global: false,
     code,
   };
-  prog.blocks.push(("conclusion".to_owned(), block));
+  prog.blocks.push((Label::Conclusion, block));
 }
 
 #[cfg(test)]

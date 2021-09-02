@@ -372,7 +372,7 @@ mod tests {
         locals: IndexSet::new(),
       },
       blocks: vec![(
-        "start".to_owned(),
+        Label::Start,
         Block {
           global: false,
           code,
@@ -420,7 +420,7 @@ mod tests {
         locals: IndexSet::new(),
       },
       blocks: vec![(
-        "start".to_owned(),
+        Label::Start,
         Block {
           global: false,
           code,
@@ -468,7 +468,7 @@ mod tests {
         locals: IndexSet::new(),
       },
       blocks: vec![(
-        "start".to_owned(),
+        Label::Start,
         Block {
           global: false,
           code,
@@ -521,7 +521,7 @@ mod tests {
         },
       },
       blocks: vec![(
-        "start".to_owned(),
+        Label::Start,
         Block {
           global: false,
           code,
@@ -598,7 +598,7 @@ mod tests {
         locals: IndexSet::new(),
       },
       blocks: vec![(
-        "start".to_owned(),
+        Label::Start,
         Block {
           global: false,
           code,

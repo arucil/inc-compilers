@@ -1,6 +1,6 @@
 #![feature(box_patterns, box_syntax)]
 
-use asm::{Arg, Block, Instr, Program};
+use asm::{Arg, Block, Instr, Program, Label};
 use support::CompileError;
 
 pub mod pass;
@@ -22,7 +22,6 @@ pub fn compile(input: &str) -> Result<String, CompileError> {
 
 fn add_prologue(prog: &mut Program<self::pass::assign_home::Info>) {
   use asm::Reg::*;
-  use asm::Label;
   use Arg::*;
   use Instr::*;
   let stack_space = (prog.info.stack_space + 15) & !15;
@@ -41,7 +40,7 @@ fn add_prologue(prog: &mut Program<self::pass::assign_home::Info>) {
       Jmp(Label::Start),
     ],
   };
-  prog.blocks.push(("_start".to_owned(), block));
+  prog.blocks.push((Label::EntryPoint, block));
 }
 
 fn add_epilogue(prog: &mut Program<self::pass::assign_home::Info>) {
@@ -69,7 +68,7 @@ fn add_epilogue(prog: &mut Program<self::pass::assign_home::Info>) {
       Syscall,
     ],
   };
-  prog.blocks.push(("conclusion".to_owned(), block));
+  prog.blocks.push((Label::Conclusion, block));
 }
 
 #[cfg(test)]

@@ -6,7 +6,7 @@ use std::fmt::{self, Debug, Formatter, Write};
 #[derive(Debug, Clone)]
 pub struct Program<INFO = (), VAR = !> {
   pub info: INFO,
-  pub blocks: Vec<(String, Block<VAR>)>,
+  pub blocks: Vec<(Label, Block<VAR>)>,
 }
 
 #[derive(Clone)]
@@ -39,12 +39,14 @@ pub enum Instr<VAR = !> {
 pub enum Label {
   Tmp(u32),
   Start,
+  EntryPoint,
   Conclusion,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum CmpResult {
   Eq,
+  Ne,
   Lt,
   Le,
   Gt,
@@ -98,7 +100,7 @@ impl<INFO: Debug, VAR: Debug> Program<INFO, VAR> {
   pub fn to_string_pretty(&self) -> String {
     let mut buf = format!("{:?}", self.info);
     for (label, block) in &self.blocks {
-      writeln!(&mut buf, "{}:", label).unwrap();
+      writeln!(&mut buf, "{:?}:", label).unwrap();
       buf += &format!("{:?}", block);
     }
     buf
@@ -113,10 +115,10 @@ impl<INFO: Debug, VAR: Debug> Program<INFO, VAR> {
       buf += "\n";
       if block.global {
         buf += "    global ";
-        buf += label;
+        buf += &format!("{:?}", label);
         buf += "\n";
       }
-      writeln!(&mut buf, "{}:", label).unwrap();
+      writeln!(&mut buf, "{:?}:", label).unwrap();
       buf += &format!("{:?}", block);
     }
     buf
@@ -237,7 +239,8 @@ impl Debug for CmpResult {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     use CmpResult::*;
     let op = match self {
-      Eq => "q",
+      Eq => "e",
+      Ne => "ne",
       Lt => "l",
       Le => "le",
       Gt => "g",
@@ -251,6 +254,7 @@ impl Debug for Label {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     match self {
       Self::Start => write!(f, "start"),
+      Self::EntryPoint => write!(f, "_start"),
       Self::Conclusion => write!(f, "conclusion"),
       Self::Tmp(n) => write!(f, "block{}", n),
     }

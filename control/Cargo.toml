@@ -8,3 +8,4 @@ edition = "2018"
 [dependencies]
 ast = { path = "../ast" }
 support = { path = "../support" }
+asm = { path = "../asm" }
