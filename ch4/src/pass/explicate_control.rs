@@ -157,11 +157,7 @@ fn explicate_pred(
     Exp::Var(_) => {
       let conseq = tail_to_label(conseq, cfg);
       let alt = tail_to_label(alt, cfg);
-      CTail::If(
-        CExp::Prim(CPrim::Cmp(CCmpOp::Eq, atom(cond), CAtom::Bool(false))),
-        alt,
-        conseq,
-      )
+      CTail::If(CCmpOp::Eq, atom(cond), CAtom::Bool(false), alt, conseq)
     }
     Exp::Let { var, init, body } => {
       let cont = explicate_pred(cfg, body.1, conseq, alt);
@@ -177,11 +173,7 @@ fn explicate_pred(
       let cmp = CCmpOp::from_str(op.1).unwrap();
       let arg2 = args.pop().unwrap().1;
       let arg1 = args.pop().unwrap().1;
-      CTail::If(
-        CExp::Prim(CPrim::Cmp(cmp, atom(arg1), atom(arg2))),
-        conseq,
-        alt,
-      )
+      CTail::If(cmp, atom(arg1), atom(arg2), conseq, alt)
     }
     Exp::If {
       cond: cond1,
@@ -305,10 +297,7 @@ mod tests {
 
   #[test]
   fn const_cond() {
-    let prog = ast::parse(
-      r#"(if (not #t) 1 2)"#,
-    )
-    .unwrap();
+    let prog = ast::parse(r#"(if (not #t) 1 2)"#).unwrap();
     let prog = super::super::uniquify::uniquify(prog);
     let prog = super::super::anf::anf(prog);
     let result = explicate_control(prog);
@@ -329,10 +318,8 @@ mod tests {
 
   #[test]
   fn var_cond() {
-    let prog = ast::parse(
-      r#"(let ([x (eq? (read) 20)]) (if x 42 89))"#,
-    )
-    .unwrap();
+    let prog =
+      ast::parse(r#"(let ([x (eq? (read) 20)]) (if x 42 89))"#).unwrap();
     let prog = super::super::uniquify::uniquify(prog);
     let prog = super::super::anf::anf(prog);
     let result = explicate_control(prog);
@@ -341,10 +328,8 @@ mod tests {
 
   #[test]
   fn shrink_and() {
-    let prog = ast::parse(
-      r#"(if (and (eq? (read) 0) (eq? (read) 2)) 0 42)"#,
-    )
-    .unwrap();
+    let prog =
+      ast::parse(r#"(if (and (eq? (read) 0) (eq? (read) 2)) 0 42)"#).unwrap();
     let prog = super::super::shrink::shrink(prog);
     let prog = super::super::uniquify::uniquify(prog);
     let prog = super::super::anf::anf(prog);

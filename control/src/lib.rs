@@ -1,4 +1,4 @@
-use asm::Label;
+use asm::{CmpResult, Label};
 use ast::IdxVar;
 use std::fmt::{self, Debug, Formatter, Write};
 
@@ -13,7 +13,7 @@ pub enum CTail {
   Seq(CStmt, Box<CTail>),
   Return(CExp),
   Goto(Label),
-  If(CExp, Label, Label),
+  If(CCmpOp, CAtom, CAtom, Label, Label),
 }
 
 #[non_exhaustive]
@@ -79,11 +79,11 @@ impl Debug for CTail {
         }
         Self::Return(exp) => return write!(f, "    return {:?}", exp),
         Self::Goto(label) => return write!(f, "    goto {:?}", label),
-        Self::If(exp, conseq, alt) => {
+        Self::If(cmp, arg1, arg2, conseq, alt) => {
           return write!(
             f,
-            "    if {:?} goto {:?} else goto {:?}",
-            exp, conseq, alt
+            "    if ({:?} {:?} {:?}) goto {:?} else goto {:?}",
+            cmp, arg1, arg2, conseq, alt
           )
         }
       }
@@ -167,6 +167,18 @@ impl CCmpOp {
       "<" => Some(Self::Lt),
       "<=" => Some(Self::Le),
       _ => None,
+    }
+  }
+}
+
+impl Into<CmpResult> for CCmpOp {
+  fn into(self) -> CmpResult {
+    match self {
+      CCmpOp::Eq => CmpResult::Eq,
+      CCmpOp::Gt => CmpResult::Gt,
+      CCmpOp::Ge => CmpResult::Ge,
+      CCmpOp::Lt => CmpResult::Lt,
+      CCmpOp::Le => CmpResult::Le,
     }
   }
 }

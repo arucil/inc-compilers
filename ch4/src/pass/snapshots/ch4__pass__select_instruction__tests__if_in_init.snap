@@ -1,0 +1,33 @@
+---
+source: ch4/src/pass/select_instruction.rs
+expression: result.to_string_pretty()
+
+---
+locals: {x.0, tmp.0, tmp.1}
+
+start:
+    call read_int
+    mov tmp.0, rax
+    cmp tmp.0, 3
+    jge block3
+    jmp block4
+block0:
+    mov rax, 2
+    jmp conclusion
+block1:
+    mov rax, 41
+    jmp conclusion
+block2:
+    cmp x.0, 10
+    sete al
+    movzb tmp.1, al
+    cmp tmp.1, 0
+    je block1
+    jmp block0
+block3:
+    mov x.0, 10
+    jmp block2
+block4:
+    mov x.0, 77
+    jmp block2
+

@@ -150,7 +150,7 @@ impl<VAR: Debug> Debug for Instr<VAR> {
       Self::Sub { src, dest } => write!(f, "sub {:?}, {:?}", dest, src),
       Self::Syscall => write!(f, "syscall"),
       Self::Xor { src, dest } => write!(f, "xor {:?}, {:?}", dest, src),
-      Self::Cmp { src, dest } => write!(f, "cmp {:?}, {:?}", src, dest),
+      Self::Cmp { src, dest } => write!(f, "cmp {:?}, {:?}", dest, src),
       Self::Movzb { src, dest } => write!(f, "movzb {:?}, {:?}", dest, src),
       Self::SetIf(cmp, dest) => write!(f, "set{:?} {:?}", cmp, dest),
       Self::JumpIf(cmp, label) => write!(f, "j{:?} {:?}", cmp, label),
