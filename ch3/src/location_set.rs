@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use num_traits::{FromPrimitive, ToPrimitive};
 use smallvec::SmallVec;
 use std::fmt::{self, Debug, Write};
-use std::ops::Deref;
+use std::ops::{Deref, BitOrAssign};
 
 #[derive(Debug, Clone)]
 pub struct LocationSet(SmallVec<[u32; 2]>);
@@ -98,6 +98,17 @@ impl LocationSet {
       write!(f, "{:?}", elem.to_arg(var_store))?;
     }
     write!(f, "}}")
+  }
+}
+
+impl<'a> BitOrAssign<&'a Self> for LocationSet {
+  fn bitor_assign(&mut self, rhs: &'a LocationSet) {
+    if self.0.len() < rhs.0.len() {
+      self.0.resize(rhs.0.len(), 0);
+    }
+    for i in 0..self.0.len().min(rhs.0.len()) {
+      self.0[i] |= rhs.0[i];
+    }
   }
 }
 

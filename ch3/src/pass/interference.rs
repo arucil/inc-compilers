@@ -115,65 +115,28 @@ impl Debug for Info {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use asm::{Arg, Label};
+  use asm::Label;
   use ch2::pass::select_instruction::Info as OldOldInfo;
   use insta::assert_snapshot;
   use maplit::hashmap;
 
-  fn var(name: &str) -> Arg<IdxVar> {
-    Arg::Var(IdxVar::new(name))
-  }
-
   #[test]
   fn example_in_book() {
     use asm::Reg::*;
-    use asm::Label;
-    use Arg::*;
-    use Instr::*;
-    let code = vec![
-      Mov {
-        src: Imm(1),
-        dest: var("v"),
-      },
-      Mov {
-        src: Imm(42),
-        dest: var("w"),
-      },
-      Mov {
-        src: var("v"),
-        dest: var("x"),
-      },
-      Add {
-        src: Imm(7),
-        dest: var("x"),
-      },
-      Mov {
-        src: var("x"),
-        dest: var("y"),
-      },
-      Mov {
-        src: var("x"),
-        dest: var("z"),
-      },
-      Add {
-        src: var("w"),
-        dest: var("z"),
-      },
-      Mov {
-        src: var("y"),
-        dest: var("t"),
-      },
-      Neg(var("t")),
-      Mov {
-        src: var("z"),
-        dest: Reg(Rax),
-      },
-      Add {
-        src: var("t"),
-        dest: Reg(Rax),
-      },
-      Jmp(Label::Conclusion)
-    ];
+    let code = asm::parse_code(|s| IdxVar::new(s), r#"
+      mov v, i
+      mov w, 42
+      mov x, v
+      add x, 7
+      mov y, x
+      mov z, x
+      add z, w
+      mov t, y
+      neg t
+      mov rax, z
+      add rax, t
+      jmp conclusion
+    "#);
     let label_live = hashmap! {
       Label::Conclusion => {
         let mut set = LocationSet::new();
@@ -204,23 +167,15 @@ mod tests {
   #[test]
   fn call() {
     use asm::Reg::*;
-    use Arg::*;
-    use Instr::*;
-    let code = vec![
-      Pop(Reg(Rdi)),
-      Pop(Reg(Rsi)),
-      Push(var("x")),
-      Mov {
-        src: Reg(Rbx),
-        dest: var("w"),
-      },
-      Call("foo".to_owned(), 3),
-      Add {
-        src: Reg(Rax),
-        dest: var("w"),
-      },
-      Jmp(Label::Conclusion)
-    ];
+    let code = asm::parse_code(|s| IdxVar::new(s), r#"
+      pop rdi
+      pop rsi
+      push x
+      mov w, rbx
+      call foo, 3
+      add w, rax
+      jmp conclusion
+    "#);
     let label_live = hashmap! {
       Label::Conclusion => {
         let mut set = LocationSet::new();
@@ -250,25 +205,12 @@ mod tests {
 
   #[test]
   fn mov_same_variables() {
-    use Instr::*;
-    let code = vec![
-      Mov {
-        src: var("x"),
-        dest: var("t"),
-      },
-      Add {
-        src: var("y"),
-        dest: var("t"),
-      },
-      Mov {
-        src: var("t"),
-        dest: var("z"),
-      },
-      Add {
-        src: var("w"),
-        dest: var("z"),
-      },
-    ];
+    let code = asm::parse_code(|s| IdxVar::new(s), r#"
+      mov t, x
+      add t, y
+      mov z, t
+      add z, w
+    "#);
     let label_live = hashmap! {};
     let prog = Program {
       info: OldOldInfo {

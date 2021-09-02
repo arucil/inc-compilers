@@ -260,3 +260,197 @@ impl Debug for Label {
     }
   }
 }
+
+pub fn parse_code<VAR: Clone>(
+  make_var: fn(&str) -> VAR,
+  code: &str,
+) -> Vec<Instr<VAR>> {
+  let parse_arg = |arg: &str| -> Arg<VAR> {
+    if let Some(reg) = Reg::from_str(arg) {
+      Arg::Reg(reg)
+    } else if let Some(r) = ByteReg::from_str(arg) {
+      Arg::ByteReg(r)
+    } else if let Ok(n) = arg.parse::<i64>() {
+      Arg::Imm(n)
+    } else if arg.starts_with('[') && arg.ends_with(']') {
+      let arg = &arg[1..arg.len() - 1];
+      let delim = arg.find(|c: char| !c.is_alphanumeric()).unwrap();
+      let reg = Reg::from_str(&arg[..delim]).unwrap();
+      let arg = arg[delim..].trim();
+      let off = if arg.starts_with('-') {
+        -arg[1..].trim().parse::<i32>().unwrap()
+      } else {
+        arg[1..].trim().parse::<i32>().unwrap()
+      };
+      Arg::Deref(reg, off)
+    } else {
+      Arg::Var(make_var(arg))
+    }
+  };
+
+  let get_args = |arg: &str| -> Vec<Arg<VAR>> {
+    arg.split(',').map(|arg| parse_arg(arg.trim())).collect()
+  };
+
+  fn parse_label(label: &str) -> Label {
+    match label {
+      "conclusion" => Label::Conclusion,
+      "start" => Label::Start,
+      "_start" => Label::EntryPoint,
+      _ => {
+        if label.starts_with("block") {
+          Label::Tmp(label[5..].parse().unwrap())
+        } else {
+          panic!("invalid label {}", label)
+        }
+      }
+    }
+  }
+
+  code
+    .lines()
+    .filter_map(|line| {
+      let line = line.trim();
+      if line.is_empty() {
+        return None;
+      }
+      let ops = line.splitn(2, ' ').collect::<Vec<_>>();
+      let instr = match ops[0] {
+        "add" => {
+          let args = get_args(ops[1]);
+          Instr::Add {
+            src: args[1].clone(),
+            dest: args[0].clone(),
+          }
+        }
+        "sub" => {
+          let args = get_args(ops[1]);
+          Instr::Sub {
+            src: args[1].clone(),
+            dest: args[0].clone(),
+          }
+        }
+        "mov" => {
+          let args = get_args(ops[1]);
+          Instr::Mov {
+            src: args[1].clone(),
+            dest: args[0].clone(),
+          }
+        }
+        "call" => {
+          let args =
+            ops[1].split(',').map(|arg| arg.trim()).collect::<Vec<_>>();
+          if args.len() == 1 {
+            Instr::Call(args[0].to_owned(), 0)
+          } else {
+            Instr::Call(args[0].to_owned(), args[1].parse().unwrap())
+          }
+        }
+        "jmp" => Instr::Jmp(parse_label(ops[1])),
+        "neg" => {
+          let args = get_args(ops[1]);
+          Instr::Neg(args[0].clone())
+        }
+        "pop" => {
+          let args = get_args(ops[1]);
+          Instr::Pop(args[0].clone())
+        }
+        "push" => {
+          let args = get_args(ops[1]);
+          Instr::Push(args[0].clone())
+        }
+        "ret" => Instr::Ret,
+        "syscall" => Instr::Syscall,
+        "xor" => {
+          let args = get_args(ops[1]);
+          Instr::Xor {
+            src: args[1].clone(),
+            dest: args[0].clone(),
+          }
+        }
+        "cmp" => {
+          let args = get_args(ops[1]);
+          Instr::Cmp {
+            src: args[1].clone(),
+            dest: args[0].clone(),
+          }
+        }
+        "movzb" => {
+          let args = get_args(ops[1]);
+          Instr::Movzb {
+            src: args[1].clone(),
+            dest: args[0].clone(),
+          }
+        }
+        _ => {
+          if ops[0].starts_with("set") {
+            let args = get_args(ops[1]);
+            let cmp = CmpResult::from_str(&ops[0][3..]).unwrap();
+            Instr::SetIf(cmp, args[0].clone())
+          } else if ops[0].starts_with("j") {
+            let cmp = CmpResult::from_str(&ops[0][1..]).unwrap();
+            let label = parse_label(ops[1]);
+            Instr::JumpIf(cmp, label)
+          } else {
+            panic!("invalid instruction {}", line)
+          }
+        }
+      };
+      Some(instr)
+    })
+    .collect()
+}
+
+impl ByteReg {
+  fn from_str(str: &str) -> Option<Self> {
+    match str {
+      "al" => Some(Self::Al),
+      "ah" => Some(Self::Ah),
+      "bl" => Some(Self::Bl),
+      "bh" => Some(Self::Bh),
+      "cl" => Some(Self::Cl),
+      "ch" => Some(Self::Ch),
+      "dl" => Some(Self::Dl),
+      "dh" => Some(Self::Dh),
+      _ => None,
+    }
+  }
+}
+
+impl Reg {
+  fn from_str(str: &str) -> Option<Self> {
+    match str {
+      "rsp" => Some(Reg::Rsp),
+      "rbp" => Some(Reg::Rbp),
+      "rax" => Some(Reg::Rax),
+      "rbx" => Some(Reg::Rbx),
+      "rcx" => Some(Reg::Rcx),
+      "rdx" => Some(Reg::Rdx),
+      "rsi" => Some(Reg::Rsi),
+      "rdi" => Some(Reg::Rdi),
+      "r8" => Some(Reg::R8),
+      "r9" => Some(Reg::R9),
+      "r10" => Some(Reg::R10),
+      "r11" => Some(Reg::R11),
+      "r12" => Some(Reg::R12),
+      "r13" => Some(Reg::R13),
+      "r14" => Some(Reg::R14),
+      "r15" => Some(Reg::R15),
+      _ => None,
+    }
+  }
+}
+
+impl CmpResult {
+  fn from_str(str: &str) -> Option<Self> {
+    match str {
+      "e" => Some(Self::Eq),
+      "ne" => Some(Self::Ne),
+      "g" => Some(Self::Gt),
+      "ge" => Some(Self::Ge),
+      "l" => Some(Self::Lt),
+      "le" => Some(Self::Le),
+      _ => None,
+    }
+  }
+}
