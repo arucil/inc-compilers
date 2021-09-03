@@ -1,0 +1,41 @@
+---
+source: ch4/src/pass/interference.rs
+expression: "format!(\"{:?}\", result.info)"
+
+---
+graph {
+    0 [ label = "rax" ]
+    1 [ label = "rsp" ]
+    2 [ label = "rcx" ]
+    3 [ label = "rdx" ]
+    4 [ label = "rsi" ]
+    5 [ label = "rdi" ]
+    6 [ label = "r8" ]
+    7 [ label = "r9" ]
+    8 [ label = "r10" ]
+    9 [ label = "r11" ]
+    10 [ label = "tmp.0" ]
+    11 [ label = "tmp.1" ]
+    12 [ label = "x.0" ]
+    0 -- 1 [ ]
+    2 -- 1 [ ]
+    2 -- 0 [ ]
+    3 -- 1 [ ]
+    3 -- 0 [ ]
+    4 -- 1 [ ]
+    4 -- 0 [ ]
+    5 -- 1 [ ]
+    5 -- 0 [ ]
+    6 -- 1 [ ]
+    6 -- 0 [ ]
+    7 -- 1 [ ]
+    7 -- 0 [ ]
+    8 -- 1 [ ]
+    8 -- 0 [ ]
+    9 -- 1 [ ]
+    9 -- 0 [ ]
+    10 -- 1 [ ]
+    11 -- 1 [ ]
+    12 -- 1 [ ]
+}
+

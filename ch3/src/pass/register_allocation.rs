@@ -50,20 +50,17 @@ pub fn allocate_registers(
     .collect();
   let mut max_locals = 0;
   let mut used_callee_saved_regs = IndexSet::new();
-  let tmp_moves = LocationGraph::new();
 
   let blocks = prog
     .blocks
     .into_iter()
     .map(|(label, block)| {
-      let conflicts = &conflicts[&label];
-      let moves = moves.get(&label).unwrap_or(&tmp_moves);
       let (block, locals) = allocate_registers_block(
         block,
         &locals,
         &mut var_store,
-        conflicts,
-        moves,
+        &conflicts,
+        &moves,
         &reg_colors,
         available_regs,
         &mut used_callee_saved_regs,
@@ -144,7 +141,7 @@ fn assign_instr_var(
         Arg::Deref(Reg::Rbp, -8 * local as i32)
       }
     }
-    Arg::ByteReg(_) => unimplemented!(),
+    Arg::ByteReg(reg) => Arg::ByteReg(reg),
   };
 
   let instr = match instr {
@@ -167,6 +164,20 @@ fn assign_instr_var(
       dest: assign(dest),
     },
     Instr::Syscall => Instr::Syscall,
+    Instr::Cmp { src, dest } => Instr::Cmp {
+      src: assign(src),
+      dest: assign(dest),
+    },
+    Instr::JumpIf(cmp, label) => Instr::JumpIf(cmp, label),
+    Instr::Movzx { src, dest } => Instr::Movzx {
+      src: assign(src),
+      dest: assign(dest),
+    },
+    Instr::SetIf(cmp, dest) => Instr::SetIf(cmp, assign(dest)),
+    Instr::Xor { src, dest } => Instr::Xor {
+      src: assign(src),
+      dest: assign(dest),
+    },
     _ => unreachable!("{:?}", instr),
   };
   instr
@@ -300,65 +311,33 @@ fn color_graph(
 mod tests {
   use super::*;
   use crate::location_set::LocationSet;
-  use asm::{Arg, Block, Label};
+  use asm::Label;
   use ch2::pass::select_instruction::Info as OldOldInfo;
   use indexmap::indexset;
   use insta::assert_snapshot;
   use maplit::hashmap;
 
-  fn var(name: &str) -> Arg<IdxVar> {
-    Arg::Var(IdxVar::new(name))
-  }
-
   #[test]
   fn example_in_book() {
     use asm::Reg::*;
-    use Arg::*;
-    use Instr::*;
-    let code = vec![
-      Mov {
-        src: Imm(1),
-        dest: var("v"),
-      },
-      Mov {
-        src: Imm(42),
-        dest: var("w"),
-      },
-      Mov {
-        src: var("v"),
-        dest: var("x"),
-      },
-      Add {
-        src: Imm(7),
-        dest: var("x"),
-      },
-      Mov {
-        src: var("x"),
-        dest: var("y"),
-      },
-      Mov {
-        src: var("x"),
-        dest: var("z"),
-      },
-      Add {
-        src: var("w"),
-        dest: var("z"),
-      },
-      Mov {
-        src: var("y"),
-        dest: var("t"),
-      },
-      Neg(var("t")),
-      Mov {
-        src: var("z"),
-        dest: Reg(Rax),
-      },
-      Add {
-        src: var("t"),
-        dest: Reg(Rax),
-      },
-      Jmp(Label::Conclusion),
-    ];
+    let blocks = asm::parse_blocks(
+      |s| IdxVar::new(s),
+      r#"
+    start:
+      mov v, 1
+      mov w, 42
+      mov x, v
+      add x, 7
+      mov y, x
+      mov z, x
+      add z, w
+      mov t, y
+      neg t
+      mov rax, z
+      add rax, t
+      jmp conclusion
+    "#,
+    );
     let label_live = hashmap! {
       Label::Conclusion => {
         let mut set = LocationSet::new();
@@ -371,13 +350,7 @@ mod tests {
       info: OldOldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![(
-        Label::Start,
-        Block {
-          global: false,
-          code,
-        },
-      )],
+      blocks,
     };
     let prog =
       super::super::liveness_analysis::analyze_liveness(prog, label_live);
@@ -390,23 +363,19 @@ mod tests {
   #[test]
   fn call() {
     use asm::Reg::*;
-    use Arg::*;
-    use Instr::*;
-    let code = vec![
-      Pop(Reg(Rdi)),
-      Pop(Reg(Rsi)),
-      Push(var("x")),
-      Mov {
-        src: Reg(Rbx),
-        dest: var("w"),
-      },
-      Call("foo".to_owned(), 3),
-      Add {
-        src: Reg(Rax),
-        dest: var("w"),
-      },
-      Jmp(Label::Conclusion)
-    ];
+    let blocks = asm::parse_blocks(
+      |s| IdxVar::new(s),
+      r#"
+    start:
+      pop rdi
+      pop rsi
+      push x
+      mov w, rbx
+      call foo, 3
+      add w, rax
+      jmp conclusion
+    "#,
+    );
     let label_live = hashmap! {
       Label::Conclusion => {
         let mut set = LocationSet::new();
@@ -419,13 +388,7 @@ mod tests {
       info: OldOldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![(
-        Label::Start,
-        Block {
-          global: false,
-          code,
-        },
-      )],
+      blocks,
     };
     let prog =
       super::super::liveness_analysis::analyze_liveness(prog, label_live);
@@ -438,23 +401,19 @@ mod tests {
   #[test]
   fn call_no_enough_registers() {
     use asm::Reg::*;
-    use Arg::*;
-    use Instr::*;
-    let code = vec![
-      Pop(Reg(Rdi)),
-      Pop(Reg(Rsi)),
-      Push(var("x")),
-      Mov {
-        src: Reg(Rbx),
-        dest: var("w"),
-      },
-      Call("foo".to_owned(), 3),
-      Add {
-        src: Reg(Rax),
-        dest: var("w"),
-      },
-      Jmp(Label::Conclusion)
-    ];
+    let blocks = asm::parse_blocks(
+      |s| IdxVar::new(s),
+      r#"
+    start:
+      pop rdi
+      pop rsi
+      push x
+      mov w, rbx
+      call foo, 3
+      add w, rax
+      jmp conclusion
+    "#,
+    );
     let label_live = hashmap! {
       Label::Conclusion => {
         let mut set = LocationSet::new();
@@ -467,13 +426,7 @@ mod tests {
       info: OldOldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![(
-        Label::Start,
-        Block {
-          global: false,
-          code,
-        },
-      )],
+      blocks,
     };
     let prog =
       super::super::liveness_analysis::analyze_liveness(prog, label_live);
@@ -486,29 +439,20 @@ mod tests {
   #[test]
   fn mov_same_variables() {
     use asm::Reg::*;
-    use Instr::*;
-    let code = vec![
-      Mov {
-        src: var("x"),
-        dest: var("t"),
-      },
-      Add {
-        src: var("y"),
-        dest: var("t"),
-      },
-      Mov {
-        src: var("t"),
-        dest: var("z"),
-      },
-      Add {
-        src: var("w"),
-        dest: var("z"),
-      },
-      Neg(var("x")),
-      Neg(var("y")),
-      Neg(var("z")),
-      Neg(var("w")),
-    ];
+    let blocks = asm::parse_blocks(
+      |s| IdxVar::new(s),
+      r#"
+    start:
+      mov t, x
+      add t, y
+      mov z, t
+      add z, w
+      neg x
+      neg y
+      neg z
+      neg w
+    "#,
+    );
     let label_live = hashmap! {};
     let prog = Program {
       info: OldOldInfo {
@@ -520,13 +464,7 @@ mod tests {
           IdxVar::new("w"),
         },
       },
-      blocks: vec![(
-        Label::Start,
-        Block {
-          global: false,
-          code,
-        },
-      )],
+      blocks,
     };
     let prog =
       super::super::liveness_analysis::analyze_liveness(prog, label_live);
@@ -539,52 +477,24 @@ mod tests {
   #[test]
   fn move_biasing_example_in_book() {
     use asm::Reg::*;
-    use Arg::*;
-    use Instr::*;
-    let code = vec![
-      Mov {
-        src: Imm(1),
-        dest: var("v"),
-      },
-      Mov {
-        src: Imm(42),
-        dest: var("w"),
-      },
-      Mov {
-        src: var("v"),
-        dest: var("x"),
-      },
-      Add {
-        src: Imm(7),
-        dest: var("x"),
-      },
-      Mov {
-        src: var("x"),
-        dest: var("y"),
-      },
-      Mov {
-        src: var("x"),
-        dest: var("z"),
-      },
-      Add {
-        src: var("w"),
-        dest: var("z"),
-      },
-      Mov {
-        src: var("y"),
-        dest: var("t"),
-      },
-      Neg(var("t")),
-      Mov {
-        src: var("z"),
-        dest: Reg(Rax),
-      },
-      Add {
-        src: var("t"),
-        dest: Reg(Rax),
-      },
-      Jmp(Label::Conclusion),
-    ];
+    let blocks = asm::parse_blocks(
+      |s| IdxVar::new(s),
+      r#"
+    start:
+      mov v, 1
+      mov w, 42
+      mov x, v
+      add x, 7
+      mov y, x
+      mov z, x
+      add z, w
+      mov t, y
+      neg t
+      mov rax, z
+      add rax, t
+      jmp conclusion
+    "#,
+    );
     let label_live = hashmap! {
       Label::Conclusion => {
         let mut set = LocationSet::new();
@@ -597,13 +507,7 @@ mod tests {
       info: OldOldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![(
-        Label::Start,
-        Block {
-          global: false,
-          code,
-        },
-      )],
+      blocks,
     };
     let prog =
       super::super::liveness_analysis::analyze_liveness(prog, label_live);

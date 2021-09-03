@@ -194,7 +194,7 @@ impl Location {
       Arg::Deref(reg, _) | Arg::Reg(reg) => Some(reg.into()),
       Arg::Var(var) => Some(Self(var_store.get(var).0 + 16)),
       Arg::Imm(_) => None,
-      Arg::ByteReg(_) => unimplemented!(),
+      Arg::ByteReg(reg) => Some(Reg::from(reg).into())
     }
   }
 

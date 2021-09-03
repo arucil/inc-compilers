@@ -1,18 +1,9 @@
 use super::liveness_analysis::Info as OldInfo;
-use crate::location_graph::LocationGraph;
-use crate::location_set::{Location, LocationSet, VarStore};
 use asm::{Block, Instr, Program, Reg};
 use ast::IdxVar;
-use indexmap::IndexSet;
-use petgraph::dot::{Config, Dot};
-use std::fmt::{self, Debug, Formatter};
-
-pub struct Info {
-  pub locals: IndexSet<IdxVar>,
-  pub conflicts: LocationGraph,
-  pub moves: LocationGraph,
-  pub var_store: VarStore,
-}
+use ch3::location_graph::LocationGraph;
+use ch3::location_set::{Location, LocationSet, VarStore};
+use ch3::pass::interference::Info;
 
 pub fn build_interference(
   mut prog: Program<OldInfo, IdxVar>,
@@ -65,13 +56,15 @@ fn add_instr_edges(
   match instr {
     Instr::Add { dest, .. }
     | Instr::Sub { dest, .. }
+    | Instr::Xor { dest, .. }
+    | Instr::SetIf(_, dest)
     | Instr::Neg(dest)
     | Instr::Pop(dest) => {
       if let Some(dest_loc) = Location::from_arg(dest.clone(), var_store) {
         add(dest_loc);
       }
     }
-    Instr::Call(_, _) => {
+    Instr::Call(..) => {
       add(Reg::Rax.into());
       add(Reg::Rcx.into());
       add(Reg::Rdx.into());
@@ -82,7 +75,7 @@ fn add_instr_edges(
       add(Reg::R10.into());
       add(Reg::R11.into());
     }
-    Instr::Mov { src, dest } => {
+    Instr::Mov { src, dest } | Instr::Movzx { src, dest } => {
       if let Some(dest_loc) = Location::from_arg(dest.clone(), var_store) {
         let src_loc = Location::from_arg(src.clone(), var_store);
         let dest_loc_node = graph.insert_node(dest_loc);
@@ -94,18 +87,13 @@ fn add_instr_edges(
         }
       }
     }
-    Instr::Push(_) | Instr::Ret | Instr::Syscall | Instr::Jmp(_) => {}
+    Instr::Push(_)
+    | Instr::Ret
+    | Instr::Syscall
+    | Instr::Jmp(_)
+    | Instr::JumpIf(..)
+    | Instr::Cmp { .. } => {}
     _ => {}
-  }
-}
-
-impl Debug for Info {
-  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-    let graph = self
-      .conflicts
-      .graph
-      .map(|_, var| var.to_arg(&self.var_store), |_, _| ());
-    Dot::with_config(&graph, &[Config::EdgeNoLabel]).fmt(f)
   }
 }
 
@@ -116,6 +104,7 @@ mod tests {
   use ch2::pass::select_instruction::Info as OldOldInfo;
   use insta::assert_snapshot;
   use maplit::hashmap;
+  use indexmap::IndexSet;
 
   #[test]
   fn example_in_book() {
@@ -209,6 +198,191 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {};
+    let prog = Program {
+      info: OldOldInfo {
+        locals: IndexSet::new(),
+      },
+      blocks,
+    };
+    let prog =
+      super::super::liveness_analysis::analyze_liveness(prog, label_live);
+    let result = build_interference(prog);
+
+    assert_snapshot!(format!("{:?}", result.info));
+  }
+
+  #[test]
+  fn if_in_init() {
+    use asm::Reg::*;
+    let blocks = asm::parse_blocks(
+      |s| IdxVar::new(s),
+      r#"
+start:
+    call read_int
+    mov tmp.0, rax
+    cmp tmp.0, 3
+    jge block3
+    jmp block4
+block0:
+    mov rax, 2
+    jmp conclusion
+block1:
+    mov rax, 41
+    jmp conclusion
+block2:
+    cmp x.0, 10
+    sete al
+    movzx tmp.1, al
+    cmp tmp.1, 0
+    je block1
+    jmp block0
+block3:
+    mov x.0, 10
+    jmp block2
+block4:
+    mov x.0, 77
+    jmp block2
+    "#,
+    );
+    let label_live = hashmap! {
+      Label::Conclusion => {
+        let mut set = LocationSet::new();
+        set.add_reg(Rax);
+        set.add_reg(Rsp);
+        set
+      }
+    };
+    let prog = Program {
+      info: OldOldInfo {
+        locals: IndexSet::new(),
+      },
+      blocks,
+    };
+    let prog =
+      super::super::liveness_analysis::analyze_liveness(prog, label_live);
+    let result = build_interference(prog);
+
+    assert_snapshot!(format!("{:?}", result.info));
+  }
+
+  #[test]
+  fn nested_if() {
+    use asm::Reg::*;
+    let blocks = asm::parse_blocks(
+      |s| IdxVar::new(s),
+      r#"
+      start:
+        call read_int
+        mov x, rax
+        call read_int
+        mov y, rax
+        cmp x, 1
+        jl block2
+        jmp block3
+      block0:
+        mov rax, y
+        add rax, 2
+        jmp conclusion
+      block1:
+        mov rax, z
+        add rax, 10
+        jmp conclusion
+      block2:
+        cmp x, 0
+        je block0
+        jmp block1
+      block3:
+        cmp x, 2
+        je block0
+        jmp block1
+    "#,
+    );
+    let label_live = hashmap! {
+      Label::Conclusion => {
+        let mut set = LocationSet::new();
+        set.add_reg(Rax);
+        set.add_reg(Rsp);
+        set
+      }
+    };
+    let prog = Program {
+      info: OldOldInfo {
+        locals: IndexSet::new(),
+      },
+      blocks,
+    };
+    let prog =
+      super::super::liveness_analysis::analyze_liveness(prog, label_live);
+    let result = build_interference(prog);
+
+    assert_snapshot!(format!("{:?}", result.info));
+  }
+
+  #[test]
+  fn complex_if() {
+    use asm::Reg::*;
+    let blocks = asm::parse_blocks(
+      |s| IdxVar::new(s),
+      r#"
+start:
+    call read_int
+    mov x.0, rax
+    cmp x.0, 100
+    jg block8
+    jmp block9
+block0:
+    mov rax, -1
+    jmp conclusion
+block1:
+    mov rax, y.1
+    neg rax
+    jmp conclusion
+block2:
+    mov tmp.1, y.1
+    sub tmp.1, x.0
+    cmp tmp.1, 10
+    jl block0
+    jmp block1
+block3:
+    cmp x.0, y.1
+    jl block2
+    jmp block1
+block4:
+    mov tmp.0, x.0
+    sub tmp.0, y.1
+    cmp tmp.0, 10
+    jl block0
+    jmp block3
+block5:
+    mov rax, 5000
+    jmp conclusion
+block6:
+    mov rax, x.0
+    jmp conclusion
+block7:
+    cmp x.0, 60
+    jl block5
+    jmp block6
+block8:
+    call read_int
+    mov y.1, rax
+    cmp x.0, y.1
+    jge block4
+    jmp block3
+block9:
+    cmp x.0, 40
+    jg block7
+    jmp block6
+    "#,
+    );
+    let label_live = hashmap! {
+      Label::Conclusion => {
+        let mut set = LocationSet::new();
+        set.add_reg(Rax);
+        set.add_reg(Rsp);
+        set
+      }
+    };
     let prog = Program {
       info: OldOldInfo {
         locals: IndexSet::new(),

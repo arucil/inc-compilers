@@ -3,19 +3,21 @@ source: ch4/src/pass/liveness_analysis.rs
 expression: result.show()
 
 ---
-                {rbp}
-mov rsp, rbp
-                {}
-pop rbp
-                {}
-call print_int
-                {}
-call print_newline
-                {}
-mov rax, 60
-                {}
-mov rdi, 0
-                {}
-syscall
-                {}
+start:
+                    {rbp}
+    mov rsp, rbp
+                    {}
+    pop rbp
+                    {}
+    call print_int
+                    {}
+    call print_newline
+                    {}
+    mov rax, 60
+                    {}
+    mov rdi, 0
+                    {}
+    syscall
+                    {}
+
 

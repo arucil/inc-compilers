@@ -11,10 +11,7 @@ pub fn build_move_graph(
 ) -> Program<Info, IdxVar> {
   let moves = &mut prog.info.moves;
   let var_store = &mut prog.info.var_store;
-  for (label, block) in &prog.blocks {
-    let moves = moves
-      .entry(label.clone())
-      .or_insert_with(|| LocationGraph::new());
+  for (_, block) in &prog.blocks {
     build_block_move_graph(&block, moves, var_store);
   }
   prog

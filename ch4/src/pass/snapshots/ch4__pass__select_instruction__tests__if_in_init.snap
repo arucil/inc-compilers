@@ -20,7 +20,7 @@ block1:
 block2:
     cmp x.0, 10
     sete al
-    movzb tmp.1, al
+    movzx tmp.1, al
     cmp tmp.1, 0
     je block1
     jmp block0

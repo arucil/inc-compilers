@@ -107,7 +107,7 @@ impl AnalysisState {
         self.add_arg(before, src);
         self.add_arg(before, dest);
       }
-      Instr::Mov { src, dest } | Instr::Movzb { src, dest } => {
+      Instr::Mov { src, dest } | Instr::Movzx { src, dest } => {
         self.remove_arg(before, dest);
         self.add_arg(before, src);
       }
@@ -140,6 +140,9 @@ impl AnalysisState {
       Arg::Deref(reg, _) | Arg::Reg(reg) => {
         set.remove_reg(*reg);
       }
+      Arg::ByteReg(reg) => {
+        set.remove_reg((*reg).into());
+      }
       Arg::Var(var) => {
         let var = self.var_store.get(var.clone());
         set.remove_var(var);
@@ -153,6 +156,9 @@ impl AnalysisState {
       Arg::Deref(reg, _) | Arg::Reg(reg) => {
         set.add_reg(*reg);
       }
+      Arg::ByteReg(reg) => {
+        set.add_reg((*reg).into());
+      }
       Arg::Var(var) => {
         let var = self.var_store.get(var.clone());
         set.add_var(var);
@@ -165,7 +171,7 @@ impl AnalysisState {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use asm::Block;
+  use asm::Label;
   use insta::assert_snapshot;
   use maplit::hashmap;
 
@@ -186,7 +192,7 @@ mod tests {
           buf += &format!("    {:?}", block.code[i]);
           buf += "\n";
         }
-        buf += "                ";
+        buf += "                    ";
         live
           .last()
           .unwrap()
@@ -200,23 +206,23 @@ mod tests {
 
   #[test]
   fn example_in_book() {
-    use asm::Label;
     use asm::Reg::*;
-    let code = asm::parse_code(
+    let blocks = asm::parse_blocks(
       |s| IdxVar::new(s),
       r#"
-      mov v, 1
-      mov w, 42
-      mov x, v
-      add x, 7
-      mov y, x
-      mov z, x
-      add z, w
-      mov t, y
-      neg t
-      mov rax, z
-      add rax, t
-      jmp conclusion
+      start:
+        mov v, 1
+        mov w, 42
+        mov x, v
+        add x, 7
+        mov y, x
+        mov z, x
+        add z, w
+        mov t, y
+        neg t
+        mov rax, z
+        add rax, t
+        jmp conclusion
     "#,
     );
     let label_live = hashmap! {
@@ -231,13 +237,7 @@ mod tests {
       info: OldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![(
-        Label::Start,
-        Block {
-          global: false,
-          code,
-        },
-      )],
+      blocks,
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -247,14 +247,15 @@ mod tests {
   #[test]
   fn push_pop() {
     use asm::Reg::*;
-    let code = asm::parse_code(
+    let blocks = asm::parse_blocks(
       |s| IdxVar::new(s),
       r#"
-      push x
-      mov w, rbx
-      pop rbx
-      add x, w
-      jmp conclusion
+      start:
+        push x
+        mov w, rbx
+        pop rbx
+        add x, w
+        jmp conclusion
     "#,
     );
     let label_live = hashmap! {
@@ -269,13 +270,7 @@ mod tests {
       info: OldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![(
-        Label::Start,
-        Block {
-          global: false,
-          code,
-        },
-      )],
+      blocks,
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -285,16 +280,17 @@ mod tests {
   #[test]
   fn call() {
     use asm::Reg::*;
-    let code = asm::parse_code(
+    let blocks = asm::parse_blocks(
       |s| IdxVar::new(s),
       r#"
-      pop rdi
-      pop rsi
-      push x
-      mov w, rbx
-      call foo, 3
-      add w, rax
-      jmp conclusion
+      start:
+        pop rdi
+        pop rsi
+        push x
+        mov w, rbx
+        call foo, 3
+        add w, rax
+        jmp conclusion
     "#,
     );
     let label_live = hashmap! {
@@ -309,13 +305,7 @@ mod tests {
       info: OldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![(
-        Label::Start,
-        Block {
-          global: false,
-          code,
-        },
-      )],
+      blocks,
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -324,16 +314,17 @@ mod tests {
 
   #[test]
   fn epilogue() {
-    let code = asm::parse_code(
+    let blocks = asm::parse_blocks(
       |s| IdxVar::new(s),
       r#"
-      mov rsp, rbp
-      pop rbp
-      call print_int
-      call print_newline
-      mov rax, 60
-      mov rdi, 0
-      syscall
+      start:
+        mov rsp, rbp
+        pop rbp
+        call print_int
+        call print_newline
+        mov rax, 60
+        mov rdi, 0
+        syscall
     "#,
     );
     let label_live = HashMap::new();
@@ -341,13 +332,7 @@ mod tests {
       info: OldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![(
-        Label::Start,
-        Block {
-          global: false,
-          code,
-        },
-      )],
+      blocks,
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -357,48 +342,33 @@ mod tests {
   #[test]
   fn nested_if() {
     use asm::Reg::*;
-    let start = asm::parse_code(
+    let blocks = asm::parse_blocks(
       |s| IdxVar::new(s),
       r#"
-      call read_int
-      mov x, rax
-      call read_int
-      mov y, rax
-      cmp x, 1
-      jl block2
-      jmp block3
-    "#,
-    );
-    let block0 = asm::parse_code(
-      |s| IdxVar::new(s),
-      r#"
-      mov rax, y
-      add rax, 2
-      jmp conclusion
-    "#,
-    );
-    let block1 = asm::parse_code(
-      |s| IdxVar::new(s),
-      r#"
-      mov rax, y
-      add rax, 10
-      jmp conclusion
-    "#,
-    );
-    let block2 = asm::parse_code(
-      |s| IdxVar::new(s),
-      r#"
-      cmp x, 0
-      je block0
-      jmp block1
-    "#,
-    );
-    let block3 = asm::parse_code(
-      |s| IdxVar::new(s),
-      r#"
-      cmp x, 2
-      je block0
-      jmp block1
+      start:
+        call read_int
+        mov x, rax
+        call read_int
+        mov y, rax
+        cmp x, 1
+        jl block2
+        jmp block3
+      block0:
+        mov rax, y
+        add rax, 2
+        jmp conclusion
+      block1:
+        mov rax, z
+        add rax, 10
+        jmp conclusion
+      block2:
+        cmp x, 0
+        je block0
+        jmp block1
+      block3:
+        cmp x, 2
+        je block0
+        jmp block1
     "#,
     );
     let label_live = hashmap! {
@@ -413,43 +383,136 @@ mod tests {
       info: OldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![
-        (
-          Label::Start,
-          Block {
-            global: false,
-            code: start,
-          },
-        ),
-        (
-          Label::Tmp(0),
-          Block {
-            global: false,
-            code: block0,
-          },
-        ),
-        (
-          Label::Tmp(1),
-          Block {
-            global: false,
-            code: block1,
-          },
-        ),
-        (
-          Label::Tmp(2),
-          Block {
-            global: false,
-            code: block2,
-          },
-        ),
-        (
-          Label::Tmp(3),
-          Block {
-            global: false,
-            code: block3,
-          },
-        ),
-      ],
+      blocks,
+    };
+    let result = analyze_liveness(prog, label_live);
+
+    assert_snapshot!(result.show());
+  }
+
+  #[test]
+  fn if_in_init() {
+    use asm::Reg::*;
+    let blocks = asm::parse_blocks(
+      |s| IdxVar::new(s),
+      r#"
+start:
+    call read_int
+    mov tmp.0, rax
+    cmp tmp.0, 3
+    jge block3
+    jmp block4
+block0:
+    mov rax, 2
+    jmp conclusion
+block1:
+    mov rax, 41
+    jmp conclusion
+block2:
+    cmp x.0, 10
+    sete al
+    movzx tmp.1, al
+    cmp tmp.1, 0
+    je block1
+    jmp block0
+block3:
+    mov x.0, 10
+    jmp block2
+block4:
+    mov x.0, 77
+    jmp block2
+
+    "#,
+    );
+    let label_live = hashmap! {
+      Label::Conclusion => {
+        let mut set = LocationSet::new();
+        set.add_reg(Rax);
+        set.add_reg(Rsp);
+        set
+      }
+    };
+    let prog = Program {
+      info: OldInfo {
+        locals: IndexSet::new(),
+      },
+      blocks,
+    };
+    let result = analyze_liveness(prog, label_live);
+
+    assert_snapshot!(result.show());
+  }
+
+  #[test]
+  fn complex_if() {
+    use asm::Reg::*;
+    let blocks = asm::parse_blocks(
+      |s| IdxVar::new(s),
+      r#"
+start:
+    call read_int
+    mov x.0, rax
+    cmp x.0, 100
+    jg block8
+    jmp block9
+block0:
+    mov rax, -1
+    jmp conclusion
+block1:
+    mov rax, y.1
+    neg rax
+    jmp conclusion
+block2:
+    mov tmp.1, y.1
+    sub tmp.1, x.0
+    cmp tmp.1, 10
+    jl block0
+    jmp block1
+block3:
+    cmp x.0, y.1
+    jl block2
+    jmp block1
+block4:
+    mov tmp.0, x.0
+    sub tmp.0, y.1
+    cmp tmp.0, 10
+    jl block0
+    jmp block3
+block5:
+    mov rax, 5000
+    jmp conclusion
+block6:
+    mov rax, x.0
+    jmp conclusion
+block7:
+    cmp x.0, 60
+    jl block5
+    jmp block6
+block8:
+    call read_int
+    mov y.1, rax
+    cmp x.0, y.1
+    jge block4
+    jmp block3
+block9:
+    cmp x.0, 40
+    jg block7
+    jmp block6
+    "#,
+    );
+    let label_live = hashmap! {
+      Label::Conclusion => {
+        let mut set = LocationSet::new();
+        set.add_reg(Rax);
+        set.add_reg(Rsp);
+        set
+      }
+    };
+    let prog = Program {
+      info: OldInfo {
+        locals: IndexSet::new(),
+      },
+      blocks,
     };
     let result = analyze_liveness(prog, label_live);
 

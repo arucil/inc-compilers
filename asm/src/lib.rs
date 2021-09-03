@@ -6,6 +6,7 @@ use std::fmt::{self, Debug, Formatter, Write};
 #[derive(Debug, Clone)]
 pub struct Program<INFO = (), VAR = !> {
   pub info: INFO,
+  /// The order matters.
   pub blocks: Vec<(Label, Block<VAR>)>,
 }
 
@@ -31,7 +32,7 @@ pub enum Instr<VAR = !> {
   Xor { src: Arg<VAR>, dest: Arg<VAR> },
   Cmp { src: Arg<VAR>, dest: Arg<VAR> },
   SetIf(CmpResult, Arg<VAR>),
-  Movzb { src: Arg<VAR>, dest: Arg<VAR> },
+  Movzx { src: Arg<VAR>, dest: Arg<VAR> },
   JumpIf(CmpResult, Label),
 }
 
@@ -151,7 +152,7 @@ impl<VAR: Debug> Debug for Instr<VAR> {
       Self::Syscall => write!(f, "syscall"),
       Self::Xor { src, dest } => write!(f, "xor {:?}, {:?}", dest, src),
       Self::Cmp { src, dest } => write!(f, "cmp {:?}, {:?}", dest, src),
-      Self::Movzb { src, dest } => write!(f, "movzb {:?}, {:?}", dest, src),
+      Self::Movzx { src, dest } => write!(f, "movzx {:?}, {:?}", dest, src),
       Self::SetIf(cmp, dest) => write!(f, "set{:?} {:?}", cmp, dest),
       Self::JumpIf(cmp, label) => write!(f, "j{:?} {:?}", cmp, label),
     }
@@ -261,6 +262,50 @@ impl Debug for Label {
   }
 }
 
+pub fn parse_blocks<VAR: Clone>(
+  make_var: fn(&str) -> VAR,
+  code: &str,
+) -> Vec<(Label, Block<VAR>)> {
+  let mut iter = code.split(':').peekable();
+  let mut label = iter.next().unwrap().trim();
+  let mut blocks = vec![];
+  while let Some(mut code) = iter.next() {
+    let next_label;
+    if iter.peek().is_some() {
+      next_label = Some(code.lines().last().unwrap().trim());
+      code = &code[..code.rfind('\n').unwrap()];
+    } else {
+      next_label = None;
+    }
+    blocks.push((
+      parse_label(label),
+      Block {
+        global: false,
+        code: parse_code(make_var, code),
+      },
+    ));
+    if let Some(next_label) = next_label {
+      label = next_label;
+    }
+  }
+  blocks
+}
+
+fn parse_label(label: &str) -> Label {
+  match label {
+    "conclusion" => Label::Conclusion,
+    "start" => Label::Start,
+    "_start" => Label::EntryPoint,
+    _ => {
+      if label.starts_with("block") {
+        Label::Tmp(label[5..].parse().unwrap())
+      } else {
+        panic!("invalid label {}", label)
+      }
+    }
+  }
+}
+
 pub fn parse_code<VAR: Clone>(
   make_var: fn(&str) -> VAR,
   code: &str,
@@ -291,21 +336,6 @@ pub fn parse_code<VAR: Clone>(
   let get_args = |arg: &str| -> Vec<Arg<VAR>> {
     arg.split(',').map(|arg| parse_arg(arg.trim())).collect()
   };
-
-  fn parse_label(label: &str) -> Label {
-    match label {
-      "conclusion" => Label::Conclusion,
-      "start" => Label::Start,
-      "_start" => Label::EntryPoint,
-      _ => {
-        if label.starts_with("block") {
-          Label::Tmp(label[5..].parse().unwrap())
-        } else {
-          panic!("invalid label {}", label)
-        }
-      }
-    }
-  }
 
   code
     .lines()
@@ -375,9 +405,9 @@ pub fn parse_code<VAR: Clone>(
             dest: args[0].clone(),
           }
         }
-        "movzb" => {
+        "movzx" => {
           let args = get_args(ops[1]);
-          Instr::Movzb {
+          Instr::Movzx {
             src: args[1].clone(),
             dest: args[0].clone(),
           }
@@ -413,6 +443,17 @@ impl ByteReg {
       "dl" => Some(Self::Dl),
       "dh" => Some(Self::Dh),
       _ => None,
+    }
+  }
+}
+
+impl From<ByteReg> for Reg {
+  fn from(x: ByteReg) -> Reg {
+    match x {
+      ByteReg::Al | ByteReg::Ah => Reg::Rax,
+      ByteReg::Bl | ByteReg::Bh => Reg::Rbx,
+      ByteReg::Cl | ByteReg::Ch => Reg::Rcx,
+      ByteReg::Dl | ByteReg::Dh => Reg::Rdx,
     }
   }
 }

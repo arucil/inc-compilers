@@ -1,0 +1,10 @@
+(let ([x (read)])
+  (if (> x 100)
+    (let ([y (read)])
+      (if (or (and (>= x y) (< (- x y) 10))
+              (and (< x y) (< (- y x) 10)))
+        -1
+        (- y)))
+    (if (and (> x 40) (< x 60))
+      5000
+      x)))

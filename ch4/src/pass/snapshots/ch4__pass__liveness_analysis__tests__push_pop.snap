@@ -3,15 +3,17 @@ source: ch4/src/pass/liveness_analysis.rs
 expression: result.show()
 
 ---
-                {rsp, rax, rbx, x.0}
-push x.0
-                {rsp, rax, rbx, x.0}
-mov w.0, rbx
-                {rsp, rax, w.0, x.0}
-pop rbx
-                {rsp, rax, w.0, x.0}
-add x.0, w.0
-                {rsp, rax}
-jmp conclusion
-                {}
+start:
+                    {rsp, rax, rbx, x.0}
+    push x.0
+                    {rsp, rax, rbx, x.0}
+    mov w.0, rbx
+                    {rsp, rax, w.0, x.0}
+    pop rbx
+                    {rsp, rax, w.0, x.0}
+    add x.0, w.0
+                    {rsp, rax}
+    jmp conclusion
+                    {}
+
 

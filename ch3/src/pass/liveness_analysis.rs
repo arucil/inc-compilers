@@ -117,7 +117,6 @@ impl<'a> AnalysisState<'a> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use asm::Block;
   use insta::assert_snapshot;
   use maplit::hashmap;
 
@@ -156,7 +155,8 @@ mod tests {
   fn example_in_book() {
     use asm::Reg::*;
     use asm::Label;
-    let code = asm::parse_code(|s| IdxVar::new(s), r#"
+    let blocks = asm::parse_blocks(|s| IdxVar::new(s), r#"
+    start:
       mov v, 1
       mov w, 42
       mov x, v
@@ -182,13 +182,7 @@ mod tests {
       info: OldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![(
-        Label::Start,
-        Block {
-          global: false,
-          code,
-        },
-      )],
+      blocks,
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -198,7 +192,8 @@ mod tests {
   #[test]
   fn push_pop() {
     use asm::Reg::*;
-    let code = asm::parse_code(|s| IdxVar::new(s), r#"
+    let blocks = asm::parse_blocks(|s| IdxVar::new(s), r#"
+    start:
       push x
       mov w, rbx
       pop rbx
@@ -217,13 +212,7 @@ mod tests {
       info: OldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![(
-        Label::Start,
-        Block {
-          global: false,
-          code,
-        },
-      )],
+      blocks,
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -233,7 +222,8 @@ mod tests {
   #[test]
   fn call() {
     use asm::Reg::*;
-    let code = asm::parse_code(|s| IdxVar::new(s), r#"
+    let blocks = asm::parse_blocks(|s| IdxVar::new(s), r#"
+    start:
       pop rdi
       pop rsi
       push x
@@ -254,13 +244,7 @@ mod tests {
       info: OldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![(
-        Label::Start,
-        Block {
-          global: false,
-          code,
-        },
-      )],
+      blocks,
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -269,7 +253,8 @@ mod tests {
 
   #[test]
   fn epilogue() {
-    let code = asm::parse_code(|s| IdxVar::new(s), r#"
+    let blocks = asm::parse_blocks(|s| IdxVar::new(s), r#"
+    start:
       mov rsp, rbp
       pop rbp
       call print_int
@@ -283,13 +268,7 @@ mod tests {
       info: OldInfo {
         locals: IndexSet::new(),
       },
-      blocks: vec![(
-        Label::Start,
-        Block {
-          global: false,
-          code,
-        },
-      )],
+      blocks,
     };
     let result = analyze_liveness(prog, label_live);
 

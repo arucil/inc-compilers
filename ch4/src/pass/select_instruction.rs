@@ -1,19 +1,8 @@
 use super::explicate_control::CInfo;
 use asm::{Arg, Block, ByteReg, Instr, Label, Program, Reg};
 use ast::IdxVar;
+use ch2::pass::select_instruction::Info;
 use control::*;
-use indexmap::IndexSet;
-use std::fmt::{self, Debug, Formatter};
-
-pub struct Info {
-  pub locals: IndexSet<IdxVar>,
-}
-
-impl Debug for Info {
-  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-    writeln!(f, "locals: {:?}\n", self.locals)
-  }
-}
 
 pub fn select_instruction(prog: CProgram<CInfo>) -> Program<Info, IdxVar> {
   Program {
@@ -135,7 +124,7 @@ fn prim_instructions(
         src: arg2,
       });
       code.push(Instr::SetIf(cmp.into(), Arg::ByteReg(ByteReg::Al)));
-      code.push(Instr::Movzb {
+      code.push(Instr::Movzx {
         src: Arg::ByteReg(ByteReg::Al),
         dest: target,
       });
@@ -209,7 +198,15 @@ mod tests {
   #[test]
   fn nested_if() {
     let prog = ast::parse(
-      r#"(let ([x (read)] [y (read)]) (if (if (< x 1) (eq? x 0) (eq? x 2)) (+ y 2) (+ y 10)))"#,
+      r#"
+(let ([x (read)]
+      [y (read)])
+  (if (if (< x 1)
+        (eq? x 0)
+        (eq? x 2))
+    (+ y 2)
+    (+ y 10)))
+    "#,
     )
     .unwrap();
     let prog = super::super::uniquify::uniquify(prog);
@@ -225,6 +222,31 @@ mod tests {
       r#"(let ([x (if (>= (read) 3) 10 77)]) (if (not (eq? x 10)) 41 2))"#,
     )
     .unwrap();
+    let prog = super::super::uniquify::uniquify(prog);
+    let prog = super::super::anf::anf(prog);
+    let prog = super::super::explicate_control::explicate_control(prog);
+    let result = select_instruction(prog);
+    assert_snapshot!(result.to_string_pretty());
+  }
+
+  #[test]
+  fn complex_if() {
+    let prog = ast::parse(
+      r#"
+(let ([x (read)])
+  (if (> x 100)
+    (let ([y (read)])
+      (if (or (and (>= x y) (< (- x y) 10))
+              (and (< x y) (< (- y x) 10)))
+        -1
+        (- y)))
+    (if (and (> x 40) (< x 60))
+      5000
+      x)))
+      "#
+    )
+    .unwrap();
+    let prog = super::super::shrink::shrink(prog);
     let prog = super::super::uniquify::uniquify(prog);
     let prog = super::super::anf::anf(prog);
     let prog = super::super::explicate_control::explicate_control(prog);

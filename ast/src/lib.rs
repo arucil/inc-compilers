@@ -45,6 +45,15 @@ pub struct IdxVar {
 
 impl IdxVar {
   pub fn new<S: ToString>(name: S) -> Self {
+    let name = name.to_string();
+    if let Some(i) = name.find('.') {
+      if let Ok(index) = name[i + 1..].parse::<usize>() {
+        return Self {
+          name: name[..i].to_owned(),
+          index,
+        };
+      }
+    }
     Self {
       name: name.to_string(),
       index: 0,

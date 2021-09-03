@@ -46,17 +46,43 @@ impl TestCli {
       fs::remove_file(prog).unwrap();
     }
 
-    let input =
-      fs::read_to_string(self.base_dir.join(format!("{}.input", prog)))
-        .unwrap();
-    let output =
-      fs::read_to_string(self.base_dir.join(format!("{}.output", prog)))
-        .unwrap();
-    Command::new(prog)
-      .write_stdin(input)
-      .assert()
-      .success()
-      .stdout(predicates::ord::eq(output.as_bytes()));
+    let inputs = self.base_dir.read_dir().unwrap().filter_map(|entry| {
+      let entry = entry.unwrap();
+      if let Some(name) = entry.file_name().to_str() {
+        if name.starts_with(&format!("{}.", prog)) && name.ends_with(".input") {
+          if name.len() == prog.len() + ".input".len() {
+            return Some(name.to_owned());
+          }
+          if name[prog.len() + 1..name.len() - ".input".len()]
+            .parse::<u32>()
+            .is_ok()
+          {
+            return Some(name.to_owned());
+          }
+        }
+      }
+      None
+    });
+    let mut tested = false;
+    for input in inputs {
+      let output = self
+        .base_dir
+        .join(format!("{}.output", &input[..input.len() - ".input".len()]));
+      if !output.exists() {
+        panic!("missing {}", output.display());
+      }
+      let input = fs::read_to_string(self.base_dir.join(input)).unwrap();
+      let output = fs::read_to_string(output).unwrap();
+      Command::new(prog)
+        .write_stdin(input)
+        .assert()
+        .success()
+        .stdout(predicates::ord::eq(output.as_bytes()));
+      tested = true;
+    }
+    if !tested {
+      panic!("{} has no input files", prog);
+    }
   }
 }
 

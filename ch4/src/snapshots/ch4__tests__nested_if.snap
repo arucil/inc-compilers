@@ -1,0 +1,47 @@
+---
+source: ch4/src/lib.rs
+expression: prog
+
+---
+extern read_int, print_int, print_newline
+section .text
+
+    global _start
+_start:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 8
+    push rbx
+    call read_int
+    mov rbx, rax
+    call read_int
+    mov rcx, rax
+    cmp rbx, 1
+    jl block2
+    cmp rbx, 2
+    je block0
+
+block1:
+    mov rax, rcx
+    add rax, 10
+
+conclusion:
+    pop rbx
+    call print_int
+    call print_newline
+    mov rsp, rbp
+    pop rbp
+    mov rax, 60
+    mov rdi, 0
+    syscall
+
+block2:
+    cmp rbx, 0
+    je block0
+    jmp block1
+
+block0:
+    mov rax, rcx
+    add rax, 2
+    jmp conclusion
+

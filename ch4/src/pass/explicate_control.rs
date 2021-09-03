@@ -286,7 +286,15 @@ mod tests {
   #[test]
   fn nested_if() {
     let prog = ast::parse(
-      r#"(let ([x (read)] [y (read)]) (if (if (< x 1) (eq? x 0) (eq? x 2)) (+ y 2) (+ y 10)))"#,
+      r#"
+(let ([x (read)]
+      [y (read)])
+  (if (if (< x 1)
+        (eq? x 0)
+        (eq? x 2))
+    (+ y 2)
+    (+ y 10)))
+"#,
     )
     .unwrap();
     let prog = super::super::uniquify::uniquify(prog);
