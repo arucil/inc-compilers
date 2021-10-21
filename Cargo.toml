@@ -4,6 +4,7 @@ members = [
     "ch2",
     "ch3",
     "ch4",
+    "ch5",
     "ast",
     "asm",
     "control",

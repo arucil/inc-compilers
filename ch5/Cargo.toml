@@ -1,7 +1,7 @@
 [package]
-name = "ch4"
+name = "ch5"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -11,13 +11,8 @@ asm = { path = "../asm" }
 support = { path = "../support" }
 ch2 = { path = "../ch2" }
 ch3 = { path = "../ch3" }
+ch4 = { path = "../ch4" }
 control = { path = "../control" }
-indexmap = "1.7.0"
-num-traits = "0.2.14"
-petgraph = "0.6.0"
-priority-queue = "1.2.0"
-once_cell = "1.8.0"
-maplit = "1.0.2"
 
 [dev-dependencies]
 insta = "1.8.0"

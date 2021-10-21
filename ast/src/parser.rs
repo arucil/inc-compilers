@@ -214,6 +214,10 @@ fn build_exp(input: &str, cst: Cst) -> Result<(Range, Exp)> {
         match op {
           "let" => build_let(input, xs, range),
           "if" => build_if(input, xs, range),
+          "begin" => build_begin(input, xs, range),
+          "set!" => build_set(input, xs, range),
+          "while" => build_while(input, xs, range),
+          "print" => build_print(input, xs, range),
           _ => {
             const OPERATORS: &[&'static str] = &[
               "read", "+", "-", "and", "or", "not", "eq?", ">", "<", ">=", "<=",
@@ -360,6 +364,126 @@ fn build_if(
       range,
       message: format!("invalid if form"),
     })
+  }
+}
+
+fn build_begin(
+  input: &str,
+  xs: Vec<Cst>,
+  range: Range,
+) -> Result<(Range, Exp)> {
+  if xs.len() > 1 {
+    Ok((
+      range,
+      Exp::Begin(
+        xs.into_iter()
+          .skip(1)
+          .map(|exp| build_exp(input, exp))
+          .collect::<Result<_>>()?,
+      ),
+    ))
+  } else {
+    Err(CompileError {
+      range,
+      message: format!("invalid begin form"),
+    })
+  }
+}
+
+fn build_set(
+  input: &str,
+  mut xs: Vec<Cst>,
+  range: Range,
+) -> Result<(Range, Exp)> {
+  if xs.len() == 3 {
+    let exp = build_exp(input, xs.pop().unwrap())?;
+    if let Cst::Symbol(sym_range) = xs.pop().unwrap() {
+      let var = input[sym_range.start..sym_range.end].to_owned();
+      Ok((
+        range,
+        Exp::Set {
+          var: (sym_range, var),
+          exp: box exp,
+        },
+      ))
+    } else {
+      Err(CompileError {
+        range,
+        message: format!("invalid set! form"),
+      })
+    }
+  } else {
+    Err(CompileError {
+      range,
+      message: format!("invalid set! form"),
+    })
+  }
+}
+
+fn build_while(
+  input: &str,
+  mut xs: Vec<Cst>,
+  range: Range,
+) -> Result<(Range, Exp)> {
+  if xs.len() == 3 {
+    let body = build_exp(input, xs.pop().unwrap())?;
+    let cond = build_exp(input, xs.pop().unwrap())?;
+    Ok((
+      range,
+      Exp::While {
+        cond: box cond,
+        body: box body,
+      },
+    ))
+  } else if xs.len() > 3 {
+    let seq: Vec<_> = xs
+      .drain(2..)
+      .map(|exp| build_exp(input, exp))
+      .collect::<Result<_>>()?;
+    let seq_range = Range {
+      start: seq[0].0.start,
+      end: seq.last().unwrap().0.end,
+    };
+    let cond = build_exp(input, xs.pop().unwrap())?;
+    Ok((
+      range,
+      Exp::While {
+        cond: box cond,
+        body: box (seq_range, Exp::Begin(seq)),
+      },
+    ))
+  } else {
+    Err(CompileError {
+      range,
+      message: format!("invalid while form"),
+    })
+  }
+}
+
+fn build_print(
+  input: &str,
+  mut xs: Vec<Cst>,
+  range: Range,
+) -> Result<(Range, Exp)> {
+  if xs.len() == 1 {
+    Ok((range, Exp::NewLine))
+  } else if xs.len() == 2 {
+    let exp = build_exp(input, xs.pop().unwrap())?;
+    Ok((range, Exp::Print(box exp)))
+  } else {
+    let seq: Vec<_> = xs
+      .into_iter()
+      .skip(1)
+      .map(|exp| {
+        build_exp(input, exp)
+          .map(|(range, exp)| (range.clone(), Exp::Print(box (range, exp))))
+      })
+      .collect::<Result<_>>()?;
+    let seq_range = Range {
+      start: seq[0].0.start,
+      end: seq.last().unwrap().0.end,
+    };
+    Ok((seq_range, Exp::Begin(seq)))
   }
 }
 

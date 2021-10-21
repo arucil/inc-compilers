@@ -4,13 +4,14 @@ use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use support::{CompileError, Range};
 
-type Result<T> = std::result::Result<T, CompileError>;
+pub type Result<T> = std::result::Result<T, CompileError>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Type {
+pub enum Type {
   Int,
   Bool,
   Str,
+  Void,
 }
 
 static PRIM_TYPES: Lazy<HashMap<&'static str, Vec<(Vec<Type>, Type)>>> =
@@ -71,63 +72,13 @@ fn typecheck_exp(
       }
     }
     Exp::Prim { op, args } => {
-      let args = args
-        .into_iter()
-        .map(|arg| typecheck_exp(env, arg))
-        .collect::<Result<Vec<_>>>()?;
-      let arg_types = args.iter().map(|(_, ty)| *ty).collect::<Vec<_>>();
-      let args = args.into_iter().map(|(arg, _)| arg).collect();
-      let ty = typecheck_op(range.clone(), op.1, &arg_types)?;
-      Ok(((range, Exp::Prim { op, args }), ty))
+      typecheck_prim(range, op, args, env, typecheck_exp)
     }
     Exp::Let { var, init, body } => {
-      let (init, init_ty) = typecheck_exp(env, *init)?;
-      let old_var_ty = env.insert(var.1.clone(), init_ty);
-      let (body, ty) = typecheck_exp(env, *body)?;
-      if let Some(old_var_ty) = old_var_ty {
-        env.insert(var.1.clone(), old_var_ty);
-      } else {
-        env.remove(&var.1);
-      }
-      Ok((
-        (
-          range,
-          Exp::Let {
-            var,
-            init: box init,
-            body: box body,
-          },
-        ),
-        ty,
-      ))
+      typecheck_let(range, var, init, body, env, typecheck_exp)
     }
     Exp::If { cond, conseq, alt } => {
-      let (cond, ty) = typecheck_exp(env, *cond)?;
-      if ty != Type::Bool {
-        return Err(CompileError {
-          range,
-          message: format!("expected Bool, found {:?}", ty),
-        });
-      }
-      let (conseq, ty1) = typecheck_exp(env, *conseq)?;
-      let (alt, ty2) = typecheck_exp(env, *alt)?;
-      if ty1 != ty2 {
-        return Err(CompileError {
-          range,
-          message: format!("type mismatch, {:?} != {:?}", ty1, ty2),
-        });
-      }
-      Ok((
-        (
-          range,
-          Exp::If {
-            cond: box cond,
-            conseq: box conseq,
-            alt: box alt,
-          },
-        ),
-        ty1,
-      ))
+      typecheck_if(range, cond, conseq, alt, env, typecheck_exp)
     }
     _ => {
       panic!("unimplemented {:?}", exp);
@@ -135,7 +86,102 @@ fn typecheck_exp(
   }
 }
 
-fn typecheck_op(range: Range, op: &str, arg_types: &[Type]) -> Result<Type> {
+pub fn typecheck_prim(
+  range: Range,
+  op: (Range, &'static str),
+  args: Vec<(Range, Exp)>,
+  env: &mut HashMap<String, Type>,
+  typecheck_exp: fn(
+    &mut HashMap<String, Type>,
+    (Range, Exp),
+  ) -> Result<((Range, Exp), Type)>,
+) -> Result<((Range, Exp), Type)> {
+  let args = args
+    .into_iter()
+    .map(|arg| typecheck_exp(env, arg))
+    .collect::<Result<Vec<_>>>()?;
+  let arg_types = args.iter().map(|(_, ty)| *ty).collect::<Vec<_>>();
+  let args = args.into_iter().map(|(arg, _)| arg).collect();
+  let ty = typecheck_op(range.clone(), op.1, &arg_types)?;
+  Ok(((range, Exp::Prim { op, args }), ty))
+}
+
+pub fn typecheck_let(
+  range: Range,
+  var: (Range, String),
+  init: Box<(Range, Exp)>,
+  body: Box<(Range, Exp)>,
+  env: &mut HashMap<String, Type>,
+  typecheck_exp: fn(
+    &mut HashMap<String, Type>,
+    (Range, Exp),
+  ) -> Result<((Range, Exp), Type)>,
+) -> Result<((Range, Exp), Type)> {
+  let (init, init_ty) = typecheck_exp(env, *init)?;
+  let old_var_ty = env.insert(var.1.clone(), init_ty);
+  let (body, ty) = typecheck_exp(env, *body)?;
+  if let Some(old_var_ty) = old_var_ty {
+    env.insert(var.1.clone(), old_var_ty);
+  } else {
+    env.remove(&var.1);
+  }
+  Ok((
+    (
+      range,
+      Exp::Let {
+        var,
+        init: box init,
+        body: box body,
+      },
+    ),
+    ty,
+  ))
+}
+
+pub fn typecheck_if(
+  range: Range,
+  cond: Box<(Range, Exp)>,
+  conseq: Box<(Range, Exp)>,
+  alt: Box<(Range, Exp)>,
+  env: &mut HashMap<String, Type>,
+  typecheck_exp: fn(
+    &mut HashMap<String, Type>,
+    (Range, Exp),
+  ) -> Result<((Range, Exp), Type)>,
+) -> Result<((Range, Exp), Type)> {
+  let (cond, ty) = typecheck_exp(env, *cond)?;
+  if ty != Type::Bool {
+    return Err(CompileError {
+      range,
+      message: format!("expected Bool, found {:?}", ty),
+    });
+  }
+  let (conseq, ty1) = typecheck_exp(env, *conseq)?;
+  let (alt, ty2) = typecheck_exp(env, *alt)?;
+  if ty1 != ty2 {
+    return Err(CompileError {
+      range,
+      message: format!("type mismatch, {:?} != {:?}", ty1, ty2),
+    });
+  }
+  Ok((
+    (
+      range,
+      Exp::If {
+        cond: box cond,
+        conseq: box conseq,
+        alt: box alt,
+      },
+    ),
+    ty1,
+  ))
+}
+
+fn typecheck_op(
+  range: Range,
+  op: &str,
+  arg_types: &[Type],
+) -> Result<Type> {
   if op == "eq?" {
     if arg_types.len() == 2 {
       if arg_types[0] == arg_types[1] {

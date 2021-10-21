@@ -35,6 +35,17 @@ pub enum Exp<VAR = String> {
     conseq: Box<(Range, Exp<VAR>)>,
     alt: Box<(Range, Exp<VAR>)>,
   },
+  Set {
+    var: (Range, VAR),
+    exp: Box<(Range, Exp<VAR>)>,
+  },
+  Begin(Vec<(Range, Exp<VAR>)>),
+  While {
+    cond: Box<(Range, Exp<VAR>)>,
+    body: Box<(Range, Exp<VAR>)>,
+  },
+  Print(Box<(Range, Exp<VAR>)>),
+  NewLine,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -136,6 +147,53 @@ impl<VAR: Debug> Exp<VAR> {
             .nest(1)
             .group(),
         )
+        .append(RcDoc::text(")")),
+      Exp::Set { var, exp } => RcDoc::text("(")
+        .append(
+          RcDoc::text("set!")
+            .append(Doc::line())
+            .append(RcDoc::text(format!("{:?}", var.1)))
+            .append(Doc::line())
+            .append(exp.1.to_doc())
+            .nest(1)
+            .group(),
+        )
+        .append(RcDoc::text(")")),
+      Exp::Begin(seq) => RcDoc::text("(")
+        .append(
+          RcDoc::text("begin").append(Doc::line()).append(
+            RcDoc::intersperse(
+              seq.iter().map(|(_, exp)| exp.to_doc()),
+              Doc::line(),
+            )
+            .nest(1)
+            .group(),
+          ),
+        )
+        .append(RcDoc::text(")")),
+      Exp::While { cond, body } => RcDoc::text("(")
+        .append(
+          RcDoc::text("while")
+            .append(Doc::line())
+            .append(cond.1.to_doc())
+            .group()
+            .append(Doc::line())
+            .append(body.1.to_doc())
+            .nest(1)
+            .group(),
+        )
+        .append(RcDoc::text(")")),
+      Exp::Print(exp) => RcDoc::text("(")
+        .append(
+          RcDoc::text("print")
+            .append(Doc::line())
+            .append(exp.1.to_doc())
+            .nest(1)
+            .group(),
+        )
+        .append(RcDoc::text(")")),
+      Exp::NewLine => RcDoc::text("(")
+        .append(RcDoc::text("print").nest(1).group())
         .append(RcDoc::text(")")),
     }
   }
