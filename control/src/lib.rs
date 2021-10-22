@@ -125,8 +125,8 @@ impl Debug for CStmt {
       Self::Read => {
         write!(f, "read")
       }
-      Self::Print(exp) => {
-        write!(f, "print {:?}", exp)
+      Self::Print { val, ty } => {
+        write!(f, "print {:?} {:?}", ty, val)
       }
       Self::NewLine => {
         write!(f, "newline")

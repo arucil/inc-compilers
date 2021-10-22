@@ -61,12 +61,17 @@ pub fn explicate_control(mut prog: Program<IdxVar>) -> CProgram<CInfo> {
   let start = explicate_tail(&mut state, prog.body.pop().unwrap().1);
   state.blocks.insert(0, (Label::Start, start));
 
-  remove unreachable blocks
+  let blocks = remove_unreachable_blocks(state.blocks);
 
   CProgram {
     info: CInfo { locals },
-    body: state.blocks,
+    body: blocks,
   }
+}
+
+fn remove_unreachable_blocks(
+  blocks: Vec<(Label, CTail)>,
+) -> Vec<(Label, CTail)> {
 }
 
 fn collect_locals(prog: &Program<IdxVar>) -> IndexSet<IdxVar> {
@@ -269,11 +274,7 @@ fn explicate_exp_effect(
     Exp::Prim { op: _, args } => {
       explicate_effect(state, args.into_iter(), cont)
     }
-    Exp::Let {
-      var,
-      init,
-      body,
-    } => {
+    Exp::Let { var, init, body } => {
       let body = explicate_exp_effect(state, body.1, cont);
       explicate_assign(state, var.1, init.1, body)
     }

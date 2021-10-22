@@ -45,6 +45,13 @@ fn shrink_exp((range, exp): (Range, Exp)) -> (Range, Exp) {
         body: box shrink_exp(*body),
       },
     ),
+    Exp::Print { val, ty } => (
+      range,
+      Exp::Print {
+        val: box shrink_exp(*val),
+        ty,
+      },
+    ),
     Exp::Prim { op, args } => {
       let args: Vec<_> = args.into_iter().map(shrink_exp).collect();
       match op.1 {

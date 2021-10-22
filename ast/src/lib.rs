@@ -47,7 +47,18 @@ pub enum Exp<VAR = String> {
     cond: Box<(Range, Exp<VAR>)>,
     body: Box<(Range, Exp<VAR>)>,
   },
+  Print {
+    val: Box<(Range, Exp<VAR>)>,
+    ty: PrintType,
+  },
   NewLine,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrintType {
+  Int,
+  Bool,
+  Str,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -184,6 +195,15 @@ impl<VAR: Debug> Exp<VAR> {
             .group()
             .append(Doc::line())
             .append(body.1.to_doc())
+            .nest(1)
+            .group(),
+        )
+        .append(RcDoc::text(")")),
+      Exp::Print { val, ty: _ty } => RcDoc::text("(")
+        .append(
+          RcDoc::text("print")
+            .append(Doc::line())
+            .append(val.1.to_doc())
             .nest(1)
             .group(),
         )

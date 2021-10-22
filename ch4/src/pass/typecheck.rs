@@ -202,16 +202,14 @@ fn typecheck_exp(
         Type::Void,
       ))
     }
-    Exp::NewLine => Ok(((range, Exp::NewLine), Type::Void)),
-    _ => {
-      panic!("unimplemented {:?}", exp);
-    }
-  }
-}
-
-fn typecheck_op(range: Range, op: &str, arg_types: &[Type]) -> Result<Type> {
-  if op == "print" {
-    if arg_types.len() == 1 {
+    Exp::Print { val, ty: _ } => {
+      let args = args
+        .into_iter()
+        .map(|arg| typecheck_exp(env, arg))
+        .collect::<Result<Vec<_>>>()?;
+      let arg_types = args.iter().map(|(_, ty)| *ty).collect::<Vec<_>>();
+      let args = args.into_iter().map(|(arg, _)| arg).collect();
+      let ty = typecheck_op(range.clone(), op.1, &arg_types)?;
       if let Type::Bool | Type::Int | Type::Str = arg_types[0] {
         Ok(Type::Void)
       } else {
@@ -223,13 +221,16 @@ fn typecheck_op(range: Range, op: &str, arg_types: &[Type]) -> Result<Type> {
           ),
         })
       }
-    } else {
-      Err(CompileError {
-        range,
-        message: format!("arity mismatch"),
-      })
     }
-  } else if op == "eq?" {
+    Exp::NewLine => Ok(((range, Exp::NewLine), Type::Void)),
+    _ => {
+      panic!("unimplemented {:?}", exp);
+    }
+  }
+}
+
+fn typecheck_op(range: Range, op: &str, arg_types: &[Type]) -> Result<Type> {
+  if op == "eq?" {
     if arg_types.len() == 2 {
       if arg_types[0] == arg_types[1] {
         Ok(Type::Bool)

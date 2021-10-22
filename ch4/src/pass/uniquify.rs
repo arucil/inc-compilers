@@ -78,6 +78,10 @@ fn uniquify_exp(
       cond: box (cond.0, uniquify_exp(cond.1, env, counter)),
       body: box (body.0, uniquify_exp(body.1, env, counter)),
     },
+    Exp::Print { val, ty } => Exp::Print {
+      val: box (val.0, uniquify_exp(val.1, env, counter)),
+      ty,
+    },
     Exp::NewLine => Exp::NewLine,
     exp => unimplemented!("unsupported form {:?}", exp),
   }

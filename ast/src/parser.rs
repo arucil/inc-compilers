@@ -1,4 +1,4 @@
-use crate::{Exp, Program};
+use crate::{Exp, PrintType, Program};
 use support::{CompileError, Range};
 
 pub type Result<T> = std::result::Result<T, CompileError>;
@@ -504,9 +504,9 @@ fn build_print(
       Exp::Begin {
         seq: vec![(
           range,
-          Exp::Prim {
-            op: (range, "print"),
-            args: vec![exp],
+          Exp::Print {
+            val: box exp,
+            ty: PrintType::Int,
           },
         )],
         last: box (range, Exp::NewLine),
@@ -520,9 +520,9 @@ fn build_print(
         build_exp(input, exp).map(|(range, exp)| {
           (
             range,
-            Exp::Prim {
-              op: (range, "print"),
-              args: vec![(range, exp)],
+            Exp::Print {
+              val: box (range, exp),
+              ty: PrintType::Int,
             },
           )
         })
