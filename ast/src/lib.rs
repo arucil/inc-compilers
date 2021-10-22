@@ -39,12 +39,14 @@ pub enum Exp<VAR = String> {
     var: (Range, VAR),
     exp: Box<(Range, Exp<VAR>)>,
   },
-  Begin(Vec<(Range, Exp<VAR>)>),
+  Begin {
+    seq: Vec<(Range, Exp<VAR>)>,
+    last: Box<(Range, Exp<VAR>)>,
+  },
   While {
     cond: Box<(Range, Exp<VAR>)>,
     body: Box<(Range, Exp<VAR>)>,
   },
-  Print(Box<(Range, Exp<VAR>)>),
   NewLine,
 }
 
@@ -159,11 +161,14 @@ impl<VAR: Debug> Exp<VAR> {
             .group(),
         )
         .append(RcDoc::text(")")),
-      Exp::Begin(seq) => RcDoc::text("(")
+      Exp::Begin { seq, last } => RcDoc::text("(")
         .append(
           RcDoc::text("begin").append(Doc::line()).append(
             RcDoc::intersperse(
-              seq.iter().map(|(_, exp)| exp.to_doc()),
+              seq
+                .iter()
+                .chain(std::iter::once(&**last))
+                .map(|(_, exp)| exp.to_doc()),
               Doc::line(),
             )
             .nest(1)
@@ -179,15 +184,6 @@ impl<VAR: Debug> Exp<VAR> {
             .group()
             .append(Doc::line())
             .append(body.1.to_doc())
-            .nest(1)
-            .group(),
-        )
-        .append(RcDoc::text(")")),
-      Exp::Print(exp) => RcDoc::text("(")
-        .append(
-          RcDoc::text("print")
-            .append(Doc::line())
-            .append(exp.1.to_doc())
             .nest(1)
             .group(),
         )

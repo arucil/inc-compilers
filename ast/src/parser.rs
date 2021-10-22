@@ -286,8 +286,27 @@ fn build_let(
   mut xs: Vec<Cst>,
   range: Range,
 ) -> Result<(Range, Exp)> {
-  if xs.len() == 3 {
-    let body = build_exp(input, xs.pop().unwrap())?;
+  if xs.len() >= 3 {
+    let body = if xs.len() == 3 {
+      build_exp(input, xs.pop().unwrap())?
+    } else {
+      let last = build_exp(input, xs.pop().unwrap())?;
+      let seq: Vec<_> = xs
+        .drain(2..)
+        .map(|exp| build_exp(input, exp))
+        .collect::<Result<_>>()?;
+      let seq_range = Range {
+        start: seq[0].0.start,
+        end: seq.last().unwrap().0.end,
+      };
+      (
+        seq_range,
+        Exp::Begin {
+          seq,
+          last: box last,
+        },
+      )
+    };
     let inits = if let Cst::List(vars, _) = xs.pop().unwrap() {
       vars
         .into_iter()
@@ -369,18 +388,22 @@ fn build_if(
 
 fn build_begin(
   input: &str,
-  xs: Vec<Cst>,
+  mut xs: Vec<Cst>,
   range: Range,
 ) -> Result<(Range, Exp)> {
   if xs.len() > 1 {
+    let last = build_exp(input, xs.pop().unwrap())?;
+    let seq = xs
+      .into_iter()
+      .skip(1)
+      .map(|exp| build_exp(input, exp))
+      .collect::<Result<_>>()?;
     Ok((
       range,
-      Exp::Begin(
-        xs.into_iter()
-          .skip(1)
-          .map(|exp| build_exp(input, exp))
-          .collect::<Result<_>>()?,
-      ),
+      Exp::Begin {
+        seq,
+        last: box last,
+      },
     ))
   } else {
     Err(CompileError {
@@ -436,6 +459,7 @@ fn build_while(
       },
     ))
   } else if xs.len() > 3 {
+    let last = build_exp(input, xs.pop().unwrap())?;
     let seq: Vec<_> = xs
       .drain(2..)
       .map(|exp| build_exp(input, exp))
@@ -449,7 +473,13 @@ fn build_while(
       range,
       Exp::While {
         cond: box cond,
-        body: box (seq_range, Exp::Begin(seq)),
+        body: box (
+          seq_range,
+          Exp::Begin {
+            seq,
+            last: box last,
+          },
+        ),
       },
     ))
   } else {
@@ -469,21 +499,47 @@ fn build_print(
     Ok((range, Exp::NewLine))
   } else if xs.len() == 2 {
     let exp = build_exp(input, xs.pop().unwrap())?;
-    Ok((range, Exp::Print(box exp)))
+    Ok((
+      range,
+      Exp::Begin {
+        seq: vec![(
+          range,
+          Exp::Prim {
+            op: (range, "print"),
+            args: vec![exp],
+          },
+        )],
+        last: box (range, Exp::NewLine),
+      },
+    ))
   } else {
     let seq: Vec<_> = xs
       .into_iter()
       .skip(1)
       .map(|exp| {
-        build_exp(input, exp)
-          .map(|(range, exp)| (range.clone(), Exp::Print(box (range, exp))))
+        build_exp(input, exp).map(|(range, exp)| {
+          (
+            range,
+            Exp::Prim {
+              op: (range, "print"),
+              args: vec![(range, exp)],
+            },
+          )
+        })
       })
       .collect::<Result<_>>()?;
+    let last = (range, Exp::NewLine);
     let seq_range = Range {
       start: seq[0].0.start,
       end: seq.last().unwrap().0.end,
     };
-    Ok((seq_range, Exp::Begin(seq)))
+    Ok((
+      seq_range,
+      Exp::Begin {
+        seq,
+        last: box last,
+      },
+    ))
   }
 }
 

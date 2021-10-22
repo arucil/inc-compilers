@@ -24,6 +24,27 @@ fn shrink_exp((range, exp): (Range, Exp)) -> (Range, Exp) {
         body: box shrink_exp(*body),
       },
     ),
+    Exp::Set { var, exp } => (
+      range,
+      Exp::Set {
+        var,
+        exp: box shrink_exp(*exp),
+      },
+    ),
+    Exp::Begin { seq, last } => (
+      range,
+      Exp::Begin {
+        seq: seq.into_iter().map(shrink_exp).collect(),
+        last: box shrink_exp(*last),
+      },
+    ),
+    Exp::While { cond, body } => (
+      range,
+      Exp::While {
+        cond: box shrink_exp(*cond),
+        body: box shrink_exp(*body),
+      },
+    ),
     Exp::Prim { op, args } => {
       let args: Vec<_> = args.into_iter().map(shrink_exp).collect();
       match op.1 {

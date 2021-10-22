@@ -56,7 +56,29 @@ fn uniquify_exp(
       conseq: box (conseq.0, uniquify_exp(conseq.1, env, counter)),
       alt: box (alt.0, uniquify_exp(alt.1, env, counter)),
     },
-    Exp::Str(_) => unimplemented!("string is not supported"),
+    Exp::Str(s) => Exp::Str(s),
+    Exp::Set { var, exp } => Exp::Set {
+      var: (
+        var.0,
+        IdxVar {
+          name: var.1.clone(),
+          index: env[&var.1],
+        },
+      ),
+      exp: box (exp.0, uniquify_exp(exp.1, env, counter)),
+    },
+    Exp::Begin { seq, last } => Exp::Begin {
+      seq: seq
+        .into_iter()
+        .map(|exp| (exp.0, uniquify_exp(exp.1, env, counter)))
+        .collect(),
+      last: box (last.0, uniquify_exp(last.1, env, counter)),
+    },
+    Exp::While { cond, body } => Exp::While {
+      cond: box (cond.0, uniquify_exp(cond.1, env, counter)),
+      body: box (body.0, uniquify_exp(body.1, env, counter)),
+    },
+    Exp::NewLine => Exp::NewLine,
     exp => unimplemented!("unsupported form {:?}", exp),
   }
 }

@@ -47,6 +47,21 @@ fn anf_exp(range: Range, exp: Exp<IdxVar>, counter: &mut usize) -> Exp<IdxVar> {
       conseq: box (conseq.0, anf_exp(conseq.0, conseq.1, counter)),
       alt: box (alt.0, anf_exp(alt.0, alt.1, counter)),
     },
+    Exp::Set { var, exp } => Exp::Set {
+      var,
+      exp: box (exp.0, anf_exp(exp.0, exp.1, counter)),
+    },
+    Exp::Begin { seq, last } => Exp::Begin {
+      seq: seq
+        .into_iter()
+        .map(|exp| (exp.0, anf_exp(exp.0, exp.1, counter)))
+        .collect(),
+      last: box (last.0, anf_exp(last.0, last.1, counter)),
+    },
+    Exp::While { cond, body } => Exp::While {
+      cond: box (cond.0, anf_exp(cond.0, cond.1, counter)),
+      body: box (body.0, anf_exp(body.0, body.1, counter)),
+    },
     exp => exp,
   }
 }
@@ -58,42 +73,39 @@ fn atom_exp(
   counter: &mut usize,
 ) -> Exp<IdxVar> {
   match exp {
-    Exp::Let { .. } => {
-      let exp = anf_exp(range, exp, counter);
-      let tmp = IdxVar {
-        name: "tmp".to_owned(),
-        index: *counter,
-      };
-      *counter += 1;
-      tmps.push((range, tmp.clone(), exp));
-      Exp::Var(tmp)
-    }
     Exp::Prim { op, args } => {
       let args = args
         .into_iter()
         .map(|(range, arg)| (range, atom_exp(range, arg, tmps, counter)))
         .collect();
       let exp = Exp::Prim { op, args };
-      let tmp = IdxVar {
-        name: "tmp".to_owned(),
-        index: *counter,
-      };
-      *counter += 1;
-      tmps.push((range, tmp.clone(), exp));
-      Exp::Var(tmp)
+      assign_var(range, exp, tmps, counter)
     }
-    Exp::If { .. } => {
+    Exp::Let { .. }
+    | Exp::If { .. }
+    | Exp::Set { .. }
+    | Exp::Begin { .. }
+    | Exp::While { .. } => {
       let exp = anf_exp(range, exp, counter);
-      let tmp = IdxVar {
-        name: "tmp".to_owned(),
-        index: *counter,
-      };
-      *counter += 1;
-      tmps.push((range, tmp.clone(), exp));
-      Exp::Var(tmp)
+      assign_var(range, exp, tmps, counter)
     }
     exp => exp,
   }
+}
+
+fn assign_var(
+  range: Range,
+  exp: Exp<IdxVar>,
+  tmps: &mut Vec<(Range, IdxVar, Exp<IdxVar>)>,
+  counter: &mut usize,
+) -> Exp<IdxVar> {
+  let tmp = IdxVar {
+    name: "tmp".to_owned(),
+    index: *counter,
+  };
+  *counter += 1;
+  tmps.push((range, tmp.clone(), exp));
+  Exp::Var(tmp)
 }
 
 #[cfg(test)]
@@ -135,6 +147,22 @@ mod tests {
   fn if_form() {
     let prog = parse(
       r#"(+ (- 3 2) (if (not (eq? 2 3)) (- (read)) (> (read) (not #t))))"#,
+    )
+    .unwrap();
+    let prog = super::super::uniquify::uniquify(prog);
+    let result = anf(prog);
+    assert_snapshot!(result.to_string_pretty());
+  }
+
+  #[test]
+  fn begin() {
+    let prog = parse(
+      r#"
+(let ([x0 10])
+  (let ([y1 0])
+    (+ (+ (begin (set! y1 (read)) x0)
+       (begin (set! x0 (read)) y1))
+    x0)))"#,
     )
     .unwrap();
     let prog = super::super::uniquify::uniquify(prog);

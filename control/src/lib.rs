@@ -1,10 +1,31 @@
 use asm::{CmpResult, Label};
 use ast::IdxVar;
 use std::fmt::{self, Debug, Formatter, Write};
+use std::str::FromStr;
 
 pub struct CProgram<INFO> {
   pub info: INFO,
   pub body: Vec<(Label, CTail)>,
+}
+
+pub struct CDef {
+  pub label: String,
+  pub params: Vec<CParam>,
+  pub ty: CType,
+  pub body: Vec<(Label, CTail)>,
+}
+
+pub struct CParam {
+  pub name: IdxVar,
+  pub ty: CType,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CType {
+  Int,
+  Bool,
+  Str,
+  Void,
 }
 
 #[non_exhaustive]
@@ -20,6 +41,9 @@ pub enum CTail {
 #[derive(Clone)]
 pub enum CStmt {
   Assign { var: IdxVar, exp: CExp },
+  Print { val: CAtom, ty: CType },
+  NewLine,
+  Read,
 }
 
 #[derive(Clone)]
@@ -54,6 +78,7 @@ pub enum CAtom {
   Int(i64),
   Var(IdxVar),
   Bool(bool),
+  Str(String),
 }
 
 impl<INFO: Debug> CProgram<INFO> {
@@ -96,6 +121,15 @@ impl Debug for CStmt {
     match self {
       Self::Assign { var, exp } => {
         write!(f, "{:?} = {:?}", var, exp)
+      }
+      Self::Read => {
+        write!(f, "read")
+      }
+      Self::Print(exp) => {
+        write!(f, "print {:?}", exp)
+      }
+      Self::NewLine => {
+        write!(f, "newline")
       }
     }
   }
@@ -154,19 +188,25 @@ impl Debug for CAtom {
       Self::Var(n) => write!(f, "{:?}", n),
       Self::Bool(true) => write!(f, "#t"),
       Self::Bool(false) => write!(f, "#f"),
+      Self::Str(s) => write!(f, "{:?}", s),
     }
   }
 }
 
-impl CCmpOp {
-  pub fn from_str(str: &str) -> Option<Self> {
-    match str {
-      "eq?" => Some(Self::Eq),
-      ">" => Some(Self::Gt),
-      ">=" => Some(Self::Ge),
-      "<" => Some(Self::Lt),
-      "<=" => Some(Self::Le),
-      _ => None,
+#[derive(Debug, Clone)]
+pub struct InvalidCmpOp;
+
+impl FromStr for CCmpOp {
+  type Err = InvalidCmpOp;
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    match s {
+      "eq?" => Ok(Self::Eq),
+      ">" => Ok(Self::Gt),
+      ">=" => Ok(Self::Ge),
+      "<" => Ok(Self::Lt),
+      "<=" => Ok(Self::Le),
+      _ => Err(InvalidCmpOp),
     }
   }
 }

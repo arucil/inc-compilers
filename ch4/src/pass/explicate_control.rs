@@ -15,32 +15,57 @@ impl Debug for CInfo {
   }
 }
 
-struct Cfg {
+struct State {
   blocks: Vec<(Label, CTail)>,
   label_index: u32,
 }
 
-impl Cfg {
-  fn add_block(&mut self, block: CTail) -> Label {
+impl State {
+  fn new_label(&mut self) -> Label {
     let label = Label::Tmp(self.label_index);
     self.label_index += 1;
-    self.blocks.push((label, block));
     label
+  }
+
+  fn add_label_block(&mut self, label: Label, block: CTail) {
+    self.blocks.push((label, block));
+  }
+
+  fn add_block(&mut self, block: CTail) -> Label {
+    let label = self.new_label();
+    self.add_label_block(label, block);
+    label
+  }
+
+  fn tail_to_label(&mut self, tail: CTail) -> Label {
+    match tail {
+      CTail::Goto(label) => label,
+      _ => self.add_block(tail),
+    }
+  }
+
+  fn tail_to_goto(&mut self, tail: CTail) -> CTail {
+    match tail {
+      CTail::Goto(_) => tail,
+      _ => CTail::Goto(self.add_block(tail)),
+    }
   }
 }
 
 pub fn explicate_control(mut prog: Program<IdxVar>) -> CProgram<CInfo> {
   let locals = collect_locals(&prog);
-  let mut cfg = Cfg {
+  let mut state = State {
     blocks: vec![],
     label_index: 0,
   };
-  let start = explicate_tail(&mut cfg, prog.body.pop().unwrap().1);
-  cfg.blocks.insert(0, (Label::Start, start));
+  let start = explicate_tail(&mut state, prog.body.pop().unwrap().1);
+  state.blocks.insert(0, (Label::Start, start));
+
+  remove unreachable blocks
 
   CProgram {
     info: CInfo { locals },
-    body: cfg.blocks,
+    body: state.blocks,
   }
 }
 
@@ -54,12 +79,7 @@ fn collect_locals(prog: &Program<IdxVar>) -> IndexSet<IdxVar> {
 
 fn collect_exp_locals(exp: &Exp<IdxVar>, locals: &mut IndexSet<IdxVar>) {
   match exp {
-    Exp::Int(_) => {}
-    Exp::Var(var) => {
-      locals.insert(var.clone());
-    }
-    Exp::Str(_) => {}
-    Exp::Bool(_) => {}
+    Exp::Int(_) | Exp::Var(_) | Exp::Str(_) | Exp::Bool(_) => {}
     Exp::Let { var, init, body } => {
       locals.insert(var.1.clone());
       collect_exp_locals(&init.1, locals);
@@ -75,33 +95,52 @@ fn collect_exp_locals(exp: &Exp<IdxVar>, locals: &mut IndexSet<IdxVar>) {
       collect_exp_locals(&conseq.1, locals);
       collect_exp_locals(&alt.1, locals);
     }
+    Exp::Set { var: _, exp } => {
+      collect_exp_locals(&exp.1, locals);
+    }
+    Exp::Begin { seq, last } => {
+      for exp in seq {
+        collect_exp_locals(&exp.1, locals);
+      }
+      collect_exp_locals(&last.1, locals);
+    }
+    Exp::While { cond, body } => {
+      collect_exp_locals(&cond.1, locals);
+      collect_exp_locals(&body.1, locals);
+    }
+    Exp::NewLine => {}
     _ => unimplemented!(),
   }
 }
 
-fn explicate_tail(cfg: &mut Cfg, exp: Exp<IdxVar>) -> CTail {
+fn explicate_tail(state: &mut State, exp: Exp<IdxVar>) -> CTail {
   match exp {
-    Exp::Int(_) | Exp::Var(_) | Exp::Bool(_) => {
+    Exp::Int(_) | Exp::Var(_) | Exp::Bool(_) | Exp::Str(_) => {
       CTail::Return(CExp::Atom(atom(exp)))
     }
     Exp::Prim { op: (_, op), args } => {
       CTail::Return(CExp::Prim(prim(op, args)))
     }
     Exp::Let { var, init, body } => {
-      let cont = explicate_tail(cfg, body.1);
-      explicate_assign(cfg, var.1, init.1, cont)
+      let cont = explicate_tail(state, body.1);
+      explicate_assign(state, var.1, init.1, cont)
     }
     Exp::If { cond, conseq, alt } => {
-      let conseq = explicate_tail(cfg, conseq.1);
-      let alt = explicate_tail(cfg, alt.1);
-      explicate_pred(cfg, cond.1, conseq, alt)
+      let conseq = explicate_tail(state, conseq.1);
+      let alt = explicate_tail(state, alt.1);
+      explicate_pred(state, cond.1, conseq, alt)
     }
+    Exp::Begin { seq, last } => {
+      let cont = explicate_tail(state, last.1);
+      explicate_effect(state, seq.into_iter(), cont)
+    }
+    Exp::While { .. } | Exp::Set { .. } | Exp::NewLine => unreachable!(),
     exp => unimplemented!("unsupported form {:?}", exp),
   }
 }
 
 fn explicate_assign(
-  cfg: &mut Cfg,
+  state: &mut State,
   var: IdxVar,
   init: Exp<IdxVar>,
   cont: CTail,
@@ -127,21 +166,26 @@ fn explicate_assign(
       init: box (_, init1),
       body,
     } => {
-      let cont = explicate_assign(cfg, var, body.1, cont);
-      explicate_assign(cfg, var1, init1, cont)
+      let cont = explicate_assign(state, var, body.1, cont);
+      explicate_assign(state, var1, init1, cont)
     }
     Exp::If { cond, conseq, alt } => {
-      let cont = tail_to_goto(cont, cfg);
-      let conseq = explicate_assign(cfg, var.clone(), conseq.1, cont.clone());
-      let alt = explicate_assign(cfg, var, alt.1, cont);
-      explicate_pred(cfg, cond.1, conseq, alt)
+      let cont = state.tail_to_goto(cont);
+      let conseq = explicate_assign(state, var.clone(), conseq.1, cont.clone());
+      let alt = explicate_assign(state, var, alt.1, cont);
+      explicate_pred(state, cond.1, conseq, alt)
     }
+    Exp::Begin { seq, last } => {
+      let cont = explicate_assign(state, var, last.1, cont);
+      explicate_effect(state, seq.into_iter(), cont)
+    }
+    Exp::While { .. } | Exp::Set { .. } | Exp::NewLine => unreachable!(),
     _ => unimplemented!("unsupported form {:?}", init),
   }
 }
 
 fn explicate_pred(
-  cfg: &mut Cfg,
+  state: &mut State,
   cond: Exp<IdxVar>,
   conseq: CTail,
   alt: CTail,
@@ -155,22 +199,22 @@ fn explicate_pred(
       }
     }
     Exp::Var(_) => {
-      let conseq = tail_to_label(conseq, cfg);
-      let alt = tail_to_label(alt, cfg);
+      let conseq = state.tail_to_label(conseq);
+      let alt = state.tail_to_label(alt);
       CTail::If(CCmpOp::Eq, atom(cond), CAtom::Bool(false), alt, conseq)
     }
     Exp::Let { var, init, body } => {
-      let cont = explicate_pred(cfg, body.1, conseq, alt);
-      explicate_assign(cfg, var.1, init.1, cont)
+      let cont = explicate_pred(state, body.1, conseq, alt);
+      explicate_assign(state, var.1, init.1, cont)
     }
     Exp::Prim {
       op: (_, "not"),
       mut args,
-    } => explicate_pred(cfg, args.pop().unwrap().1, alt, conseq),
+    } => explicate_pred(state, args.pop().unwrap().1, alt, conseq),
     Exp::Prim { op, mut args } => {
-      let conseq = tail_to_label(conseq, cfg);
-      let alt = tail_to_label(alt, cfg);
-      let cmp = CCmpOp::from_str(op.1).unwrap();
+      let conseq = state.tail_to_label(conseq);
+      let alt = state.tail_to_label(alt);
+      let cmp = op.1.parse().unwrap();
       let arg2 = args.pop().unwrap().1;
       let arg1 = args.pop().unwrap().1;
       CTail::If(cmp, atom(arg1), atom(arg2), conseq, alt)
@@ -180,27 +224,79 @@ fn explicate_pred(
       conseq: conseq1,
       alt: alt1,
     } => {
-      let conseq = tail_to_goto(conseq, cfg);
-      let alt = tail_to_goto(alt, cfg);
-      let conseq1 = explicate_pred(cfg, conseq1.1, conseq.clone(), alt.clone());
-      let alt1 = explicate_pred(cfg, alt1.1, conseq, alt);
-      explicate_pred(cfg, cond1.1, conseq1, alt1)
+      let conseq = state.tail_to_goto(conseq);
+      let alt = state.tail_to_goto(alt);
+      let conseq1 =
+        explicate_pred(state, conseq1.1, conseq.clone(), alt.clone());
+      let alt1 = explicate_pred(state, alt1.1, conseq, alt);
+      explicate_pred(state, cond1.1, conseq1, alt1)
     }
+    Exp::Begin { seq, last } => {
+      let cont = explicate_pred(state, last.1, conseq, alt);
+      explicate_effect(state, seq.into_iter(), cont)
+    }
+    Exp::While { .. } | Exp::Set { .. } | Exp::NewLine => unreachable!(),
     _ => unimplemented!(),
   }
 }
 
-fn tail_to_label(tail: CTail, cfg: &mut Cfg) -> Label {
-  match tail {
-    CTail::Goto(label) => label,
-    _ => cfg.add_block(tail),
-  }
+fn explicate_effect(
+  state: &mut State,
+  seq: impl DoubleEndedIterator<Item = (Range, Exp<IdxVar>)>,
+  cont: CTail,
+) -> CTail {
+  seq.rfold(cont, |cont, exp| explicate_exp_effect(state, exp.1, cont))
 }
 
-fn tail_to_goto(tail: CTail, cfg: &mut Cfg) -> CTail {
-  match tail {
-    CTail::Goto(_) => tail,
-    _ => CTail::Goto(cfg.add_block(tail)),
+fn explicate_exp_effect(
+  state: &mut State,
+  exp: Exp<IdxVar>,
+  cont: CTail,
+) -> CTail {
+  match exp {
+    Exp::Bool(_) | Exp::Int(_) | Exp::Var(_) | Exp::Str(_) => cont,
+    Exp::Prim {
+      op: (_, "read"),
+      args: _,
+    } => CTail::Seq(CStmt::Read, box cont),
+    Exp::Prim {
+      op: (_, "print"),
+      mut args,
+    } => {
+      let arg = atom(args.pop().unwrap().1);
+      CTail::Seq(CStmt::Print(arg), box cont)
+    }
+    Exp::Prim { op: _, args } => {
+      explicate_effect(state, args.into_iter(), cont)
+    }
+    Exp::Let {
+      var,
+      init,
+      body,
+    } => {
+      let body = explicate_exp_effect(state, body.1, cont);
+      explicate_assign(state, var.1, init.1, body)
+    }
+    Exp::If { cond, conseq, alt } => {
+      let cont = state.tail_to_goto(cont);
+      let conseq = explicate_exp_effect(state, conseq.1, cont.clone());
+      let alt = explicate_exp_effect(state, alt.1, cont);
+      explicate_pred(state, cond.1, conseq, alt)
+    }
+    Exp::Set { var, exp } => explicate_assign(state, var.1, exp.1, cont),
+    Exp::Begin { seq, last } => {
+      let cont = explicate_exp_effect(state, last.1, cont);
+      explicate_effect(state, seq.into_iter(), cont)
+    }
+    Exp::While { cond, body } => {
+      let loop_start = state.new_label();
+      let body = explicate_exp_effect(state, body.1, CTail::Goto(loop_start));
+      let block = explicate_pred(state, cond.1, body, cont);
+      state.add_label_block(loop_start, block);
+      CTail::Goto(loop_start)
+    }
+    Exp::NewLine => CTail::Seq(CStmt::NewLine, box cont),
+    _ => panic!("unimplemented {:?}", exp),
   }
 }
 
@@ -209,6 +305,7 @@ fn atom(exp: Exp<IdxVar>) -> CAtom {
     Exp::Int(n) => CAtom::Int(n),
     Exp::Var(var) => CAtom::Var(var),
     Exp::Bool(v) => CAtom::Bool(v),
+    Exp::Str(s) => CAtom::Str(s),
     _ => unreachable!("{:?}", exp),
   }
 }
@@ -238,7 +335,7 @@ fn prim(op: &str, mut args: Vec<(Range, Exp<IdxVar>)>) -> CPrim {
     "eq?" | ">" | ">=" | "<" | "<=" => {
       let arg2 = args.pop().unwrap().1;
       let arg1 = args.pop().unwrap().1;
-      CPrim::Cmp(CCmpOp::from_str(op).unwrap(), atom(arg1), atom(arg2))
+      CPrim::Cmp(op.parse().unwrap(), atom(arg1), atom(arg2))
     }
     _ => unreachable!("{}", op),
   }
@@ -338,6 +435,30 @@ mod tests {
   fn shrink_and() {
     let prog =
       ast::parse(r#"(if (and (eq? (read) 0) (eq? (read) 2)) 0 42)"#).unwrap();
+    let prog = super::super::shrink::shrink(prog);
+    let prog = super::super::uniquify::uniquify(prog);
+    let prog = super::super::anf::anf(prog);
+    let result = explicate_control(prog);
+    assert_snapshot!(result.to_string_pretty());
+  }
+
+  #[test]
+  fn begin() {
+    let prog = ast::parse(
+      r#"
+(let ([x 1] [y (read)])
+  (while (> x 10)
+    (set! x (begin (print "x=" x) (+ x (- y 1))))
+    (print (> x (- y 1))))
+  (begin 1 2 3)
+  (let ([k (+ x 1)])
+    (print k)
+    k)
+  (+ 7 (read) (if (begin (set! y 37) (not (eq? y x))) 11 23))
+  (+ x y))
+      "#,
+    )
+    .unwrap();
     let prog = super::super::shrink::shrink(prog);
     let prog = super::super::uniquify::uniquify(prog);
     let prog = super::super::anf::anf(prog);

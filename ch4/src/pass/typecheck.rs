@@ -72,117 +72,164 @@ fn typecheck_exp(
       }
     }
     Exp::Prim { op, args } => {
-      typecheck_prim(range, op, args, env, typecheck_exp)
+      let args = args
+        .into_iter()
+        .map(|arg| typecheck_exp(env, arg))
+        .collect::<Result<Vec<_>>>()?;
+      let arg_types = args.iter().map(|(_, ty)| *ty).collect::<Vec<_>>();
+      let args = args.into_iter().map(|(arg, _)| arg).collect();
+      let ty = typecheck_op(range.clone(), op.1, &arg_types)?;
+      Ok(((range, Exp::Prim { op, args }), ty))
     }
     Exp::Let { var, init, body } => {
-      typecheck_let(range, var, init, body, env, typecheck_exp)
+      let (init, init_ty) = typecheck_exp(env, *init)?;
+      if !matches!(init_ty, Type::Int | Type::Bool) {
+        return Err(CompileError {
+          range: init.0,
+          message: format!(
+            "variable can only be Int or Bool, found {:?}",
+            init_ty
+          ),
+        });
+      }
+      let old_var_ty = env.insert(var.1.clone(), init_ty);
+      let (body, ty) = typecheck_exp(env, *body)?;
+      if let Some(old_var_ty) = old_var_ty {
+        env.insert(var.1.clone(), old_var_ty);
+      } else {
+        env.remove(&var.1);
+      }
+      Ok((
+        (
+          range,
+          Exp::Let {
+            var,
+            init: box init,
+            body: box body,
+          },
+        ),
+        ty,
+      ))
     }
     Exp::If { cond, conseq, alt } => {
-      typecheck_if(range, cond, conseq, alt, env, typecheck_exp)
+      let (cond, ty) = typecheck_exp(env, *cond)?;
+      if ty != Type::Bool {
+        return Err(CompileError {
+          range: cond.0,
+          message: format!("expected Bool, found {:?}", ty),
+        });
+      }
+      let (conseq, ty1) = typecheck_exp(env, *conseq)?;
+      let (alt, ty2) = typecheck_exp(env, *alt)?;
+      if ty1 != ty2 {
+        return Err(CompileError {
+          range,
+          message: format!("type mismatch, {:?} != {:?}", ty1, ty2),
+        });
+      }
+      Ok((
+        (
+          range,
+          Exp::If {
+            cond: box cond,
+            conseq: box conseq,
+            alt: box alt,
+          },
+        ),
+        ty1,
+      ))
     }
+    Exp::Set { ref var, exp } => {
+      if let Some(&ty) = env.get(&var.1) {
+        let (exp, exp_ty) = typecheck_exp(env, *exp)?;
+        if ty != exp_ty {
+          return Err(CompileError {
+            range,
+            message: format!("type mismatch, {:?} != {:?}", ty, exp_ty),
+          });
+        }
+        Ok((
+          (
+            range,
+            Exp::Set {
+              var: var.clone(),
+              exp: box exp,
+            },
+          ),
+          Type::Void,
+        ))
+      } else {
+        Err(CompileError {
+          range,
+          message: format!("variable {} not found", var.1),
+        })
+      }
+    }
+    Exp::Begin { seq, last } => {
+      let (last, last_ty) = typecheck_exp(env, *last)?;
+      let seq: Vec<_> = seq
+        .into_iter()
+        .map(|exp| typecheck_exp(env, exp).map(|r| r.0))
+        .collect::<Result<_>>()?;
+      Ok((
+        (
+          range,
+          Exp::Begin {
+            seq,
+            last: box last,
+          },
+        ),
+        last_ty,
+      ))
+    }
+    Exp::While { cond, body } => {
+      let (cond, ty) = typecheck_exp(env, *cond)?;
+      if ty != Type::Bool {
+        return Err(CompileError {
+          range: cond.0,
+          message: format!("expected Bool, found {:?}", ty),
+        });
+      }
+      let (body, _) = typecheck_exp(env, *body)?;
+      Ok((
+        (
+          range,
+          Exp::While {
+            cond: box cond,
+            body: box body,
+          },
+        ),
+        Type::Void,
+      ))
+    }
+    Exp::NewLine => Ok(((range, Exp::NewLine), Type::Void)),
     _ => {
       panic!("unimplemented {:?}", exp);
     }
   }
 }
 
-pub fn typecheck_prim(
-  range: Range,
-  op: (Range, &'static str),
-  args: Vec<(Range, Exp)>,
-  env: &mut HashMap<String, Type>,
-  typecheck_exp: fn(
-    &mut HashMap<String, Type>,
-    (Range, Exp),
-  ) -> Result<((Range, Exp), Type)>,
-) -> Result<((Range, Exp), Type)> {
-  let args = args
-    .into_iter()
-    .map(|arg| typecheck_exp(env, arg))
-    .collect::<Result<Vec<_>>>()?;
-  let arg_types = args.iter().map(|(_, ty)| *ty).collect::<Vec<_>>();
-  let args = args.into_iter().map(|(arg, _)| arg).collect();
-  let ty = typecheck_op(range.clone(), op.1, &arg_types)?;
-  Ok(((range, Exp::Prim { op, args }), ty))
-}
-
-pub fn typecheck_let(
-  range: Range,
-  var: (Range, String),
-  init: Box<(Range, Exp)>,
-  body: Box<(Range, Exp)>,
-  env: &mut HashMap<String, Type>,
-  typecheck_exp: fn(
-    &mut HashMap<String, Type>,
-    (Range, Exp),
-  ) -> Result<((Range, Exp), Type)>,
-) -> Result<((Range, Exp), Type)> {
-  let (init, init_ty) = typecheck_exp(env, *init)?;
-  let old_var_ty = env.insert(var.1.clone(), init_ty);
-  let (body, ty) = typecheck_exp(env, *body)?;
-  if let Some(old_var_ty) = old_var_ty {
-    env.insert(var.1.clone(), old_var_ty);
-  } else {
-    env.remove(&var.1);
-  }
-  Ok((
-    (
-      range,
-      Exp::Let {
-        var,
-        init: box init,
-        body: box body,
-      },
-    ),
-    ty,
-  ))
-}
-
-pub fn typecheck_if(
-  range: Range,
-  cond: Box<(Range, Exp)>,
-  conseq: Box<(Range, Exp)>,
-  alt: Box<(Range, Exp)>,
-  env: &mut HashMap<String, Type>,
-  typecheck_exp: fn(
-    &mut HashMap<String, Type>,
-    (Range, Exp),
-  ) -> Result<((Range, Exp), Type)>,
-) -> Result<((Range, Exp), Type)> {
-  let (cond, ty) = typecheck_exp(env, *cond)?;
-  if ty != Type::Bool {
-    return Err(CompileError {
-      range,
-      message: format!("expected Bool, found {:?}", ty),
-    });
-  }
-  let (conseq, ty1) = typecheck_exp(env, *conseq)?;
-  let (alt, ty2) = typecheck_exp(env, *alt)?;
-  if ty1 != ty2 {
-    return Err(CompileError {
-      range,
-      message: format!("type mismatch, {:?} != {:?}", ty1, ty2),
-    });
-  }
-  Ok((
-    (
-      range,
-      Exp::If {
-        cond: box cond,
-        conseq: box conseq,
-        alt: box alt,
-      },
-    ),
-    ty1,
-  ))
-}
-
-fn typecheck_op(
-  range: Range,
-  op: &str,
-  arg_types: &[Type],
-) -> Result<Type> {
-  if op == "eq?" {
+fn typecheck_op(range: Range, op: &str, arg_types: &[Type]) -> Result<Type> {
+  if op == "print" {
+    if arg_types.len() == 1 {
+      if let Type::Bool | Type::Int | Type::Str = arg_types[0] {
+        Ok(Type::Void)
+      } else {
+        Err(CompileError {
+          range,
+          message: format!(
+            "expected Int, Bool, or Str, found {:?}",
+            arg_types[0],
+          ),
+        })
+      }
+    } else {
+      Err(CompileError {
+        range,
+        message: format!("arity mismatch"),
+      })
+    }
+  } else if op == "eq?" {
     if arg_types.len() == 2 {
       if arg_types[0] == arg_types[1] {
         Ok(Type::Bool)
@@ -295,7 +342,7 @@ mod tests {
     assert_eq!(
       result,
       Err(CompileError {
-        range: Range { start: 0, end: 31 },
+        range: Range { start: 4, end: 10 },
         message: format!("expected Bool, found Int"),
       })
     );
@@ -351,5 +398,73 @@ mod tests {
         message: format!("invalid \"+\" operation"),
       })
     );
+  }
+
+  #[test]
+  fn set() {
+    let prog = parse(r#"(let ([x 1]) (set! x (+ x 1)) x)"#).unwrap();
+    let result = typecheck(prog);
+    assert_eq!(result.map(|_| ()), Ok(()));
+  }
+
+  #[test]
+  fn set_returns_void() {
+    let prog = parse(r#"(let ([x 1]) (set! x (+ x 1)))"#).unwrap();
+    let result = typecheck(prog);
+    assert_eq!(
+      result.map(|_| ()),
+      Err(CompileError {
+        range: Range { start: 0, end: 30 },
+        message: format!("expected Int, found Void"),
+      })
+    );
+  }
+
+  #[test]
+  fn begin_returns_last_type() {
+    let prog = parse(r#"(begin (- 7) (begin (+ 2 3) (> 2 1)))"#).unwrap();
+    let result = typecheck(prog);
+    assert_eq!(
+      result.map(|_| ()),
+      Err(CompileError {
+        range: Range { start: 0, end: 37 },
+        message: format!("expected Int, found Bool"),
+      })
+    );
+  }
+
+  #[test]
+  fn while_loop() {
+    let prog =
+      parse(r#"(let ([x 1]) (while (< x 3) (set! x (+ x 1)) "x"))"#).unwrap();
+    let result = typecheck(prog);
+    assert_eq!(
+      result.map(|_| ()),
+      Err(CompileError {
+        range: Range { start: 0, end: 50 },
+        message: format!("expected Int, found Void"),
+      })
+    );
+  }
+
+  #[test]
+  fn while_cond_mismatch() {
+    let prog =
+      parse(r#"(let ([x 1]) (while (+ x 3) (set! x (+ x 1)) "x"))"#).unwrap();
+    let result = typecheck(prog);
+    assert_eq!(
+      result.map(|_| ()),
+      Err(CompileError {
+        range: Range { start: 20, end: 27 },
+        message: format!("expected Bool, found Int"),
+      })
+    );
+  }
+
+  #[test]
+  fn print() {
+    let prog = parse(r#"(begin (print (+ 1 2) "abc" #f) 0)"#).unwrap();
+    let result = typecheck(prog);
+    assert_eq!(result.map(|_| ()), Ok(()));
   }
 }
