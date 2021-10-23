@@ -1,4 +1,4 @@
-use ast::{Exp, Program};
+use ast::{Exp, PrintType, Program};
 use maplit::hashmap;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -203,24 +203,19 @@ fn typecheck_exp(
       ))
     }
     Exp::Print { val, ty: _ } => {
-      let args = args
-        .into_iter()
-        .map(|arg| typecheck_exp(env, arg))
-        .collect::<Result<Vec<_>>>()?;
-      let arg_types = args.iter().map(|(_, ty)| *ty).collect::<Vec<_>>();
-      let args = args.into_iter().map(|(arg, _)| arg).collect();
-      let ty = typecheck_op(range.clone(), op.1, &arg_types)?;
-      if let Type::Bool | Type::Int | Type::Str = arg_types[0] {
-        Ok(Type::Void)
-      } else {
-        Err(CompileError {
-          range,
-          message: format!(
-            "expected Int, Bool, or Str, found {:?}",
-            arg_types[0],
-          ),
-        })
-      }
+      let (val, ty) = typecheck_exp(env, *val)?;
+      let ty = match ty {
+        Type::Int => PrintType::Int,
+        Type::Bool => PrintType::Bool,
+        Type::Str => PrintType::Str,
+        _ => {
+          return Err(CompileError {
+            range,
+            message: format!("expected Int, Bool, or Str, found {:?}", ty),
+          });
+        }
+      };
+      Ok(((range, Exp::Print { val: box val, ty }), Type::Void))
     }
     Exp::NewLine => Ok(((range, Exp::NewLine), Type::Void)),
     _ => {

@@ -11,12 +11,12 @@ start:
     cmp tmp.0, 3
     jge block3
     jmp block4
-block0:
-    mov rax, 2
-    jmp conclusion
-block1:
-    mov rax, 41
-    jmp conclusion
+block3:
+    mov x.0, 10
+    jmp block2
+block4:
+    mov x.0, 77
+    jmp block2
 block2:
     cmp x.0, 10
     sete al
@@ -24,10 +24,10 @@ block2:
     cmp tmp.1, 0
     je block1
     jmp block0
-block3:
-    mov x.0, 10
-    jmp block2
-block4:
-    mov x.0, 77
-    jmp block2
+block1:
+    mov rax, 41
+    jmp conclusion
+block0:
+    mov rax, 2
+    jmp conclusion
 

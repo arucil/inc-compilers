@@ -9,6 +9,10 @@ section .data
 
 section .rodata
     newline db `\n`
+    true_lit db `true`
+    true_lit_len equ $-true_lit
+    false_lit db `false`
+    false_lit_len equ $-false_lit
     invalid_integer db `Invalid integer\n`
     invalid_integer_len equ $-invalid_integer
 
@@ -175,12 +179,33 @@ print_int:
 
 ;; args
 ;;   rsi: buffer address
-;;   rcx: length
+;;   rdx: length
     global print_str
 print_str:
     mov rax, 1
     mov rdi, 1
-    mov rdx, rcx
+    syscall
+    ret
+
+;; args
+;;   rax: bool
+;; uses:
+;;   rsi, rdi, rdx
+    global print_bool
+print_bool:
+    cmp rax, 0
+    je print_bool_f
+    mov rsi, true_lit
+    mov rdx, true_lit_len
+    mov rax, 1
+    mov rdi, 1
+    syscall
+    ret
+print_bool_f:
+    mov rsi, false_lit
+    mov rdx, false_lit_len
+    mov rax, 1
+    mov rdi, 1
     syscall
     ret
 

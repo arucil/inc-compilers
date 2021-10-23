@@ -19,7 +19,11 @@ pub fn merge_jumps<INFO>(prog: Program<INFO>) -> Program<INFO> {
   let mut worklist = vec![Label::EntryPoint];
   let mut new_blocks = vec![];
   while let Some(mut label) = worklist.pop() {
-    let mut block = blocks.remove(&label).unwrap();
+    let mut block = if let Some(block) = blocks.remove(&label) {
+      block
+    } else{
+      continue;
+    };
     while let Instr::Jmp(next_label) = block.code.last().unwrap() {
       if block.code.len() > 1 {
         if let Instr::JumpIf(_, label) = &block.code[block.code.len() - 2] {
@@ -33,10 +37,14 @@ pub fn merge_jumps<INFO>(prog: Program<INFO>) -> Program<INFO> {
         block.code.pop();
         block.code.append(&mut next_block.code);
       } else {
-        block.code.pop();
-        new_blocks.push((label, block));
-        label = next_label;
-        block = blocks.remove(&label).unwrap();
+        if let Some(next_block) = blocks.remove(&next_label) {
+          block.code.pop();
+          new_blocks.push((label, block));
+          label = next_label;
+          block = next_block;
+        } else {
+          break;
+        }
       }
     }
     new_blocks.push((label, block));

@@ -20,7 +20,7 @@ pub struct CParam {
   pub ty: CType,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CType {
   Int,
   Bool,
@@ -41,7 +41,7 @@ pub enum CTail {
 #[derive(Clone)]
 pub enum CStmt {
   Assign { var: IdxVar, exp: CExp },
-  Print { val: CAtom, ty: CType },
+  Print { val: CExp, ty: CType },
   NewLine,
   Read,
 }

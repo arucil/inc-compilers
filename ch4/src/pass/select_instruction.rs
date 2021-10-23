@@ -61,7 +61,21 @@ fn tail_instructions(mut tail: CTail, code: &mut Vec<Instr<IdxVar>>) {
 fn stmt_instructions(stmt: CStmt, code: &mut Vec<Instr<IdxVar>>) {
   match stmt {
     CStmt::Assign { var, exp } => exp_instructions(Arg::Var(var), exp, code),
-    _ => unimplemented!(),
+    CStmt::Print { val, ty: CType::Int } => {
+      exp_instructions(Arg::Reg(Reg::Rax), val, code);
+      code.push(Instr::Call("print_int".to_owned(), 0));
+    }
+    CStmt::Print { val, ty: CType::Bool } => {
+      exp_instructions(Arg::Reg(Reg::Rax), val, code);
+      code.push(Instr::Call("print_bool".to_owned(), 0));
+    }
+    CStmt::Print { val, ty: CType::Str } => {
+      exp_instructions(Arg::Reg(Reg::Rax), val, code);
+      code.push(Instr::Call("print_str".t_owned(), 0));
+    }
+    CStmt::NewLine => code.push(Instr::Call("print_newline".to_owned(), 0)),
+    CStmt::Read => code.push(Instr::Call("read_int".to_owned(), 0)),
+    _ => unimplemented!("{:?}", stmt),
   }
 }
 
@@ -243,7 +257,7 @@ mod tests {
     (if (and (> x 40) (< x 60))
       5000
       x)))
-      "#
+      "#,
     )
     .unwrap();
     let prog = super::super::shrink::shrink(prog);

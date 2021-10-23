@@ -62,29 +62,10 @@ fn anf_exp(range: Range, exp: Exp<IdxVar>, counter: &mut usize) -> Exp<IdxVar> {
       cond: box (cond.0, anf_exp(cond.0, cond.1, counter)),
       body: box (body.0, anf_exp(body.0, body.1, counter)),
     },
-    Exp::Print { val, ty } => {
-      let mut tmps = vec![];
-      let args = args
-        .into_iter()
-        .map(|(range, arg)| (range, atom_exp(range, arg, &mut tmps, counter)))
-        .collect();
-      tmps
-        .into_iter()
-        .rfold(
-          (range, Exp::Prim { op, args }),
-          |(body_range, body), (range, var, init)| {
-            (
-              body_range,
-              Exp::Let {
-                var: (range, var),
-                init: box (range, init),
-                body: box (body_range, body),
-              },
-            )
-          },
-        )
-        .1
-    }
+    Exp::Print { val, ty } => Exp::Print {
+      val: box (val.0, anf_exp(val.0, val.1, counter)),
+      ty,
+    },
     exp => exp,
   }
 }

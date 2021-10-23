@@ -109,7 +109,7 @@ impl<INFO: Debug, VAR: Debug> Program<INFO, VAR> {
 
   pub fn to_nasm(&self) -> String {
     let mut buf = format!(
-      "extern read_int, print_int, print_newline\n\
+      "extern read_int, print_int, print_str, print_bool, print_newline\n\
       section .text\n"
     );
     for (label, block) in &self.blocks {

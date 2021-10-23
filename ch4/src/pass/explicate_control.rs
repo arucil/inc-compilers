@@ -1,7 +1,8 @@
 use asm::Label;
-use ast::{Exp, IdxVar, Program};
-use control::{CAtom, CCmpOp, CExp, CPrim, CProgram, CStmt, CTail};
-use indexmap::IndexSet;
+use ast::{Exp, IdxVar, PrintType, Program};
+use control::{CAtom, CCmpOp, CExp, CPrim, CProgram, CStmt, CTail, CType};
+use indexmap::{IndexMap, IndexSet};
+use std::collections::VecDeque;
 use std::fmt::{self, Debug, Formatter};
 use support::Range;
 
@@ -72,6 +73,40 @@ pub fn explicate_control(mut prog: Program<IdxVar>) -> CProgram<CInfo> {
 fn remove_unreachable_blocks(
   blocks: Vec<(Label, CTail)>,
 ) -> Vec<(Label, CTail)> {
+  let mut blocks: IndexMap<_, _> = blocks.into_iter().collect();
+  let mut reachable_blocks = IndexMap::<Label, CTail>::default();
+  let mut worklist = VecDeque::new();
+  worklist.push_back((Label::Start, blocks.remove(&Label::Start).unwrap()));
+
+  while let Some((label, block)) = worklist.pop_front() {
+    let mut tail = &block;
+    loop {
+      match tail {
+        CTail::Seq(_, t) => {
+          tail = &**t;
+          continue;
+        }
+        CTail::Goto(goto_label) => {
+          if let Some(goto_block) = blocks.remove(goto_label) {
+            worklist.push_back((*goto_label, goto_block));
+          }
+        }
+        CTail::If(_, _, _, goto_label1, goto_label2) => {
+          if let Some(goto_block) = blocks.remove(goto_label1) {
+            worklist.push_back((*goto_label1, goto_block));
+          }
+          if let Some(goto_block) = blocks.remove(goto_label2) {
+            worklist.push_back((*goto_label2, goto_block));
+          }
+        }
+        _ => {}
+      }
+      break;
+    }
+    reachable_blocks.insert(label, block);
+  }
+
+  reachable_blocks.into_iter().collect()
 }
 
 fn collect_locals(prog: &Program<IdxVar>) -> IndexSet<IdxVar> {
@@ -113,8 +148,11 @@ fn collect_exp_locals(exp: &Exp<IdxVar>, locals: &mut IndexSet<IdxVar>) {
       collect_exp_locals(&cond.1, locals);
       collect_exp_locals(&body.1, locals);
     }
+    Exp::Print { val, ty: _ } => {
+      collect_exp_locals(&val.1, locals);
+    }
     Exp::NewLine => {}
-    _ => unimplemented!(),
+    _ => unimplemented!("{:?}", exp),
   }
 }
 
@@ -264,13 +302,6 @@ fn explicate_exp_effect(
       op: (_, "read"),
       args: _,
     } => CTail::Seq(CStmt::Read, box cont),
-    Exp::Prim {
-      op: (_, "print"),
-      mut args,
-    } => {
-      let arg = atom(args.pop().unwrap().1);
-      CTail::Seq(CStmt::Print(arg), box cont)
-    }
     Exp::Prim { op: _, args } => {
       explicate_effect(state, args.into_iter(), cont)
     }
@@ -297,7 +328,59 @@ fn explicate_exp_effect(
       CTail::Goto(loop_start)
     }
     Exp::NewLine => CTail::Seq(CStmt::NewLine, box cont),
+    Exp::Print { val, ty } => {
+      let ty = match ty {
+        PrintType::Int => CType::Int,
+        PrintType::Bool => CType::Bool,
+        PrintType::Str => CType::Str,
+      };
+      explicate_print(state, val.1, ty, cont)
+    }
     _ => panic!("unimplemented {:?}", exp),
+  }
+}
+
+fn explicate_print(
+  state: &mut State,
+  exp: Exp<IdxVar>,
+  ty: CType,
+  cont: CTail,
+) -> CTail {
+  match exp {
+    Exp::Int(_) | Exp::Var(_) | Exp::Bool(_) => CTail::Seq(
+      CStmt::Print {
+        val: CExp::Atom(atom(exp)),
+        ty,
+      },
+      box cont,
+    ),
+    Exp::Prim { op: (_, op), args } => CTail::Seq(
+      CStmt::Print {
+        val: CExp::Prim(prim(op, args)),
+        ty,
+      },
+      box cont,
+    ),
+    Exp::Let {
+      var: (_, var1),
+      init: box (_, init1),
+      body,
+    } => {
+      let cont = explicate_print(state, body.1, ty, cont);
+      explicate_assign(state, var1, init1, cont)
+    }
+    Exp::If { cond, conseq, alt } => {
+      let cont = state.tail_to_goto(cont);
+      let conseq = explicate_print(state, conseq.1, ty, cont.clone());
+      let alt = explicate_print(state, alt.1, ty, cont.clone());
+      explicate_pred(state, cond.1, conseq, alt)
+    }
+    Exp::Begin { seq, last } => {
+      let cont = explicate_print(state, last.1, ty, cont);
+      explicate_effect(state, seq.into_iter(), cont)
+    }
+    Exp::While { .. } | Exp::Set { .. } | Exp::NewLine => unreachable!(),
+    _ => unimplemented!("unsupported form {:?}", exp),
   }
 }
 
@@ -455,11 +538,12 @@ mod tests {
   (let ([k (+ x 1)])
     (print k)
     k)
-  (+ 7 (read) (if (begin (set! y 37) (not (eq? y x))) 11 23))
+  (+ 7 (+ (read) (if (begin (set! y 37) (not (eq? y x))) 11 23)))
   (+ x y))
       "#,
     )
     .unwrap();
+    let prog = super::super::typecheck::typecheck(prog).unwrap();
     let prog = super::super::shrink::shrink(prog);
     let prog = super::super::uniquify::uniquify(prog);
     let prog = super::super::anf::anf(prog);

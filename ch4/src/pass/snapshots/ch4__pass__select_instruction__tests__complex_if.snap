@@ -11,39 +11,6 @@ start:
     cmp x.0, 100
     jg block8
     jmp block9
-block0:
-    mov rax, -1
-    jmp conclusion
-block1:
-    mov rax, y.1
-    neg rax
-    jmp conclusion
-block2:
-    mov tmp.1, y.1
-    sub tmp.1, x.0
-    cmp tmp.1, 10
-    jl block0
-    jmp block1
-block3:
-    cmp x.0, y.1
-    jl block2
-    jmp block1
-block4:
-    mov tmp.0, x.0
-    sub tmp.0, y.1
-    cmp tmp.0, 10
-    jl block0
-    jmp block3
-block5:
-    mov rax, 5000
-    jmp conclusion
-block6:
-    mov rax, x.0
-    jmp conclusion
-block7:
-    cmp x.0, 60
-    jl block5
-    jmp block6
 block8:
     call read_int
     mov y.1, rax
@@ -54,4 +21,37 @@ block9:
     cmp x.0, 40
     jg block7
     jmp block6
+block4:
+    mov tmp.0, x.0
+    sub tmp.0, y.1
+    cmp tmp.0, 10
+    jl block0
+    jmp block3
+block3:
+    cmp x.0, y.1
+    jl block2
+    jmp block1
+block7:
+    cmp x.0, 60
+    jl block5
+    jmp block6
+block6:
+    mov rax, x.0
+    jmp conclusion
+block0:
+    mov rax, -1
+    jmp conclusion
+block2:
+    mov tmp.1, y.1
+    sub tmp.1, x.0
+    cmp tmp.1, 10
+    jl block0
+    jmp block1
+block1:
+    mov rax, y.1
+    neg rax
+    jmp conclusion
+block5:
+    mov rax, 5000
+    jmp conclusion
 

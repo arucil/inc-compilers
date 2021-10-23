@@ -9,12 +9,12 @@ start:
     x.0 = (read)
     y.1 = (read)
     if (< x.0 1) goto block2 else goto block3
-block0:
-    return (+ y.1 2)
-block1:
-    return (+ y.1 10)
 block2:
     if (eq? x.0 0) goto block0 else goto block1
 block3:
     if (eq? x.0 2) goto block0 else goto block1
+block0:
+    return (+ y.1 2)
+block1:
+    return (+ y.1 10)
 

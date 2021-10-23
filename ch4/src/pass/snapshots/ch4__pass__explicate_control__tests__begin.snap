@@ -3,39 +3,40 @@ source: ch4/src/pass/explicate_control.rs
 expression: result.to_string_pretty()
 
 ---
-locals: {x.0, y.1, tmp.0, tmp.1, tmp.2, k.2, tmp.3, tmp.5, tmp.4}
+locals: {x.0, y.1, tmp.0, tmp.1, tmp.2, k.2, tmp.3, tmp.5, tmp.4, tmp.6}
 
 start:
     x.0 = 1
     y.1 = (read)
     goto block3
-block0:
-    return (+ x.0 y.1)
-block1:
-    tmp.5 = 23
-    goto block0
-block2:
-    tmp.5 = 11
-    goto block0
+block3:
+    if (> x.0 10) goto block4 else goto block5
 block4:
-    print "x="
-    print x.0
+    print Str "x="
+    print Int x.0
     newline
     tmp.0 = (- y.1 1)
     x.0 = (+ x.0 tmp.0)
     tmp.1 = (- y.1 1)
     tmp.2 = (> x.0 tmp.1)
-    print tmp.2
+    print Bool tmp.2
     newline
     goto block3
 block5:
     k.2 = (+ x.0 1)
-    print k.2
+    print Int k.2
     newline
     tmp.3 = (read)
     y.1 = 37
     tmp.4 = (eq? y.1 x.0)
     if (eq? tmp.4 #f) goto block2 else goto block1
-block3:
-    if (> x.0 10) goto block4 else goto block5
+block2:
+    tmp.5 = 11
+    goto block0
+block1:
+    tmp.5 = 23
+    goto block0
+block0:
+    tmp.6 = (+ tmp.3 tmp.5)
+    return (+ x.0 y.1)
 

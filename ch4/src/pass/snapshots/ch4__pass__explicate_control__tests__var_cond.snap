@@ -9,8 +9,8 @@ start:
     tmp.0 = (read)
     x.0 = (eq? tmp.0 20)
     if (eq? x.0 #f) goto block1 else goto block0
-block0:
-    return 42
 block1:
     return 89
+block0:
+    return 42
 
