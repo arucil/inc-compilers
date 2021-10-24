@@ -20,6 +20,7 @@ pub fn select_instruction(prog: CProgram<CInfo>) -> Program<Info, IdxVar> {
     info: Info {
       locals: prog.info.locals,
     },
+    constants: Default::default(),
     blocks: prog
       .body
       .into_iter()

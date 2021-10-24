@@ -1,11 +1,13 @@
 #![feature(never_type)]
 
+use indexmap::IndexMap;
 use num_derive::{FromPrimitive, ToPrimitive};
 use std::fmt::{self, Debug, Formatter, Write};
 
 #[derive(Debug, Clone)]
 pub struct Program<INFO = (), VAR = !> {
   pub info: INFO,
+  pub constants: IndexMap<String, String>,
   /// The order matters.
   pub blocks: Vec<(Label, Block<VAR>)>,
 }
@@ -60,6 +62,7 @@ pub enum Arg<VAR = !> {
   Reg(Reg),
   ByteReg(ByteReg),
   Deref(Reg, i32),
+  Label(String),
   Var(VAR),
 }
 
@@ -175,6 +178,7 @@ impl<VAR: Debug> Debug for Arg<VAR> {
       }
       Self::Reg(r) => r.fmt(f),
       Self::ByteReg(r) => r.fmt(f),
+      Self::Label(l) => write!(f, "{}", l),
     }
   }
 }

@@ -22,20 +22,19 @@ pub fn compile(input: &str) -> Result<String, CompileError> {
 
 fn add_prologue(prog: &mut Program<self::pass::assign_home::Info>) {
   use asm::Reg::*;
-  use Arg::*;
   use Instr::*;
   let stack_space = (prog.info.stack_space + 15) & !15;
   let block = Block {
     global: true,
     code: vec![
-      Push(Reg(Rbp)),
+      Push(Arg::Reg(Rbp)),
       Mov {
-        src: Reg(Rsp),
-        dest: Reg(Rbp),
+        src: Arg::Reg(Rsp),
+        dest: Arg::Reg(Rbp),
       },
       Sub {
-        src: Imm(stack_space as i64),
-        dest: Reg(Rsp),
+        src: Arg::Imm(stack_space as i64),
+        dest: Arg::Reg(Rsp),
       },
       Jmp(Label::Start),
     ],
@@ -45,25 +44,24 @@ fn add_prologue(prog: &mut Program<self::pass::assign_home::Info>) {
 
 fn add_epilogue(prog: &mut Program<self::pass::assign_home::Info>) {
   use asm::Reg::*;
-  use Arg::*;
   use Instr::*;
   let block = Block {
     global: false,
     code: vec![
       Mov {
-        src: Reg(Rbp),
-        dest: Reg(Rsp),
+        src: Arg::Reg(Rbp),
+        dest: Arg::Reg(Rsp),
       },
-      Pop(Reg(Rbp)),
+      Pop(Arg::Reg(Rbp)),
       Call("print_int".to_owned(), 0),
       Call("print_newline".to_owned(), 0),
       Mov {
-        src: Imm(60),
-        dest: Reg(Rax),
+        src: Arg::Imm(60),
+        dest: Arg::Reg(Rax),
       },
       Mov {
-        src: Imm(0),
-        dest: Reg(Rdi),
+        src: Arg::Imm(0),
+        dest: Arg::Reg(Rdi),
       },
       Syscall,
     ],

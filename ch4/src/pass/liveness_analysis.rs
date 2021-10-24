@@ -38,6 +38,7 @@ pub fn analyze_liveness(
       live,
       var_store: state.var_store,
     },
+    constants: prog.constants,
     blocks: prog.blocks,
   }
 }
@@ -237,6 +238,7 @@ mod tests {
       info: OldInfo {
         locals: IndexSet::new(),
       },
+      constants: Default::default(),
       blocks,
     };
     let result = analyze_liveness(prog, label_live);
@@ -270,6 +272,7 @@ mod tests {
       info: OldInfo {
         locals: IndexSet::new(),
       },
+      constants: Default::default(),
       blocks,
     };
     let result = analyze_liveness(prog, label_live);
@@ -305,6 +308,7 @@ mod tests {
       info: OldInfo {
         locals: IndexSet::new(),
       },
+      constants: Default::default(),
       blocks,
     };
     let result = analyze_liveness(prog, label_live);
@@ -332,6 +336,7 @@ mod tests {
       info: OldInfo {
         locals: IndexSet::new(),
       },
+      constants: Default::default(),
       blocks,
     };
     let result = analyze_liveness(prog, label_live);
@@ -383,6 +388,7 @@ mod tests {
       info: OldInfo {
         locals: IndexSet::new(),
       },
+      constants: Default::default(),
       blocks,
     };
     let result = analyze_liveness(prog, label_live);
@@ -436,6 +442,7 @@ block4:
       info: OldInfo {
         locals: IndexSet::new(),
       },
+      constants: Default::default(),
       blocks,
     };
     let result = analyze_liveness(prog, label_live);
@@ -512,6 +519,7 @@ block9:
       info: OldInfo {
         locals: IndexSet::new(),
       },
+      constants: Default::default(),
       blocks,
     };
     let result = analyze_liveness(prog, label_live);

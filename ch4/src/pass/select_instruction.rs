@@ -3,8 +3,10 @@ use asm::{Arg, Block, ByteReg, Instr, Label, Program, Reg};
 use ast::IdxVar;
 use ch2::pass::select_instruction::Info;
 use control::*;
+use indexmap::IndexMap;
 
 pub fn select_instruction(prog: CProgram<CInfo>) -> Program<Info, IdxVar> {
+  let mut constants = IndexMap::default();
   Program {
     info: Info {
       locals: prog.info.locals,
@@ -12,21 +14,29 @@ pub fn select_instruction(prog: CProgram<CInfo>) -> Program<Info, IdxVar> {
     blocks: prog
       .body
       .into_iter()
-      .map(|(label, tail)| (label, tail_block(tail)))
+      .map(|(label, tail)| (label, tail_block(tail, &mut constants)))
       .collect(),
+    constants,
   }
 }
 
-fn tail_block(tail: CTail) -> Block<IdxVar> {
+fn tail_block(
+  tail: CTail,
+  constants: &mut IndexMap<String, String>,
+) -> Block<IdxVar> {
   let mut code = vec![];
-  tail_instructions(tail, &mut code);
+  tail_instructions(tail, &mut code, constants);
   Block {
     global: false,
     code,
   }
 }
 
-fn tail_instructions(mut tail: CTail, code: &mut Vec<Instr<IdxVar>>) {
+fn tail_instructions(
+  mut tail: CTail,
+  code: &mut Vec<Instr<IdxVar>>,
+  constants: &mut IndexMap<String, String>,
+) {
   loop {
     match tail {
       CTail::Return(exp) => {
@@ -35,7 +45,7 @@ fn tail_instructions(mut tail: CTail, code: &mut Vec<Instr<IdxVar>>) {
         return;
       }
       CTail::Seq(stmt, new_tail) => {
-        stmt_instructions(stmt, code);
+        stmt_instructions(stmt, code, constants);
         tail = *new_tail;
       }
       CTail::Goto(label) => {
@@ -58,21 +68,47 @@ fn tail_instructions(mut tail: CTail, code: &mut Vec<Instr<IdxVar>>) {
   }
 }
 
-fn stmt_instructions(stmt: CStmt, code: &mut Vec<Instr<IdxVar>>) {
+fn stmt_instructions(
+  stmt: CStmt,
+  code: &mut Vec<Instr<IdxVar>>,
+  constants: &mut IndexMap<String, String>,
+) {
   match stmt {
     CStmt::Assign { var, exp } => exp_instructions(Arg::Var(var), exp, code),
-    CStmt::Print { val, ty: CType::Int } => {
+    CStmt::Print {
+      val,
+      ty: CType::Int,
+    } => {
       exp_instructions(Arg::Reg(Reg::Rax), val, code);
       code.push(Instr::Call("print_int".to_owned(), 0));
     }
-    CStmt::Print { val, ty: CType::Bool } => {
+    CStmt::Print {
+      val,
+      ty: CType::Bool,
+    } => {
       exp_instructions(Arg::Reg(Reg::Rax), val, code);
       code.push(Instr::Call("print_bool".to_owned(), 0));
     }
-    CStmt::Print { val, ty: CType::Str } => {
-      exp_instructions(Arg::Reg(Reg::Rax), val, code);
-      code.push(Instr::Call("print_str".t_owned(), 0));
-    }
+    CStmt::Print {
+      val,
+      ty: CType::Str,
+    } => match val {
+      CExp::Atom(CAtom::Str(s)) => {
+        let label = format!("const_{}", constants.len() + 1);
+        let len = s.len();
+        constants.insert(label.clone(), s);
+        code.push(Instr::Mov {
+          src: Arg::Label(label),
+          dest: Arg::Reg(Reg::Rsi),
+        });
+        code.push(Instr::Mov {
+          src: Arg::Imm(len as i64),
+          dest: Arg::Reg(Reg::Rsi),
+        });
+        code.push(Instr::Call("print_str".to_owned(), 0));
+      }
+      _ => unreachable!(),
+    },
     CStmt::NewLine => code.push(Instr::Call("print_newline".to_owned(), 0)),
     CStmt::Read => code.push(Instr::Call("read_int".to_owned(), 0)),
     _ => unimplemented!("{:?}", stmt),

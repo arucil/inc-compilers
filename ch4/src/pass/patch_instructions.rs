@@ -3,6 +3,7 @@ use asm::{Arg, Block, Instr, Program, Reg};
 pub fn patch_instructions<T>(prog: Program<T>) -> Program<T> {
   Program {
     info: prog.info,
+    constants: prog.constants,
     blocks: prog
       .blocks
       .into_iter()

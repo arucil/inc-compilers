@@ -51,6 +51,7 @@ pub fn merge_jumps<INFO>(prog: Program<INFO>) -> Program<INFO> {
   }
   Program {
     info: prog.info,
+    constants: prog.constants,
     blocks: new_blocks,
   }
 }

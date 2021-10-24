@@ -46,25 +46,24 @@ pub fn compile(
 
 fn add_prologue(prog: &mut Program<ch3::pass::register_allocation::Info>) {
   use asm::Reg::*;
-  use Arg::*;
   use Instr::*;
   let stack_space =
     prog.info.stack_space + prog.info.used_callee_saved_regs.len() * 8;
   let stack_space =
     ((stack_space + 15) & !15) - prog.info.used_callee_saved_regs.len() * 8;
   let mut code = vec![
-    Push(Reg(Rbp)),
+    Push(Arg::Reg(Rbp)),
     Mov {
-      src: Reg(Rsp),
-      dest: Reg(Rbp),
+      src: Arg::Reg(Rsp),
+      dest: Arg::Reg(Rbp),
     },
     Sub {
-      src: Imm(stack_space as i64),
-      dest: Reg(Rsp),
+      src: Arg::Imm(stack_space as i64),
+      dest: Arg::Reg(Rsp),
     },
   ];
   for &reg in &prog.info.used_callee_saved_regs {
-    code.push(Push(Reg(reg)));
+    code.push(Push(Arg::Reg(reg)));
   }
   code.push(Jmp(Label::Start));
   let block = Block { global: true, code };
@@ -73,30 +72,29 @@ fn add_prologue(prog: &mut Program<ch3::pass::register_allocation::Info>) {
 
 fn add_epilogue(prog: &mut Program<ch3::pass::register_allocation::Info>) {
   use asm::Reg::*;
-  use Arg::*;
   use Instr::*;
   let mut code: Vec<Instr> = prog
     .info
     .used_callee_saved_regs
     .iter()
     .rev()
-    .map(|&reg| Pop(Reg(reg)))
+    .map(|&reg| Pop(Arg::Reg(reg)))
     .collect();
   code.extend_from_slice(&[
     Call("print_int".to_owned(), 0),
     Call("print_newline".to_owned(), 0),
     Mov {
-      src: Reg(Rbp),
-      dest: Reg(Rsp),
+      src: Arg::Reg(Rbp),
+      dest: Arg::Reg(Rsp),
     },
-    Pop(Reg(Rbp)),
+    Pop(Arg::Reg(Rbp)),
     Mov {
-      src: Imm(60),
-      dest: Reg(Rax),
+      src: Arg::Imm(60),
+      dest: Arg::Reg(Rax),
     },
     Mov {
-      src: Imm(0),
-      dest: Reg(Rdi),
+      src: Arg::Imm(0),
+      dest: Arg::Reg(Rdi),
     },
     Syscall,
   ]);

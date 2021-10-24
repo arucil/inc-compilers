@@ -31,6 +31,7 @@ pub fn assign_home(
       locals: prog.info.locals,
       stack_space: local_spaces.len() * 8,
     },
+    constants: Default::default(),
     blocks,
   }
 }
@@ -92,6 +93,7 @@ fn assign_home_arg(
     Arg::Reg(r) => Arg::Reg(r),
     Arg::Deref(r, i) => Arg::Deref(r, i),
     Arg::ByteReg(_) => unimplemented!(),
+    Arg::Label(_) => unimplemented!(),
   }
 }
 

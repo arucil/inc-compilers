@@ -78,6 +78,7 @@ pub fn allocate_registers(
       stack_space: max_locals * 8,
       used_callee_saved_regs,
     },
+    constants: prog.constants,
     blocks,
   }
 }
@@ -142,6 +143,7 @@ fn assign_instr_var(
       }
     }
     Arg::ByteReg(reg) => Arg::ByteReg(reg),
+    Arg::Label(l) => Arg::Label(l),
   };
 
   let instr = match instr {
@@ -350,6 +352,7 @@ mod tests {
       info: OldOldInfo {
         locals: IndexSet::new(),
       },
+      constants: Default::default(),
       blocks,
     };
     let prog =
@@ -388,6 +391,7 @@ mod tests {
       info: OldOldInfo {
         locals: IndexSet::new(),
       },
+      constants: Default::default(),
       blocks,
     };
     let prog =
@@ -426,6 +430,7 @@ mod tests {
       info: OldOldInfo {
         locals: IndexSet::new(),
       },
+      constants: Default::default(),
       blocks,
     };
     let prog =
@@ -464,6 +469,7 @@ mod tests {
           IdxVar::new("w"),
         },
       },
+      constants: Default::default(),
       blocks,
     };
     let prog =
@@ -507,6 +513,7 @@ mod tests {
       info: OldOldInfo {
         locals: IndexSet::new(),
       },
+      constants: Default::default(),
       blocks,
     };
     let prog =

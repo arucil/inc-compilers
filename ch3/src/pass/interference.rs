@@ -31,6 +31,7 @@ pub fn build_interference(
       moves: LocationGraph::new(),
       var_store: prog.info.var_store,
     },
+    constants: prog.constants,
     blocks: prog.blocks,
   }
 }
@@ -150,6 +151,7 @@ mod tests {
       info: OldOldInfo {
         locals: IndexSet::new(),
       },
+      constants: Default::default(),
       blocks,
     };
     let prog =
@@ -187,6 +189,7 @@ mod tests {
       info: OldOldInfo {
         locals: IndexSet::new(),
       },
+      constants: Default::default(),
       blocks,
     };
     let prog =
@@ -213,6 +216,7 @@ mod tests {
       info: OldOldInfo {
         locals: IndexSet::new(),
       },
+      constants: Default::default(),
       blocks,
     };
     let prog =

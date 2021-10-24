@@ -347,7 +347,7 @@ fn explicate_print(
   cont: CTail,
 ) -> CTail {
   match exp {
-    Exp::Int(_) | Exp::Var(_) | Exp::Bool(_) => CTail::Seq(
+    Exp::Int(_) | Exp::Var(_) | Exp::Bool(_) | Exp::Str(_) => CTail::Seq(
       CStmt::Print {
         val: CExp::Atom(atom(exp)),
         ty,
