@@ -1,0 +1,7 @@
+(let ([i 1] [n (read)] [sum 0])
+  (while (<= i n)
+    (print "i=" i)
+    (set! sum (+ sum i))
+    (set! i (+ i 1)))
+  (print "sum(1..." n ")=" sum)
+  0)

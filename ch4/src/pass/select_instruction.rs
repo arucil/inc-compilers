@@ -103,7 +103,7 @@ fn stmt_instructions(
         });
         code.push(Instr::Mov {
           src: Arg::Imm(len as i64),
-          dest: Arg::Reg(Reg::Rsi),
+          dest: Arg::Reg(Reg::Rdx),
         });
         code.push(Instr::Call("print_str".to_owned(), 0));
       }

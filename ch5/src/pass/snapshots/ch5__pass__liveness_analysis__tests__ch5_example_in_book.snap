@@ -1,0 +1,48 @@
+---
+source: ch5/src/pass/liveness_analysis.rs
+expression: result.show()
+
+---
+start:
+                    {rsp}
+    mov sum.0, 0
+                    {rsp, sum.0}
+    mov i.0, 5
+                    {rsp, i.0, sum.0}
+    jmp block5
+                    {}
+
+block5:
+                    {rsp, i.0, sum.0}
+    mov tmp.3, i.0
+                    {rsp, i.0, sum.0, tmp.3}
+    cmp tmp.3, 0
+                    {rsp, i.0, sum.0}
+    jg block7
+                    {rsp, sum.0}
+    jmp block8
+                    {}
+
+block7:
+                    {rsp, i.0, sum.0}
+    add sum.0, i.0
+                    {rsp, i.0, sum.0}
+    mov tmp.4, 1
+                    {rsp, i.0, sum.0, tmp.4}
+    neg tmp.4
+                    {rsp, i.0, sum.0, tmp.4}
+    add tmp.4, i.0
+                    {rsp, i.0, sum.0}
+    jmp block5
+                    {}
+
+block8:
+                    {rsp, sum.0}
+    mov rax, 27
+                    {rsp, rax, sum.0}
+    add rax, sum.0
+                    {rsp, rax}
+    jmp conclusion
+                    {}
+
+

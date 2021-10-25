@@ -16,18 +16,15 @@ pub struct Info {
 
 pub fn analyze_liveness(
   prog: Program<OldInfo, IdxVar>,
-  label_live: HashMap<Label, LocationSet>,
+  mut label_live: HashMap<Label, LocationSet>,
 ) -> Program<Info, IdxVar> {
-  let mut state = AnalysisState {
-    var_store: VarStore::new(),
-    label_live,
-  };
+  let mut state = AnalysisState::new();
 
   let live = sort_blocks(&prog.blocks)
     .iter()
     .map(|(label, block)| {
-      let live = state.block_liveness(block);
-      state.label_live.insert(*label, live[0].clone());
+      let live = state.block_liveness(block, &label_live);
+      label_live.insert(*label, live[0].clone());
       (label.clone(), live)
     })
     .collect();
@@ -76,23 +73,37 @@ fn sort_blocks(
     .collect()
 }
 
-struct AnalysisState {
-  var_store: VarStore,
-  label_live: HashMap<Label, LocationSet>,
+pub struct AnalysisState {
+  pub var_store: VarStore,
 }
 
 impl AnalysisState {
-  fn block_liveness(&mut self, block: &asm::Block<IdxVar>) -> Vec<LocationSet> {
+  pub fn new() -> Self {
+    Self {
+      var_store: VarStore::new(),
+    }
+  }
+
+  pub fn block_liveness(
+    &mut self,
+    block: &asm::Block<IdxVar>,
+    mapping: &HashMap<Label, LocationSet>,
+  ) -> Vec<LocationSet> {
     let mut set = vec![LocationSet::new(); block.code.len() + 2];
     for (i, ins) in block.code.iter().enumerate().rev() {
       set[i] = set[i + 1].clone();
-      self.instr_liveness(ins, &mut set[i]);
+      self.instr_liveness(ins, &mut set[i], mapping);
     }
     set.pop();
     set
   }
 
-  fn instr_liveness(&mut self, ins: &Instr<IdxVar>, before: &mut LocationSet) {
+  fn instr_liveness(
+    &mut self,
+    ins: &Instr<IdxVar>,
+    before: &mut LocationSet,
+    mapping: &HashMap<Label, LocationSet>,
+  ) {
     match ins {
       Instr::Ret => {}
       Instr::Syscall => {}
@@ -120,13 +131,13 @@ impl AnalysisState {
         self.add_arg(before, dest);
       }
       Instr::Jmp(label) => {
-        *before = self.label_live[label].clone();
+        *before = mapping[label].clone();
       }
       Instr::SetIf(_, dest) => {
         self.remove_arg(before, dest);
       }
       Instr::JumpIf(_, label) => {
-        *before |= &self.label_live[label];
+        *before |= &mapping[label];
       }
       Instr::Call(_, arity) => {
         before.remove_caller_saved_regs();

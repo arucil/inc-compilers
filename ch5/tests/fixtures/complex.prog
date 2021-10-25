@@ -1,0 +1,15 @@
+(let ([x 0] [y 10] [step (- y 7)] [z (read)])
+  (print "start")
+  (print (if (not (eq? y z)) "y!=z " "y=z") (eq? z y))
+  (while (< x y)
+    (let ([z (+ x step)])
+      (set! x z)
+      (print
+        "?="
+        (if (and (> x 5) (< x 9))
+          (begin
+            (print "neg!")
+            (set! z (+ z 1))
+            (- step))
+          z))))
+  x)

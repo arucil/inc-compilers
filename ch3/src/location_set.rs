@@ -7,7 +7,7 @@ use smallvec::SmallVec;
 use std::fmt::{self, Debug, Write};
 use std::ops::{Deref, BitOrAssign};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocationSet(SmallVec<[u32; 2]>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -35,7 +35,13 @@ impl LocationSet {
   pub fn remove_reg(&mut self, reg: Reg) {
     let i = reg_index(reg);
     if !self.0.is_empty() {
-      self.0[i / 32] &= !(1 << (i % 32));
+      let ix = i / 32;
+      self.0[ix] &= !(1 << (i % 32));
+      if ix == self.0.len() - 1 {
+        while let Some(&0) = self.0.last() {
+          self.0.pop();
+        }
+      }
     }
   }
 

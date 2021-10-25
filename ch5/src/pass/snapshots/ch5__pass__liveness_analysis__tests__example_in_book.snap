@@ -1,0 +1,33 @@
+---
+source: ch5/src/pass/liveness_analysis.rs
+expression: result.show()
+
+---
+start:
+                    {rsp}
+    mov v.0, 1
+                    {rsp, v.0}
+    mov w.0, 42
+                    {rsp, w.0, v.0}
+    mov x.0, v.0
+                    {rsp, w.0, x.0}
+    add x.0, 7
+                    {rsp, w.0, x.0}
+    mov y.0, x.0
+                    {rsp, y.0, w.0, x.0}
+    mov z.0, x.0
+                    {rsp, z.0, y.0, w.0}
+    add z.0, w.0
+                    {rsp, z.0, y.0}
+    mov t.0, y.0
+                    {rsp, t.0, z.0}
+    neg t.0
+                    {rsp, t.0, z.0}
+    mov rax, z.0
+                    {rsp, rax, t.0}
+    add rax, t.0
+                    {rsp, rax}
+    jmp conclusion
+                    {}
+
+

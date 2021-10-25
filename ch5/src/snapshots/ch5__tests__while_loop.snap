@@ -1,0 +1,77 @@
+---
+source: ch5/src/lib.rs
+expression: prog
+
+---
+extern read_int, print_int, print_str, print_bool, print_newline
+section .rodata
+    const_1 db `x`
+    const_2 db `Y`
+    const_3 db `abc`
+    const_4 db `def`
+section .text
+
+    global _start
+_start:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 8
+    push rbx
+    mov rbx, 1
+    mov rcx, 2
+
+block3:
+    mov rdx, rcx
+    neg rdx
+    cmp rbx, rdx
+    jl block6
+    add rbx, 1
+    cmp rbx, rcx
+    je block1
+    mov rsi, const_2
+    mov rdx, 1
+    call print_str
+
+block0:
+    mov rsi, const_3
+    mov rdx, 3
+    call print_str
+    mov rax, 1
+    xor rax, 1
+    call print_bool
+    mov rsi, const_4
+    mov rdx, 3
+    call print_str
+    call print_newline
+    call read_int
+    mov rbx, rax
+    add rbx, 1
+    sub rbx, 4
+    mov rax, 17
+    pop rbx
+    call print_int
+    call print_newline
+    mov rsp, rbp
+    pop rbp
+    mov rax, 60
+    mov rdi, 0
+    syscall
+
+block1:
+    mov rsi, const_1
+    mov rdx, 1
+    call print_str
+    jmp block0
+
+block6:
+    add rbx, rcx
+    cmp rbx, 10
+    jg block4
+    mov rcx, rbx
+    jmp block3
+
+block4:
+    mov rcx, rbx
+    sub rcx, 1
+    jmp block3
+
