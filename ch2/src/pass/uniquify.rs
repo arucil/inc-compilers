@@ -2,6 +2,7 @@ use ast::{Exp, IdxVar, Program};
 use std::collections::HashMap;
 use support::{CompileError, Range};
 
+/// Make variable names unique.
 pub fn uniquify(prog: Program) -> Result<Program<IdxVar>, CompileError> {
   let mut counter = 0;
   let mut env = HashMap::new();

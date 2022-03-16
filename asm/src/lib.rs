@@ -25,7 +25,7 @@ pub enum Instr<VAR = !> {
   Sub { src: Arg<VAR>, dest: Arg<VAR> },
   Mov { src: Arg<VAR>, dest: Arg<VAR> },
   Neg(Arg<VAR>),
-  Call(String, usize),
+  Call { label: String, arity: usize },
   Ret,
   Push(Arg<VAR>),
   Pop(Arg<VAR>),
@@ -157,7 +157,7 @@ impl<VAR: Debug> Debug for Instr<VAR> {
     match self {
       Self::Add { src, dest } => write!(f, "add {:?}, {:?}", dest, src),
       Self::Mov { src, dest } => write!(f, "mov {:?}, {:?}", dest, src),
-      Self::Call(label, _) => write!(f, "call {}", label),
+      Self::Call { label, .. } => write!(f, "call {}", label),
       Self::Jmp(label) => write!(f, "jmp {:?}", label),
       Self::Neg(dest) => write!(f, "neg {:?}", dest),
       Self::Pop(dest) => write!(f, "pop {:?}", dest),
@@ -387,9 +387,15 @@ pub fn parse_code<VAR: Clone>(
           let args =
             ops[1].split(',').map(|arg| arg.trim()).collect::<Vec<_>>();
           if args.len() == 1 {
-            Instr::Call(args[0].to_owned(), 0)
+            Instr::Call {
+              label: args[0].to_owned(),
+              arity: 0,
+            }
           } else {
-            Instr::Call(args[0].to_owned(), args[1].parse().unwrap())
+            Instr::Call {
+              label: args[0].to_owned(),
+              arity: args[1].parse().unwrap(),
+            }
           }
         }
         "jmp" => Instr::Jmp(parse_label(ops[1])),

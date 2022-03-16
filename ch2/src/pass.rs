@@ -1,4 +1,4 @@
-pub mod anf;
+pub mod remove_complex_operands;
 pub mod assign_home;
 pub mod explicate_control;
 pub mod partial_evaluation;

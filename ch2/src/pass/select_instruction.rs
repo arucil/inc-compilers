@@ -1,5 +1,5 @@
 use super::explicate_control::CInfo;
-use asm::{Arg, Block, Instr, Program, Reg, Label};
+use asm::{Arg, Block, Instr, Label, Program, Reg};
 use ast::IdxVar;
 use control::*;
 use indexmap::IndexSet;
@@ -50,7 +50,7 @@ fn tail_instructions(mut tail: CTail, code: &mut Vec<Instr<IdxVar>>) {
         stmt_instructions(stmt, code);
         tail = *new_tail;
       }
-      _ => unimplemented!()
+      _ => unimplemented!(),
     }
   }
 }
@@ -72,7 +72,10 @@ fn exp_instructions(
       atom_instructions(target, atom, code);
     }
     CExp::Prim(CPrim::Read) => {
-      code.push(Instr::Call("read_int".to_owned(), 0));
+      code.push(Instr::Call {
+        label: "read_int".to_owned(),
+        arity: 0,
+      });
       code.push(Instr::Mov {
         src: Arg::Reg(Reg::Rax),
         dest: target,
@@ -132,7 +135,8 @@ mod tests {
       parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#)
         .unwrap();
     let prog = super::super::uniquify::uniquify(prog).unwrap();
-    let prog = super::super::anf::anf(prog);
+    let prog =
+      super::super::remove_complex_operands::remove_complex_operands(prog);
     let prog = super::super::explicate_control::explicate_control(prog);
     let result = select_instruction(prog);
     assert_snapshot!(result.to_string_pretty());

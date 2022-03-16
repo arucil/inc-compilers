@@ -68,17 +68,18 @@ mod tests {
   use super::*;
   use ast::*;
   use insta::assert_snapshot;
+  use super::super::*;
 
   #[test]
   fn nested_prims() {
     let prog =
       parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#)
         .unwrap();
-    let prog = super::super::uniquify::uniquify(prog).unwrap();
-    let prog = super::super::anf::anf(prog);
-    let prog = super::super::explicate_control::explicate_control(prog);
-    let prog = super::super::select_instruction::select_instruction(prog);
-    let prog = super::super::assign_home::assign_home(prog);
+    let prog = uniquify::uniquify(prog).unwrap();
+    let prog = remove_complex_operands::remove_complex_operands(prog);
+    let prog = explicate_control::explicate_control(prog);
+    let prog = select_instruction::select_instruction(prog);
+    let prog = assign_home::assign_home(prog);
     let result = patch_instructions(prog);
     assert_snapshot!(result.to_string_pretty());
   }

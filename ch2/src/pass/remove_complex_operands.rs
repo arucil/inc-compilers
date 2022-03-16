@@ -1,23 +1,33 @@
 use ast::{Exp, IdxVar, Program};
 use support::Range;
 
-pub fn anf(prog: Program<IdxVar>) -> Program<IdxVar> {
+pub fn remove_complex_operands(prog: Program<IdxVar>) -> Program<IdxVar> {
   let mut counter = 0;
   Program {
     body: prog
       .body
       .into_iter()
-      .map(|(range, exp)| (range, anf_exp(range, exp, &mut counter)))
+      .map(|(range, exp)| (range, mon_exp(range, exp, &mut counter)))
       .collect(),
   }
 }
 
-fn anf_exp(range: Range, exp: Exp<IdxVar>, counter: &mut usize) -> Exp<IdxVar> {
+struct TmpVar {
+  range: Range,
+  name: IdxVar,
+  /// May be not atomic.
+  init: Exp<IdxVar>,
+}
+
+/// process expressions that do not need to be atomic.
+///
+/// `mon` stands for Monadic Normal Form.
+fn mon_exp(range: Range, exp: Exp<IdxVar>, counter: &mut usize) -> Exp<IdxVar> {
   match exp {
     Exp::Let { var, init, body } => Exp::Let {
       var,
-      init: box (init.0, anf_exp(init.0, init.1, counter)),
-      body: box (body.0, anf_exp(body.0, body.1, counter)),
+      init: box (init.0, mon_exp(init.0, init.1, counter)),
+      body: box (body.0, mon_exp(body.0, body.1, counter)),
     },
     Exp::Prim { op, args } => {
       let mut tmps = vec![];
@@ -29,12 +39,12 @@ fn anf_exp(range: Range, exp: Exp<IdxVar>, counter: &mut usize) -> Exp<IdxVar> {
         .into_iter()
         .rfold(
           (range, Exp::Prim { op, args }),
-          |(body_range, body), (range, var, init)| {
+          |(body_range, body), tmp| {
             (
               body_range,
               Exp::Let {
-                var: (range, var),
-                init: box (range, init),
+                var: (tmp.range, tmp.name),
+                init: box (range, tmp.init),
                 body: box (body_range, body),
               },
             )
@@ -46,21 +56,32 @@ fn anf_exp(range: Range, exp: Exp<IdxVar>, counter: &mut usize) -> Exp<IdxVar> {
   }
 }
 
+/// Process expressions that need to be atomic.
 fn atom_exp(
   range: Range,
   exp: Exp<IdxVar>,
-  tmps: &mut Vec<(Range, IdxVar, Exp<IdxVar>)>,
+  tmps: &mut Vec<TmpVar>,
   counter: &mut usize,
 ) -> Exp<IdxVar> {
   match exp {
-    exp @ Exp::Let { .. } => {
-      let exp = anf_exp(range, exp, counter);
+    Exp::Let { var, init, body } => {
+      // TODO
+      tmps.push(TmpVar {
+        range: var.0,
+        name: var.1,
+        init: mon_exp(init.0, init.1, counter),
+      });
+      let exp = mon_exp(range, exp, counter);
       let tmp = IdxVar {
         name: "tmp".to_owned(),
         index: *counter,
       };
       *counter += 1;
-      tmps.push((range, tmp.clone(), exp));
+      tmps.push(TmpVar {
+        range,
+        name: tmp.clone(),
+        init: exp,
+      });
       Exp::Var(tmp)
     }
     Exp::Prim { op, args } => {
@@ -74,7 +95,11 @@ fn atom_exp(
         index: *counter,
       };
       *counter += 1;
-      tmps.push((range, tmp.clone(), exp));
+      tmps.push(TmpVar {
+        range,
+        name: tmp.clone(),
+        init: exp,
+      });
       Exp::Var(tmp)
     }
     exp => exp,
@@ -93,7 +118,7 @@ mod tests {
       parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#)
         .unwrap();
     let prog = super::super::uniquify::uniquify(prog).unwrap();
-    let result = anf(prog);
+    let result = remove_complex_operands(prog);
     assert_snapshot!(result.to_string_pretty());
   }
 
@@ -101,7 +126,7 @@ mod tests {
   fn init_with_var() {
     let prog = parse(r#"(let ([a 42]) (let ([b a]) b))"#).unwrap();
     let prog = super::super::uniquify::uniquify(prog).unwrap();
-    let result = anf(prog);
+    let result = remove_complex_operands(prog);
     assert_snapshot!(result.to_string_pretty());
   }
 
@@ -112,7 +137,7 @@ mod tests {
     )
     .unwrap();
     let prog = super::super::uniquify::uniquify(prog).unwrap();
-    let result = anf(prog);
+    let result = remove_complex_operands(prog);
     assert_snapshot!(result.to_string_pretty());
   }
 }

@@ -61,7 +61,7 @@ fn assign_home_instr(
       let dest = assign_home_arg(dest, local_spaces);
       Instr::Add { src, dest }
     }
-    Instr::Call(label, n) => Instr::Call(label, n),
+    Instr::Call { label, arity } => Instr::Call { label, arity },
     Instr::Jmp(label) => Instr::Jmp(label),
     Instr::Mov { src, dest } => {
       let src = assign_home_arg(src, local_spaces);
@@ -99,6 +99,7 @@ fn assign_home_arg(
 
 #[cfg(test)]
 mod tests {
+  use super::super::*;
   use super::*;
   use ast::*;
   use insta::assert_snapshot;
@@ -108,10 +109,10 @@ mod tests {
     let prog =
       parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#)
         .unwrap();
-    let prog = super::super::uniquify::uniquify(prog).unwrap();
-    let prog = super::super::anf::anf(prog);
-    let prog = super::super::explicate_control::explicate_control(prog);
-    let prog = super::super::select_instruction::select_instruction(prog);
+    let prog = uniquify::uniquify(prog).unwrap();
+    let prog = remove_complex_operands::remove_complex_operands(prog);
+    let prog = explicate_control::explicate_control(prog);
+    let prog = select_instruction::select_instruction(prog);
     let result = assign_home(prog);
     assert_snapshot!(result.to_string_pretty());
   }

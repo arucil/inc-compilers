@@ -1,6 +1,6 @@
 #![feature(box_patterns, box_syntax)]
 
-use asm::{Arg, Block, Instr, Program, Label};
+use asm::{Arg, Block, Instr, Label, Program};
 use support::CompileError;
 
 pub mod pass;
@@ -9,7 +9,7 @@ pub fn compile(input: &str) -> Result<String, CompileError> {
   let prog = ast::parse(input)?;
   let prog = self::pass::partial_evaluation::partial_evaluate(prog);
   let prog = self::pass::uniquify::uniquify(prog)?;
-  let prog = self::pass::anf::anf(prog);
+  let prog = self::pass::remove_complex_operands::remove_complex_operands(prog);
   let prog = self::pass::explicate_control::explicate_control(prog);
   let prog = self::pass::select_instruction::select_instruction(prog);
   let prog = self::pass::assign_home::assign_home(prog);
@@ -53,8 +53,14 @@ fn add_epilogue(prog: &mut Program<self::pass::assign_home::Info>) {
         dest: Arg::Reg(Rsp),
       },
       Pop(Arg::Reg(Rbp)),
-      Call("print_int".to_owned(), 0),
-      Call("print_newline".to_owned(), 0),
+      Call {
+        label: "print_int".to_owned(),
+        arity: 0,
+      },
+      Call {
+        label: "print_newline".to_owned(),
+        arity: 0,
+      },
       Mov {
         src: Arg::Imm(60),
         dest: Arg::Reg(Rax),
