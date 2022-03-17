@@ -1,5 +1,5 @@
 use crate::location_set::{LocationSet, VarStore};
-use asm::{Arg, Instr, Program, Label};
+use asm::{Arg, Instr, Label, Program};
 use ast::IdxVar;
 use ch2::pass::select_instruction::Info as OldInfo;
 use indexmap::{IndexMap, IndexSet};
@@ -80,7 +80,7 @@ impl<'a> AnalysisState<'a> {
       Instr::Jmp(label) => {
         *before = self.label_live[label].clone();
       }
-      Instr::Call(_, arity) => {
+      Instr::Call { arity, .. } => {
         before.remove_caller_saved_regs();
         before.add_argument_regs(*arity);
       }
@@ -154,9 +154,11 @@ mod tests {
 
   #[test]
   fn example_in_book() {
-    use asm::Reg::*;
     use asm::Label;
-    let blocks = asm::parse_blocks(|s| IdxVar::new(s), r#"
+    use asm::Reg::*;
+    let blocks = asm::parse_blocks(
+      |s| IdxVar::new(s),
+      r#"
     start:
       mov v, 1
       mov w, 42
@@ -170,7 +172,8 @@ mod tests {
       mov rax, z
       add rax, t
       jmp conclusion
-    "#);
+    "#,
+    );
     let label_live = hashmap! {
       Label::Conclusion => {
         let mut set = LocationSet::new();
@@ -194,14 +197,17 @@ mod tests {
   #[test]
   fn push_pop() {
     use asm::Reg::*;
-    let blocks = asm::parse_blocks(|s| IdxVar::new(s), r#"
+    let blocks = asm::parse_blocks(
+      |s| IdxVar::new(s),
+      r#"
     start:
       push x
       mov w, rbx
       pop rbx
       add x, w
       jmp conclusion
-    "#);
+    "#,
+    );
     let label_live = hashmap! {
       Label::Conclusion => {
         let mut set = LocationSet::new();
@@ -225,7 +231,9 @@ mod tests {
   #[test]
   fn call() {
     use asm::Reg::*;
-    let blocks = asm::parse_blocks(|s| IdxVar::new(s), r#"
+    let blocks = asm::parse_blocks(
+      |s| IdxVar::new(s),
+      r#"
     start:
       pop rdi
       pop rsi
@@ -234,7 +242,8 @@ mod tests {
       call foo, 3
       add w, rax
       jmp conclusion
-    "#);
+    "#,
+    );
     let label_live = hashmap! {
       Label::Conclusion => {
         let mut set = LocationSet::new();
@@ -257,7 +266,9 @@ mod tests {
 
   #[test]
   fn epilogue() {
-    let blocks = asm::parse_blocks(|s| IdxVar::new(s), r#"
+    let blocks = asm::parse_blocks(
+      |s| IdxVar::new(s),
+      r#"
     start:
       mov rsp, rbp
       pop rbp
@@ -266,7 +277,8 @@ mod tests {
       mov rax, 60
       mov rdi, 0
       syscall
-    "#);
+    "#,
+    );
     let label_live = HashMap::new();
     let prog = Program {
       info: OldInfo {

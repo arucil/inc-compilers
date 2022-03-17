@@ -23,35 +23,6 @@ pub fn explicate_control(mut prog: Program<IdxVar>) -> CProgram<CInfo> {
   }
 }
 
-fn collect_locals(prog: &Program<IdxVar>) -> IndexSet<IdxVar> {
-  let mut locals = IndexSet::new();
-  for (_, exp) in &prog.body {
-    collect_exp_locals(exp, &mut locals);
-  }
-  locals
-}
-
-fn collect_exp_locals(exp: &Exp<IdxVar>, locals: &mut IndexSet<IdxVar>) {
-  match exp {
-    Exp::Int(_) => {}
-    Exp::Var(var) => {
-      locals.insert(var.clone());
-    }
-    Exp::Str(_) => {}
-    Exp::Let { var, init, body } => {
-      locals.insert(var.1.clone());
-      collect_exp_locals(&init.1, locals);
-      collect_exp_locals(&body.1, locals);
-    }
-    Exp::Prim { op: _, args } => {
-      for (_, arg) in args {
-        collect_exp_locals(arg, locals);
-      }
-    }
-    _ => unimplemented!(),
-  }
-}
-
 fn explicate_tail(exp: Exp<IdxVar>) -> CTail {
   match exp {
     exp @ (Exp::Int(_) | Exp::Var(_)) => CTail::Return(CExp::Atom(atom(exp))),
@@ -102,23 +73,65 @@ fn atom(exp: Exp<IdxVar>) -> CAtom {
 fn prim(op: &str, mut args: Vec<(Range, Exp<IdxVar>)>) -> CPrim {
   match op {
     "read" => CPrim::Read,
-    "-" => CPrim::Neg(atom(args.pop().unwrap().1)),
+    "-" => {
+      if args.len() == 1 {
+        CPrim::Neg(atom(args.pop().unwrap().1))
+      } else {
+        CPrim::Sub(atom(args[0].1.clone()), atom(args.pop().unwrap().1))
+      }
+    }
     "+" => CPrim::Add(atom(args[0].1.clone()), atom(args.pop().unwrap().1)),
     _ => unreachable!("{}", op),
   }
 }
 
+fn collect_locals(prog: &Program<IdxVar>) -> IndexSet<IdxVar> {
+  let mut locals = IndexSet::new();
+  for (_, exp) in &prog.body {
+    collect_exp_locals(exp, &mut locals);
+  }
+  locals
+}
+
+fn collect_exp_locals(exp: &Exp<IdxVar>, locals: &mut IndexSet<IdxVar>) {
+  match exp {
+    Exp::Int(_) => {}
+    Exp::Var(var) => {
+      locals.insert(var.clone());
+    }
+    Exp::Str(_) => {}
+    Exp::Let { var, init, body } => {
+      locals.insert(var.1.clone());
+      collect_exp_locals(&init.1, locals);
+      collect_exp_locals(&body.1, locals);
+    }
+    Exp::Prim { op: _, args } => {
+      for (_, arg) in args {
+        collect_exp_locals(arg, locals);
+      }
+    }
+    _ => unimplemented!(),
+  }
+}
+
 #[cfg(test)]
 mod tests {
-  use super::*;
   use super::super::*;
+  use super::*;
   use insta::assert_snapshot;
 
   #[test]
   fn let_in_init() {
-    let prog =
-      ast::parse(r#"(let ([y (let ([x 20]) (+ x (let ([x 22]) x)))]) y)"#)
-        .unwrap();
+    let prog = ast::parse(
+      r#"
+        (let
+          ([y (let ([x 20])
+                (+ x
+                   (let ([x 22]) x)))])
+          y)
+        "#,
+    )
+    .unwrap();
     let prog = uniquify::uniquify(prog).unwrap();
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let result = explicate_control(prog);

@@ -151,7 +151,7 @@ fn assign_instr_var(
       src: assign(src),
       dest: assign(dest),
     },
-    Instr::Call(label, arity) => Instr::Call(label, arity),
+    Instr::Call { label, arity } => Instr::Call { label, arity },
     Instr::Jmp(label) => Instr::Jmp(label),
     Instr::Mov { src, dest } => Instr::Mov {
       src: assign(src),

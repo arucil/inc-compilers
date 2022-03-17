@@ -1,5 +1,5 @@
 use self::location_set::LocationSet;
-use asm::{Arg, Block, Instr, Program, Reg, Label};
+use asm::{Arg, Block, Instr, Label, Program, Reg};
 use maplit::hashmap;
 use support::CompileError;
 
@@ -79,8 +79,14 @@ fn add_epilogue(prog: &mut Program<self::pass::register_allocation::Info>) {
     .map(|&reg| Pop(Arg::Reg(reg)))
     .collect();
   code.extend_from_slice(&[
-    Call("print_int".to_owned(), 0),
-    Call("print_newline".to_owned(), 0),
+    Call {
+      label: "print_int".to_owned(),
+      arity: 0,
+    },
+    Call {
+      label: "print_newline".to_owned(),
+      arity: 0,
+    },
     Mov {
       src: Arg::Reg(Rbp),
       dest: Arg::Reg(Rsp),

@@ -33,31 +33,59 @@ fn pe_prim(op: (Range, &'static str), args: Vec<(Range, Exp)>) -> Exp {
     .collect::<Vec<_>>();
   match (op.1, &mut args[..]) {
     ("+", [(_, Exp::Int(a)), (_, Exp::Int(b))]) => Exp::Int(*a + *b),
-    (
-      "+",
-      [(range1, Exp::Int(a)), (
-        _,
-        Exp::Prim {
-          op: (_, "+"),
-          args: subargs,
-        },
-      )],
-    ) => match subargs[0].1 {
-      Exp::Int(b) => Exp::Prim {
-        op: (op.0, "+"),
-        args: vec![(*range1, Exp::Int(*a + b)), subargs.pop().unwrap()],
-      },
-      _ => Exp::Prim {
-        op: (op.0, "+"),
-        args,
-      },
-    },
-    ("+", [_, (_, Exp::Int(_))]) => pe_exp(Exp::Prim {
-      op: (op.0, "+"),
-      args: args.into_iter().rev().collect(),
-    }),
+    ("-", [(_, Exp::Int(a)), (_, Exp::Int(b))]) => Exp::Int(*a - *b),
+    ("+", [(range1, Exp::Int(a)), rhs] | [rhs, (range1, Exp::Int(a))]) => {
+      pe_add(op.0, (range1.clone(), *a), rhs.clone())
+    }
+    ("-", [(range1, Exp::Int(a)), rhs]) => {
+      pe_sub(op.0, (range1.clone(), *a), rhs.clone())
+    }
     ("-", [(_, Exp::Int(a))]) => Exp::Int(-*a),
     _ => Exp::Prim { op, args },
+  }
+}
+
+fn pe_add(range: Range, lhs: (Range, i64), mut rhs: (Range, Exp)) -> Exp {
+  match &mut rhs.1 {
+    Exp::Prim {
+      op: (_, op @ ("+" | "-")),
+      args: subargs,
+    } => match subargs[0].1 {
+      Exp::Int(b) => Exp::Prim {
+        op: (range, op),
+        args: vec![(lhs.0, Exp::Int(lhs.1 + b)), subargs.pop().unwrap()],
+      },
+      _ => Exp::Prim {
+        op: (range, "+"),
+        args: vec![(lhs.0, Exp::Int(lhs.1)), rhs],
+      },
+    },
+    _ => Exp::Prim {
+      op: (range, "+"),
+      args: vec![(lhs.0, Exp::Int(lhs.1)), rhs],
+    },
+  }
+}
+
+fn pe_sub(range: Range, lhs: (Range, i64), mut rhs: (Range, Exp)) -> Exp {
+  match &mut rhs.1 {
+    Exp::Prim {
+      op: (_, op @ ("+" | "-")),
+      args: subargs,
+    } => match subargs[0].1 {
+      Exp::Int(b) => Exp::Prim {
+        op: (range, op),
+        args: vec![(lhs.0, Exp::Int(lhs.1 - b)), subargs.pop().unwrap()],
+      },
+      _ => Exp::Prim {
+        op: (range, "-"),
+        args: vec![(lhs.0, Exp::Int(lhs.1)), rhs],
+      },
+    },
+    _ => Exp::Prim {
+      op: (range, "-"),
+      args: vec![(lhs.0, Exp::Int(lhs.1)), rhs],
+    },
   }
 }
 
@@ -76,14 +104,21 @@ mod tests {
 
   #[test]
   fn nested_prims2() {
-    let prog = parse(r#"(+ (+ 7 (read)) 3)"#).unwrap();
+    let prog = parse(r#"(+ (- 7 (read)) 3)"#).unwrap();
     let result = partial_evaluate(prog);
     assert_snapshot!(result.to_string_pretty());
   }
 
   #[test]
   fn fold_constant() {
-    let prog = parse(r#"(+ 1 (+ (+ (- 7) 2) (read)))"#).unwrap();
+    let prog = parse(r#"(+ (- (- (- 7) 2) (read)) 1)"#).unwrap();
+    let result = partial_evaluate(prog);
+    assert_snapshot!(result.to_string_pretty());
+  }
+
+  #[test]
+  fn cannot_fold_sub_rhs() {
+    let prog = parse(r#"(+ 1 (- (read) (- (- 7) 2)))"#).unwrap();
     let result = partial_evaluate(prog);
     assert_snapshot!(result.to_string_pretty());
   }

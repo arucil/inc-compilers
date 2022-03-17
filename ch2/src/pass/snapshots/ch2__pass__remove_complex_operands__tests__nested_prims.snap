@@ -1,0 +1,17 @@
+---
+source: ch2/src/pass/remove_complex_operands.rs
+expression: result.to_string_pretty()
+---
+(let
+ [x.0 (read)]
+ (let
+  [y.1 (+ 2 3)]
+  (let
+   [tmp.0 (read)]
+   (let
+    [tmp.1 (- tmp.0)]
+    (let
+     [tmp.2 (- 2)]
+     (let
+      [tmp.3 (- y.1 tmp.2)]
+      (+ tmp.1 tmp.3)))))))

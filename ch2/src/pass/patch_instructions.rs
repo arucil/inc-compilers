@@ -29,6 +29,19 @@ fn patch_block(block: Block) -> Block {
           dest,
         });
       }
+      Instr::Sub {
+        src: src @ Arg::Deref(..),
+        dest: dest @ Arg::Deref(..),
+      } => {
+        code.push(Instr::Mov {
+          src,
+          dest: Arg::Reg(Reg::Rax),
+        });
+        code.push(Instr::Sub {
+          src: Arg::Reg(Reg::Rax),
+          dest,
+        });
+      }
       Instr::Mov {
         src: src @ Arg::Deref(..),
         dest: dest @ Arg::Deref(..),

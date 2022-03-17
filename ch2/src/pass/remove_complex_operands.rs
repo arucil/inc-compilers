@@ -65,24 +65,12 @@ fn atom_exp(
 ) -> Exp<IdxVar> {
   match exp {
     Exp::Let { var, init, body } => {
-      // TODO
       tmps.push(TmpVar {
         range: var.0,
         name: var.1,
         init: mon_exp(init.0, init.1, counter),
       });
-      let exp = mon_exp(range, exp, counter);
-      let tmp = IdxVar {
-        name: "tmp".to_owned(),
-        index: *counter,
-      };
-      *counter += 1;
-      tmps.push(TmpVar {
-        range,
-        name: tmp.clone(),
-        init: exp,
-      });
-      Exp::Var(tmp)
+      atom_exp(body.0, body.1, tmps, counter)
     }
     Exp::Prim { op, args } => {
       let args = args
@@ -115,7 +103,7 @@ mod tests {
   #[test]
   fn nested_prims() {
     let prog =
-      parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#)
+      parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (- y (- 2))))"#)
         .unwrap();
     let prog = super::super::uniquify::uniquify(prog).unwrap();
     let result = remove_complex_operands(prog);
@@ -133,7 +121,18 @@ mod tests {
   #[test]
   fn let_in_init() {
     let prog = parse(
-      r#"(let ([a (+ (let ([x (read)] [y (- x)]) (+ x (- y))) 7)]) (- a))"#,
+      r#"
+      (let
+        ([a
+          (+ (let
+               ([x (let
+                     ([x (read)])
+                     (+ x 13))]
+                [y (- x)])
+               (+ x (- y)))
+             7)])
+        (- a))
+      "#,
     )
     .unwrap();
     let prog = super::super::uniquify::uniquify(prog).unwrap();

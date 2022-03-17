@@ -97,6 +97,18 @@ fn exp_instructions(
         dest: target,
       });
     }
+    CExp::Prim(CPrim::Sub(atom1, atom2)) => {
+      atom_instructions(target.clone(), atom1, code);
+      let arg = match atom2 {
+        CAtom::Int(n) => Arg::Imm(n),
+        CAtom::Var(var) => Arg::Var(var),
+        _ => unimplemented!(),
+      };
+      code.push(Instr::Sub {
+        src: arg,
+        dest: target,
+      });
+    }
     _ => unimplemented!(),
   }
 }
@@ -125,6 +137,7 @@ fn atom_instructions(
 
 #[cfg(test)]
 mod tests {
+  use super::super::*;
   use super::*;
   use ast::*;
   use insta::assert_snapshot;
@@ -134,10 +147,19 @@ mod tests {
     let prog =
       parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#)
         .unwrap();
-    let prog = super::super::uniquify::uniquify(prog).unwrap();
-    let prog =
-      super::super::remove_complex_operands::remove_complex_operands(prog);
-    let prog = super::super::explicate_control::explicate_control(prog);
+    let prog = uniquify::uniquify(prog).unwrap();
+    let prog = remove_complex_operands::remove_complex_operands(prog);
+    let prog = explicate_control::explicate_control(prog);
+    let result = select_instruction(prog);
+    assert_snapshot!(result.to_string_pretty());
+  }
+
+  #[test]
+  fn single_read() {
+    let prog = parse(r#"(read)"#).unwrap();
+    let prog = uniquify::uniquify(prog).unwrap();
+    let prog = remove_complex_operands::remove_complex_operands(prog);
+    let prog = explicate_control::explicate_control(prog);
     let result = select_instruction(prog);
     assert_snapshot!(result.to_string_pretty());
   }

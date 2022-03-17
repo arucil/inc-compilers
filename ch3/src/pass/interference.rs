@@ -72,7 +72,7 @@ fn add_instr_edges(
         add(dest_loc);
       }
     }
-    Instr::Call(_, _) => {
+    Instr::Call { .. } => {
       add(Reg::Rax.into());
       add(Reg::Rcx.into());
       add(Reg::Rdx.into());

@@ -139,7 +139,7 @@ impl AnalysisState {
       Instr::JumpIf(_, label) => {
         *before |= &mapping[label];
       }
-      Instr::Call(_, arity) => {
+      Instr::Call { arity, .. } => {
         before.remove_caller_saved_regs();
         before.add_argument_regs(*arity);
       }

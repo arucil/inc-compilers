@@ -80,14 +80,20 @@ fn stmt_instructions(
       ty: CType::Int,
     } => {
       exp_instructions(Arg::Reg(Reg::Rax), val, code);
-      code.push(Instr::Call("print_int".to_owned(), 0));
+      code.push(Instr::Call {
+        label: "print_int".to_owned(),
+        arity: 0,
+      });
     }
     CStmt::Print {
       val,
       ty: CType::Bool,
     } => {
       exp_instructions(Arg::Reg(Reg::Rax), val, code);
-      code.push(Instr::Call("print_bool".to_owned(), 0));
+      code.push(Instr::Call {
+        label: "print_bool".to_owned(),
+        arity: 0,
+      });
     }
     CStmt::Print {
       val,
@@ -105,12 +111,21 @@ fn stmt_instructions(
           src: Arg::Imm(len as i64),
           dest: Arg::Reg(Reg::Rdx),
         });
-        code.push(Instr::Call("print_str".to_owned(), 0));
+        code.push(Instr::Call {
+          label: "print_str".to_owned(),
+          arity: 0,
+        });
       }
       _ => unreachable!(),
     },
-    CStmt::NewLine => code.push(Instr::Call("print_newline".to_owned(), 0)),
-    CStmt::Read => code.push(Instr::Call("read_int".to_owned(), 0)),
+    CStmt::NewLine => code.push(Instr::Call {
+      label: "print_newline".to_owned(),
+      arity: 0,
+    }),
+    CStmt::Read => code.push(Instr::Call {
+      label: "read_int".to_owned(),
+      arity: 0,
+    }),
     _ => unimplemented!("{:?}", stmt),
   }
 }
@@ -133,7 +148,10 @@ fn prim_instructions(
 ) {
   match prim {
     CPrim::Read => {
-      code.push(Instr::Call("read_int".to_owned(), 0));
+      code.push(Instr::Call {
+        label: "read_int".to_owned(),
+        arity: 0,
+      });
       code.push(Instr::Mov {
         src: Arg::Reg(Reg::Rax),
         dest: target,

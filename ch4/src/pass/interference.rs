@@ -65,7 +65,7 @@ fn add_instr_edges(
         add(dest_loc);
       }
     }
-    Instr::Call(..) => {
+    Instr::Call { .. } => {
       add(Reg::Rax.into());
       add(Reg::Rcx.into());
       add(Reg::Rdx.into());
@@ -103,9 +103,9 @@ mod tests {
   use super::*;
   use asm::Label;
   use ch2::pass::select_instruction::Info as OldOldInfo;
+  use indexmap::IndexSet;
   use insta::assert_snapshot;
   use maplit::hashmap;
-  use indexmap::IndexSet;
 
   #[test]
   fn example_in_book() {

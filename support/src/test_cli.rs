@@ -73,7 +73,7 @@ impl TestCli {
       }
       let input = fs::read_to_string(self.base_dir.join(input)).unwrap();
       let output = fs::read_to_string(output).unwrap();
-      Command::new(prog)
+      Command::new(format!("./{}", prog))
         .write_stdin(input)
         .assert()
         .success()

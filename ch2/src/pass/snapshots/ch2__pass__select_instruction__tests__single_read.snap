@@ -1,0 +1,11 @@
+---
+source: ch2/src/pass/select_instruction.rs
+expression: result.to_string_pretty()
+---
+locals: {}
+
+start:
+    call read_int
+    mov rax, rax
+    jmp conclusion
+

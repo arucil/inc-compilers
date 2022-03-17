@@ -20,11 +20,17 @@ impl Debug for Info {
 pub fn assign_home(
   prog: Program<super::select_instruction::Info, IdxVar>,
 ) -> Program<Info> {
-  let mut local_spaces = HashMap::new();
+  let local_spaces = prog
+    .info
+    .locals
+    .iter()
+    .enumerate()
+    .map(|(i, var)| (var.clone(), (i + 1) * 8))
+    .collect();
   let blocks = prog
     .blocks
     .into_iter()
-    .map(|(label, block)| (label, assign_home_block(block, &mut local_spaces)))
+    .map(|(label, block)| (label, assign_home_block(block, &local_spaces)))
     .collect();
   Program {
     info: Info {
@@ -38,7 +44,7 @@ pub fn assign_home(
 
 fn assign_home_block(
   block: Block<IdxVar>,
-  local_spaces: &mut HashMap<IdxVar, usize>,
+  local_spaces: &HashMap<IdxVar, usize>,
 ) -> Block {
   let code = block
     .code
@@ -53,7 +59,7 @@ fn assign_home_block(
 
 fn assign_home_instr(
   instr: Instr<IdxVar>,
-  local_spaces: &mut HashMap<IdxVar, usize>,
+  local_spaces: &HashMap<IdxVar, usize>,
 ) -> Instr {
   match instr {
     Instr::Add { src, dest } => {
@@ -78,18 +84,11 @@ fn assign_home_instr(
 
 fn assign_home_arg(
   arg: Arg<IdxVar>,
-  local_spaces: &mut HashMap<IdxVar, usize>,
+  local_spaces: &HashMap<IdxVar, usize>,
 ) -> Arg {
   match arg {
     Arg::Imm(n) => Arg::Imm(n),
-    Arg::Var(var) => {
-      if let Some(&i) = local_spaces.get(&var) {
-        return Arg::Deref(Reg::Rbp, -(i as i32));
-      }
-      let i = (local_spaces.len() + 1) * 8;
-      local_spaces.insert(var, i);
-      Arg::Deref(Reg::Rbp, -(i as i32))
-    }
+    Arg::Var(var) => Arg::Deref(Reg::Rbp, -(local_spaces[&var] as i32)),
     Arg::Reg(r) => Arg::Reg(r),
     Arg::Deref(r, i) => Arg::Deref(r, i),
     Arg::ByteReg(_) => unimplemented!(),
