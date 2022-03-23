@@ -73,15 +73,9 @@ fn add_instr_edges(
       }
     }
     Instr::Call { .. } => {
-      add(Reg::Rax.into());
-      add(Reg::Rcx.into());
-      add(Reg::Rdx.into());
-      add(Reg::Rsi.into());
-      add(Reg::Rdi.into());
-      add(Reg::R8.into());
-      add(Reg::R9.into());
-      add(Reg::R10.into());
-      add(Reg::R11.into());
+      for reg in Reg::caller_saved_regs() {
+        add(reg.into());
+      }
     }
     Instr::Mov { src, dest } => {
       if let Some(dest_loc) = Location::from_arg(dest.clone(), var_store) {

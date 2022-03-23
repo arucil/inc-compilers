@@ -208,6 +208,11 @@ impl Reg {
       _ => false,
     }
   }
+
+  pub fn caller_saved_regs() -> impl std::iter::IntoIterator<Item=Self> {
+    use Reg::*;
+    [ Rax, Rcx, Rdx, Rdx, Rsi, Rdi, R8, R9, R10, R11 ]
+  }
 }
 
 impl Debug for Reg {
