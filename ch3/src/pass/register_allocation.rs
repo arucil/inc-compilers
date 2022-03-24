@@ -170,12 +170,15 @@ fn assign_instr_var(
       src: assign(src),
       dest: assign(dest),
     },
-    Instr::JumpIf(cmp, label) => Instr::JumpIf(cmp, label),
+    Instr::JumpIf { cmp, label } => Instr::JumpIf { cmp, label },
     Instr::Movzx { src, dest } => Instr::Movzx {
       src: assign(src),
       dest: assign(dest),
     },
-    Instr::SetIf(cmp, dest) => Instr::SetIf(cmp, assign(dest)),
+    Instr::SetIf { cmp, dest } => Instr::SetIf {
+      cmp,
+      dest: assign(dest),
+    },
     Instr::Xor { src, dest } => Instr::Xor {
       src: assign(src),
       dest: assign(dest),
@@ -341,12 +344,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => {
-        let mut set = LocationSet::new();
-        set.add_reg(Rax);
-        set.add_reg(Rsp);
-        set
-      }
+      Label::Conclusion => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldOldInfo {
@@ -380,12 +378,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => {
-        let mut set = LocationSet::new();
-        set.add_reg(Rax);
-        set.add_reg(Rsp);
-        set
-      }
+      Label::Conclusion => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldOldInfo {
@@ -419,12 +412,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => {
-        let mut set = LocationSet::new();
-        set.add_reg(Rax);
-        set.add_reg(Rsp);
-        set
-      }
+      Label::Conclusion => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldOldInfo {
@@ -502,12 +490,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => {
-        let mut set = LocationSet::new();
-        set.add_reg(Rax);
-        set.add_reg(Rsp);
-        set
-      }
+      Label::Conclusion => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldOldInfo {

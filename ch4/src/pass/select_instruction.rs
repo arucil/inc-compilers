@@ -59,7 +59,10 @@ fn tail_instructions(
           dest: arg1,
           src: arg2,
         });
-        code.push(Instr::JumpIf(cmp.into(), conseq));
+        code.push(Instr::JumpIf {
+          cmp: cmp.into(),
+          label: conseq,
+        });
         code.push(Instr::Jmp(alt));
         return;
       }
@@ -191,7 +194,10 @@ fn prim_instructions(
         dest: arg1,
         src: arg2,
       });
-      code.push(Instr::SetIf(cmp.into(), Arg::ByteReg(ByteReg::Al)));
+      code.push(Instr::SetIf {
+        cmp: cmp.into(),
+        dest: Arg::ByteReg(ByteReg::Al),
+      });
       code.push(Instr::Movzx {
         src: Arg::ByteReg(ByteReg::Al),
         dest: target,

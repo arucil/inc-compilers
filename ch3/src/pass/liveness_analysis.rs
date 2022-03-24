@@ -1,5 +1,5 @@
 use crate::location_set::{LocationSet, VarStore};
-use asm::{Arg, Instr, Label, Program};
+use asm::{Arg, Instr, Label, Program, Reg};
 use ast::IdxVar;
 use ch2::pass::select_instruction::Info as OldInfo;
 use indexmap::{IndexMap, IndexSet};
@@ -11,6 +11,8 @@ pub struct Info {
   pub var_store: VarStore,
 }
 
+/// `label_live` is a map from labels to sets of live locations before the first
+/// instruction of the blocks.
 pub fn analyze_liveness(
   prog: Program<OldInfo, IdxVar>,
   label_live: HashMap<Label, LocationSet>,
@@ -47,12 +49,11 @@ struct AnalysisState<'a> {
 
 impl<'a> AnalysisState<'a> {
   fn block_liveness(&mut self, block: &asm::Block<IdxVar>) -> Vec<LocationSet> {
-    let mut set = vec![LocationSet::new(); block.code.len() + 2];
+    let mut set = vec![LocationSet::new(); block.code.len() + 1];
     for (i, ins) in block.code.iter().enumerate().rev() {
       set[i] = set[i + 1].clone();
       self.instr_liveness(ins, &mut set[i]);
     }
-    set.pop();
     set
   }
 
@@ -81,8 +82,13 @@ impl<'a> AnalysisState<'a> {
         *before = self.label_live[label].clone();
       }
       Instr::Call { arity, .. } => {
-        before.remove_caller_saved_regs();
-        before.add_argument_regs(*arity);
+        assert!(*arity <= 6);
+        for reg in Reg::caller_saved_regs() {
+          before.remove_reg(reg);
+        }
+        for reg in Reg::argument_regs().into_iter().take(*arity) {
+          before.add_reg(reg);
+        }
       }
       _ => unimplemented!("{:?}", ins),
     }
@@ -175,12 +181,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => {
-        let mut set = LocationSet::new();
-        set.add_reg(Rax);
-        set.add_reg(Rsp);
-        set
-      }
+      Label::Conclusion => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldInfo {
@@ -209,12 +210,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => {
-        let mut set = LocationSet::new();
-        set.add_reg(Rax);
-        set.add_reg(Rsp);
-        set
-      }
+      Label::Conclusion => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldInfo {
@@ -245,12 +241,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => {
-        let mut set = LocationSet::new();
-        set.add_reg(Rax);
-        set.add_reg(Rsp);
-        set
-      }
+      Label::Conclusion => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldInfo {

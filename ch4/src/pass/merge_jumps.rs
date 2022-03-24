@@ -8,7 +8,7 @@ pub fn merge_jumps<INFO>(prog: Program<INFO>) -> Program<INFO> {
     if let Instr::Jmp(label) = block.code.last().unwrap() {
       *refs.entry(label.clone()).or_default() += 1;
       if block.code.len() > 1 {
-        if let Instr::JumpIf(_, label) = &block.code[block.code.len() - 2] {
+        if let Instr::JumpIf { label, .. } = &block.code[block.code.len() - 2] {
           *refs.entry(label.clone()).or_default() += 1;
         }
       }
@@ -21,12 +21,12 @@ pub fn merge_jumps<INFO>(prog: Program<INFO>) -> Program<INFO> {
   while let Some(mut label) = worklist.pop() {
     let mut block = if let Some(block) = blocks.remove(&label) {
       block
-    } else{
+    } else {
       continue;
     };
     while let Instr::Jmp(next_label) = block.code.last().unwrap() {
       if block.code.len() > 1 {
-        if let Instr::JumpIf(_, label) = &block.code[block.code.len() - 2] {
+        if let Instr::JumpIf { label, .. } = &block.code[block.code.len() - 2] {
           worklist.push(*label);
         }
       }

@@ -38,24 +38,24 @@ pub fn build_interference(
 
 fn build_graph(
   block: &Block<IdxVar>,
-  live: &[LocationSet],
+  live_sets: &[LocationSet],
   var_store: &mut VarStore,
   graph: &mut LocationGraph,
 ) {
-  for (i, instr) in block.code.iter().enumerate() {
-    add_instr_edges(instr, &live[i + 1], var_store, graph);
+  for (instr, live_after) in block.code.iter().zip(live_sets.iter().skip(1)) {
+    add_instr_edges(instr, live_after, var_store, graph);
   }
 }
 
 fn add_instr_edges(
   instr: &Instr<IdxVar>,
-  after: &LocationSet,
+  live_after: &LocationSet,
   var_store: &mut VarStore,
   graph: &mut LocationGraph,
 ) {
   let mut add = |write_loc: Location| {
     let write_loc_node = graph.insert_node(write_loc);
-    for after_loc in after {
+    for after_loc in live_after {
       if after_loc != write_loc {
         let after_loc_node = graph.insert_node(after_loc);
         graph.add_edge(write_loc_node, after_loc_node);
@@ -66,6 +66,7 @@ fn add_instr_edges(
   match instr {
     Instr::Add { dest, .. }
     | Instr::Sub { dest, .. }
+    | Instr::Xor { dest, .. }
     | Instr::Neg(dest)
     | Instr::Pop(dest) => {
       if let Some(dest_loc) = Location::from_arg(dest.clone(), var_store) {
@@ -77,20 +78,28 @@ fn add_instr_edges(
         add(reg.into());
       }
     }
-    Instr::Mov { src, dest } => {
+    Instr::Mov { src, dest } | Instr::Movzx { src, dest } => {
       if let Some(dest_loc) = Location::from_arg(dest.clone(), var_store) {
-        let src_loc = Location::from_arg(src.clone(), var_store);
-        let dest_loc_node = graph.insert_node(dest_loc);
-        for after_loc in after {
-          if after_loc != dest_loc && Some(after_loc) != src_loc {
-            let after_loc_node = graph.insert_node(after_loc);
-            graph.add_edge(dest_loc_node, after_loc_node);
+        if let Some(src_loc) = Location::from_arg(src.clone(), var_store) {
+          let dest_loc_node = graph.insert_node(dest_loc);
+          for after_loc in live_after {
+            if after_loc != dest_loc && after_loc != src_loc {
+              let after_loc_node = graph.insert_node(after_loc);
+              graph.add_edge(dest_loc_node, after_loc_node);
+            }
           }
+        } else {
+          add(dest_loc);
         }
       }
     }
-    Instr::Push(_) | Instr::Ret | Instr::Syscall | Instr::Jmp(_) => {}
-    _ => {}
+    Instr::Cmp { .. }
+    | Instr::Push(_)
+    | Instr::Ret
+    | Instr::Syscall
+    | Instr::Jmp(_)
+    | Instr::JumpIf { .. } => {}
+    _ => todo!(),
   }
 }
 
@@ -134,12 +143,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => {
-        let mut set = LocationSet::new();
-        set.add_reg(Rax);
-        set.add_reg(Rsp);
-        set
-      }
+      Label::Conclusion => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldOldInfo {
@@ -172,12 +176,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => {
-        let mut set = LocationSet::new();
-        set.add_reg(Rax);
-        set.add_reg(Rsp);
-        set
-      }
+      Label::Conclusion => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldOldInfo {

@@ -155,12 +155,7 @@ mod tests {
     let prog = super::super::liveness_analysis::analyze_liveness(
       prog,
       hashmap! {
-        Label::Conclusion => {
-          let mut set = LocationSet::new();
-          set.add_reg(Rax);
-          set.add_reg(Rbp);
-          set
-        }
+        Label::Conclusion => LocationSet::regs([Rax, Rbp])
       },
     );
     let prog = super::super::interference::build_interference(prog);

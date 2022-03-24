@@ -32,6 +32,14 @@ impl LocationSet {
     self.0[i / 32] |= 1 << (i % 32);
   }
 
+  pub fn regs<const N: usize>(regs: [Reg; N]) -> Self {
+    let mut new = Self::new();
+    for reg in regs {
+      new.add_reg(reg);
+    }
+    new
+  }
+
   pub fn remove_reg(&mut self, reg: Reg) {
     let i = reg_index(reg);
     if !self.0.is_empty() {
@@ -59,28 +67,6 @@ impl LocationSet {
     let offset = i / 32;
     if offset < self.0.len() {
       self.0[offset] &= !(1 << (i % 32));
-    }
-  }
-
-  pub fn remove_caller_saved_regs(&mut self) {
-    self.remove_reg(Reg::Rax);
-    self.remove_reg(Reg::Rcx);
-    self.remove_reg(Reg::Rdx);
-    self.remove_reg(Reg::Rsi);
-    self.remove_reg(Reg::Rdi);
-    self.remove_reg(Reg::R8);
-    self.remove_reg(Reg::R9);
-    self.remove_reg(Reg::R10);
-    self.remove_reg(Reg::R11);
-  }
-
-  pub fn add_argument_regs(&mut self, arity: usize) {
-    const ARGUMENT_REGS: [Reg; 6] =
-      [Reg::Rdi, Reg::Rsi, Reg::Rdx, Reg::Rcx, Reg::R8, Reg::R9];
-
-    assert!(arity <= 6);
-    for reg in &ARGUMENT_REGS[..arity] {
-      self.add_reg(*reg);
     }
   }
 

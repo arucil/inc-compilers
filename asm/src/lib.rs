@@ -3,6 +3,7 @@
 use indexmap::IndexMap;
 use num_derive::{FromPrimitive, ToPrimitive};
 use std::fmt::{self, Debug, Formatter, Write};
+use std::iter::IntoIterator;
 
 #[derive(Debug, Clone)]
 pub struct Program<INFO = (), VAR = !> {
@@ -33,9 +34,9 @@ pub enum Instr<VAR = !> {
   Syscall,
   Xor { src: Arg<VAR>, dest: Arg<VAR> },
   Cmp { src: Arg<VAR>, dest: Arg<VAR> },
-  SetIf(CmpResult, Arg<VAR>),
+  SetIf { cmp: CmpResult, dest: Arg<VAR> },
   Movzx { src: Arg<VAR>, dest: Arg<VAR> },
-  JumpIf(CmpResult, Label),
+  JumpIf { cmp: CmpResult, label: Label },
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -62,6 +63,7 @@ pub enum Arg<VAR = !> {
   Reg(Reg),
   ByteReg(ByteReg),
   Deref(Reg, i32),
+  /// used for .rodata
   Label(String),
   Var(VAR),
 }
@@ -168,8 +170,8 @@ impl<VAR: Debug> Debug for Instr<VAR> {
       Self::Xor { src, dest } => write!(f, "xor {:?}, {:?}", dest, src),
       Self::Cmp { src, dest } => write!(f, "cmp {:?}, {:?}", dest, src),
       Self::Movzx { src, dest } => write!(f, "movzx {:?}, {:?}", dest, src),
-      Self::SetIf(cmp, dest) => write!(f, "set{:?} {:?}", cmp, dest),
-      Self::JumpIf(cmp, label) => write!(f, "j{:?} {:?}", cmp, label),
+      Self::SetIf { cmp, dest } => write!(f, "set{:?} {:?}", cmp, dest),
+      Self::JumpIf { cmp, label } => write!(f, "j{:?} {:?}", cmp, label),
     }
   }
 }
@@ -209,9 +211,14 @@ impl Reg {
     }
   }
 
-  pub fn caller_saved_regs() -> impl std::iter::IntoIterator<Item=Self> {
+  pub fn caller_saved_regs() -> impl IntoIterator<Item = Self> {
     use Reg::*;
-    [ Rax, Rcx, Rdx, Rdx, Rsi, Rdi, R8, R9, R10, R11 ]
+    [Rax, Rcx, Rdx, Rdx, Rsi, Rdi, R8, R9, R10, R11]
+  }
+
+  pub fn argument_regs() -> impl IntoIterator<Item = Self> {
+    use Reg::*;
+    [Rdi, Rsi, Rdx, Rcx, R8, R9]
   }
 }
 
@@ -443,11 +450,14 @@ pub fn parse_code<VAR: Clone>(
           if ops[0].starts_with("set") {
             let args = get_args(ops[1]);
             let cmp = CmpResult::from_str(&ops[0][3..]).unwrap();
-            Instr::SetIf(cmp, args[0].clone())
+            Instr::SetIf {
+              cmp,
+              dest: args[0].clone(),
+            }
           } else if ops[0].starts_with("j") {
             let cmp = CmpResult::from_str(&ops[0][1..]).unwrap();
             let label = parse_label(ops[1]);
-            Instr::JumpIf(cmp, label)
+            Instr::JumpIf { cmp, label }
           } else {
             panic!("invalid instruction {}", line)
           }

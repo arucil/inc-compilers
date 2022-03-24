@@ -58,7 +58,7 @@ fn add_instr_edges(
     Instr::Add { dest, .. }
     | Instr::Sub { dest, .. }
     | Instr::Xor { dest, .. }
-    | Instr::SetIf(_, dest)
+    | Instr::SetIf { dest, .. }
     | Instr::Neg(dest)
     | Instr::Pop(dest) => {
       if let Some(dest_loc) = Location::from_arg(dest.clone(), var_store) {
@@ -92,7 +92,7 @@ fn add_instr_edges(
     | Instr::Ret
     | Instr::Syscall
     | Instr::Jmp(_)
-    | Instr::JumpIf(..)
+    | Instr::JumpIf { .. }
     | Instr::Cmp { .. } => {}
     _ => {}
   }
@@ -129,12 +129,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => {
-        let mut set = LocationSet::new();
-        set.add_reg(Rax);
-        set.add_reg(Rsp);
-        set
-      }
+      Label::Conclusion => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldOldInfo {
@@ -167,12 +162,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => {
-        let mut set = LocationSet::new();
-        set.add_reg(Rax);
-        set.add_reg(Rsp);
-        set
-      }
+      Label::Conclusion => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldOldInfo {
@@ -249,12 +239,7 @@ block4:
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => {
-        let mut set = LocationSet::new();
-        set.add_reg(Rax);
-        set.add_reg(Rsp);
-        set
-      }
+      Label::Conclusion => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldOldInfo {
@@ -303,12 +288,7 @@ block4:
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => {
-        let mut set = LocationSet::new();
-        set.add_reg(Rax);
-        set.add_reg(Rsp);
-        set
-      }
+      Label::Conclusion => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldOldInfo {
@@ -382,12 +362,7 @@ block9:
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => {
-        let mut set = LocationSet::new();
-        set.add_reg(Rax);
-        set.add_reg(Rsp);
-        set
-      }
+      Label::Conclusion => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldOldInfo {
