@@ -37,7 +37,7 @@ pub fn allocate_registers(
   let reg_colors: HashMap<_, _> = available_regs
     .iter()
     .enumerate()
-    .map(|(i, &reg)| (reg, i as i32))
+    .map(|(i, &reg)| (reg, i as _))
     .collect();
   let mut var_store = prog.info.var_store;
   let conflicts = prog.info.conflicts;
@@ -89,7 +89,7 @@ fn allocate_registers_block(
   var_store: &mut VarStore,
   conflicts: &LocationGraph,
   moves: &LocationGraph,
-  reg_colors: &HashMap<Reg, i32>,
+  reg_colors: &HashMap<Reg, u32>,
   available_regs: &[Reg],
   used_callee_saved_regs: &mut IndexSet<Reg>,
 ) -> (Block, usize) {
@@ -189,7 +189,7 @@ fn assign_instr_var(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct Color(i32);
+struct Color(u32);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct NodeState {
@@ -236,7 +236,7 @@ fn color_graph(
   graph: &LocationGraph,
   moves: &LocationGraph,
   locals: &[Var],
-  reg_colors: &HashMap<Reg, i32>,
+  reg_colors: &HashMap<Reg, u32>,
 ) -> IndexMap<Var, Color> {
   let mut queue = PriorityQueue::<NodeIndex, NodeState>::new();
 
