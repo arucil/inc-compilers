@@ -1,7 +1,6 @@
 ---
 source: ch5/src/lib.rs
 expression: prog
-
 ---
 extern read_int, print_int, print_str, print_bool, print_newline
 section .rodata
@@ -17,16 +16,16 @@ _start:
     mov rbp, rsp
     sub rsp, 8
     push rbx
-    mov rbx, 1
-    mov rcx, 2
+    mov rcx, 1
+    mov rbx, 2
 
 block3:
-    mov rdx, rcx
+    mov rdx, rbx
     neg rdx
-    cmp rbx, rdx
+    cmp rcx, rdx
     jl block6
-    add rbx, 1
-    cmp rbx, rcx
+    add rcx, 1
+    cmp rcx, rbx
     je block1
     mov rsi, const_2
     mov rdx, 1
@@ -64,14 +63,14 @@ block1:
     jmp block0
 
 block6:
-    add rbx, rcx
-    cmp rbx, 10
+    add rcx, rbx
+    cmp rcx, 10
     jg block4
-    mov rcx, rbx
+    mov rbx, rcx
     jmp block3
 
 block4:
-    mov rcx, rbx
-    sub rcx, 1
+    mov rbx, rcx
+    sub rbx, 1
     jmp block3
 

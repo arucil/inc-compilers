@@ -1,20 +1,19 @@
 ---
 source: ch3/src/pass/register_allocation.rs
 expression: result.to_string_pretty()
-
 ---
-locals: {}
+locals: {v.0, w.0, x.0, y.0, z.0, t.0}
 used_callee_saved_regs: {}
 stack_space: 16 bytes
 start:
-    mov qword [rbp - 8], 1
-    mov rcx, 42
-    mov qword [rbp - 8], qword [rbp - 8]
-    add qword [rbp - 8], 7
-    mov qword [rbp - 16], qword [rbp - 8]
-    mov qword [rbp - 8], qword [rbp - 8]
-    add qword [rbp - 8], rcx
-    mov rcx, qword [rbp - 16]
+    mov rcx, 1
+    mov qword [rbp - 16], 42
+    mov rcx, rcx
+    add rcx, 7
+    mov rcx, rcx
+    mov qword [rbp - 8], rcx
+    add qword [rbp - 8], qword [rbp - 16]
+    mov rcx, rcx
     neg rcx
     mov rax, qword [rbp - 8]
     add rax, rcx

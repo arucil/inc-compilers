@@ -1,15 +1,15 @@
 ---
 source: ch3/src/pass/interference.rs
 expression: "format!(\"{:?}\", result.info)"
-
 ---
 graph {
     0 [ label = "t.0" ]
-    1 [ label = "w.0" ]
+    1 [ label = "x.0" ]
     2 [ label = "y.0" ]
     3 [ label = "z.0" ]
-    0 -- 1 [ ]
+    4 [ label = "w.0" ]
     0 -- 2 [ ]
-    3 -- 1 [ ]
+    0 -- 4 [ ]
+    3 -- 4 [ ]
 }
 

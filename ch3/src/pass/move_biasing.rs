@@ -1,4 +1,4 @@
-use super::interference::Info;
+use super::interference::{Info, Moves};
 use crate::{
   location_graph::LocationGraph,
   location_set::{Location, VarStore},
@@ -19,7 +19,7 @@ pub fn build_move_graph(
 
 fn build_block_move_graph(
   block: &Block<IdxVar>,
-  moves: &mut LocationGraph,
+  moves: &mut LocationGraph<Moves>,
   var_store: &mut VarStore,
 ) {
   for instr in &block.code {
@@ -28,11 +28,13 @@ fn build_block_move_graph(
         src: src @ Arg::Var(_),
         dest: dest @ Arg::Var(_),
       } => {
-        let src = moves
-          .insert_node(Location::from_arg(src.clone(), var_store).unwrap());
-        let dest = moves
-          .insert_node(Location::from_arg(dest.clone(), var_store).unwrap());
-        moves.add_edge(src, dest);
+        if src != dest {
+          let src = moves
+            .insert_node(Location::from_arg(src.clone(), var_store).unwrap());
+          let dest = moves
+            .insert_node(Location::from_arg(dest.clone(), var_store).unwrap());
+          moves.add_edge(src, dest);
+        }
       }
       _ => {}
     }

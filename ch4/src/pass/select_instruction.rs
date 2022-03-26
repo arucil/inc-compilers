@@ -253,6 +253,7 @@ fn atom_instructions(
 
 #[cfg(test)]
 mod tests {
+  use super::super::*;
   use super::*;
   use ast::*;
   use insta::assert_snapshot;
@@ -262,9 +263,9 @@ mod tests {
     let prog =
       parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#)
         .unwrap();
-    let prog = super::super::uniquify::uniquify(prog);
-    let prog = super::super::anf::anf(prog);
-    let prog = super::super::explicate_control::explicate_control(prog);
+    let prog = uniquify::uniquify(prog);
+    let prog = anf::anf(prog);
+    let prog = explicate_control::explicate_control(prog);
     let result = select_instruction(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -283,9 +284,9 @@ mod tests {
     "#,
     )
     .unwrap();
-    let prog = super::super::uniquify::uniquify(prog);
-    let prog = super::super::anf::anf(prog);
-    let prog = super::super::explicate_control::explicate_control(prog);
+    let prog = uniquify::uniquify(prog);
+    let prog = anf::anf(prog);
+    let prog = explicate_control::explicate_control(prog);
     let result = select_instruction(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -296,9 +297,9 @@ mod tests {
       r#"(let ([x (if (>= (read) 3) 10 77)]) (if (not (eq? x 10)) 41 2))"#,
     )
     .unwrap();
-    let prog = super::super::uniquify::uniquify(prog);
-    let prog = super::super::anf::anf(prog);
-    let prog = super::super::explicate_control::explicate_control(prog);
+    let prog = uniquify::uniquify(prog);
+    let prog = anf::anf(prog);
+    let prog = explicate_control::explicate_control(prog);
     let result = select_instruction(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -320,10 +321,10 @@ mod tests {
       "#,
     )
     .unwrap();
-    let prog = super::super::shrink::shrink(prog);
-    let prog = super::super::uniquify::uniquify(prog);
-    let prog = super::super::anf::anf(prog);
-    let prog = super::super::explicate_control::explicate_control(prog);
+    let prog = shrink::shrink(prog);
+    let prog = uniquify::uniquify(prog);
+    let prog = anf::anf(prog);
+    let prog = explicate_control::explicate_control(prog);
     let result = select_instruction(prog);
     assert_snapshot!(result.to_string_pretty());
   }

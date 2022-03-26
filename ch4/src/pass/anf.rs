@@ -114,6 +114,7 @@ fn assign_var(
 
 #[cfg(test)]
 mod tests {
+  use super::super::*;
   use super::*;
   use ast::*;
   use insta::assert_snapshot;
@@ -123,7 +124,7 @@ mod tests {
     let prog =
       parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#)
         .unwrap();
-    let prog = super::super::uniquify::uniquify(prog);
+    let prog = uniquify::uniquify(prog);
     let result = anf(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -131,7 +132,7 @@ mod tests {
   #[test]
   fn init_with_var() {
     let prog = parse(r#"(let ([a 42]) (let ([b a]) b))"#).unwrap();
-    let prog = super::super::uniquify::uniquify(prog);
+    let prog = uniquify::uniquify(prog);
     let result = anf(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -142,7 +143,7 @@ mod tests {
       r#"(let ([a (+ (let ([x (read)] [y (- x)]) (+ x (- y))) 7)]) (- a))"#,
     )
     .unwrap();
-    let prog = super::super::uniquify::uniquify(prog);
+    let prog = uniquify::uniquify(prog);
     let result = anf(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -153,7 +154,7 @@ mod tests {
       r#"(+ (- 3 2) (if (not (eq? 2 3)) (- (read)) (> (read) (not #t))))"#,
     )
     .unwrap();
-    let prog = super::super::uniquify::uniquify(prog);
+    let prog = uniquify::uniquify(prog);
     let result = anf(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -169,7 +170,7 @@ mod tests {
     x0)))"#,
     )
     .unwrap();
-    let prog = super::super::uniquify::uniquify(prog);
+    let prog = uniquify::uniquify(prog);
     let result = anf(prog);
     assert_snapshot!(result.to_string_pretty());
   }

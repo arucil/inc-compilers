@@ -7,19 +7,30 @@ use indexmap::IndexSet;
 use petgraph::dot::{Config, Dot};
 use std::fmt::{self, Debug, Formatter};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Interference;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Moves;
+
 pub struct Info {
+  /// Includes all locals.
   pub locals: IndexSet<IdxVar>,
-  pub conflicts: LocationGraph,
-  pub moves: LocationGraph,
+  /// Nodes include all locals.
+  pub conflicts: LocationGraph<Interference>,
+  pub moves: LocationGraph<Moves>,
   pub var_store: VarStore,
 }
 
 pub fn build_interference(
-  mut prog: Program<OldInfo, IdxVar>,
+  prog: Program<OldInfo, IdxVar>,
 ) -> Program<Info, IdxVar> {
-  let var_store = &mut prog.info.var_store;
+  let var_store = &prog.info.var_store;
   let live = &prog.info.live;
   let mut conflicts = LocationGraph::new();
+  for (_, var) in var_store.iter() {
+    conflicts.insert_node(Location::from(var.clone()));
+  }
   for (label, block) in &prog.blocks {
     build_graph(block, &live[label], var_store, &mut conflicts);
   }
@@ -39,8 +50,8 @@ pub fn build_interference(
 fn build_graph(
   block: &Block<IdxVar>,
   live_sets: &[LocationSet],
-  var_store: &mut VarStore,
-  graph: &mut LocationGraph,
+  var_store: &VarStore,
+  graph: &mut LocationGraph<Interference>,
 ) {
   for (instr, live_after) in block.code.iter().zip(live_sets.iter().skip(1)) {
     add_instr_edges(instr, live_after, var_store, graph);
@@ -50,8 +61,8 @@ fn build_graph(
 fn add_instr_edges(
   instr: &Instr<IdxVar>,
   live_after: &LocationSet,
-  var_store: &mut VarStore,
-  graph: &mut LocationGraph,
+  var_store: &VarStore,
+  graph: &mut LocationGraph<Interference>,
 ) {
   let mut add = |write_loc: Location| {
     let write_loc_node = graph.insert_node(write_loc);
@@ -107,7 +118,7 @@ impl Debug for Info {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     let graph = self
       .conflicts
-      .graph
+      .graph()
       .map(|_, var| var.to_arg(&self.var_store), |_, _| ());
     Dot::with_config(&graph, &[Config::EdgeNoLabel]).fmt(f)
   }
@@ -115,9 +126,11 @@ impl Debug for Info {
 
 #[cfg(test)]
 mod tests {
+  use super::super::*;
   use super::*;
   use asm::Label;
   use ch2::pass::select_instruction::Info as OldOldInfo;
+  use indexmap::indexset;
   use insta::assert_snapshot;
   use maplit::hashmap;
 
@@ -147,13 +160,20 @@ mod tests {
     };
     let prog = Program {
       info: OldOldInfo {
-        locals: IndexSet::new(),
+        locals: indexset! {
+          IdxVar::new("v"),
+          IdxVar::new("i"),
+          IdxVar::new("w"),
+          IdxVar::new("x"),
+          IdxVar::new("y"),
+          IdxVar::new("z"),
+          IdxVar::new("t")
+        },
       },
       constants: Default::default(),
       blocks,
     };
-    let prog =
-      super::super::liveness_analysis::analyze_liveness(prog, label_live);
+    let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = build_interference(prog);
 
     assert_snapshot!(format!("{:?}", result.info));
@@ -180,13 +200,15 @@ mod tests {
     };
     let prog = Program {
       info: OldOldInfo {
-        locals: IndexSet::new(),
+        locals: indexset! {
+          IdxVar::new("x"),
+          IdxVar::new("w"),
+        },
       },
       constants: Default::default(),
       blocks,
     };
-    let prog =
-      super::super::liveness_analysis::analyze_liveness(prog, label_live);
+    let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = build_interference(prog);
 
     assert_snapshot!(format!("{:?}", result.info));
@@ -207,13 +229,18 @@ mod tests {
     let label_live = hashmap! {};
     let prog = Program {
       info: OldOldInfo {
-        locals: IndexSet::new(),
+        locals: indexset! {
+          IdxVar::new("t"),
+          IdxVar::new("x"),
+          IdxVar::new("y"),
+          IdxVar::new("z"),
+          IdxVar::new("w"),
+        },
       },
       constants: Default::default(),
       blocks,
     };
-    let prog =
-      super::super::liveness_analysis::analyze_liveness(prog, label_live);
+    let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = build_interference(prog);
 
     assert_snapshot!(format!("{:?}", result.info));

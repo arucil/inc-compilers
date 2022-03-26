@@ -78,10 +78,10 @@ fn patch_block(block: Block) -> Block {
 
 #[cfg(test)]
 mod tests {
+  use super::super::*;
   use super::*;
   use ast::*;
   use insta::assert_snapshot;
-  use super::super::*;
 
   #[test]
   fn nested_prims() {

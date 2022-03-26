@@ -1,7 +1,6 @@
 ---
 source: ch3/src/lib.rs
 expression: prog
-
 ---
 extern read_int, print_int, print_str, print_bool, print_newline
 section .text
@@ -66,13 +65,13 @@ _start:
     jmp start
 
 conclusion:
+    call print_int
+    call print_newline
     pop r15
     pop r14
     pop r13
     pop r12
     pop rbx
-    call print_int
-    call print_newline
     mov rsp, rbp
     pop rbp
     mov rax, 60

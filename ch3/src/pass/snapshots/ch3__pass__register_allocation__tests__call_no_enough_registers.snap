@@ -1,9 +1,8 @@
 ---
 source: ch3/src/pass/register_allocation.rs
 expression: result.to_string_pretty()
-
 ---
-locals: {}
+locals: {x.0, w.0}
 used_callee_saved_regs: {}
 stack_space: 8 bytes
 start:

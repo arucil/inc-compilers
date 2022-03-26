@@ -66,14 +66,7 @@ fn add_prologue(prog: &mut Program<self::pass::register_allocation::Info>) {
 fn add_epilogue(prog: &mut Program<self::pass::register_allocation::Info>) {
   use asm::Reg::*;
   use Instr::*;
-  let mut code: Vec<Instr> = prog
-    .info
-    .used_callee_saved_regs
-    .iter()
-    .rev()
-    .map(|&reg| Pop(Arg::Reg(reg)))
-    .collect();
-  code.extend_from_slice(&[
+  let mut code = vec![
     Call {
       label: "print_int".to_owned(),
       arity: 0,
@@ -82,6 +75,11 @@ fn add_epilogue(prog: &mut Program<self::pass::register_allocation::Info>) {
       label: "print_newline".to_owned(),
       arity: 0,
     },
+  ];
+  for &reg in prog.info.used_callee_saved_regs.iter().rev() {
+    code.push(Pop(Arg::Reg(reg)));
+  }
+  code.extend_from_slice(&[
     Mov {
       src: Arg::Reg(Rbp),
       dest: Arg::Reg(Rsp),

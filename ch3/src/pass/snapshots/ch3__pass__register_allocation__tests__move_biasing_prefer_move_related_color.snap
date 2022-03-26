@@ -1,0 +1,31 @@
+---
+source: ch3/src/pass/register_allocation.rs
+expression: result
+---
+{
+    Var(
+        2,
+    ): Color(
+        0,
+    ),
+    Var(
+        0,
+    ): Color(
+        1,
+    ),
+    Var(
+        1,
+    ): Color(
+        1,
+    ),
+    Var(
+        3,
+    ): Color(
+        0,
+    ),
+    Var(
+        4,
+    ): Color(
+        1,
+    ),
+}

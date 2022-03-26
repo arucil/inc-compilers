@@ -136,6 +136,7 @@ fn patch_block(block: Block) -> Block {
 
 #[cfg(test)]
 mod tests {
+  use super::super::*;
   use super::*;
   use asm::{Label, Reg::*};
   use ast::*;
@@ -148,17 +149,17 @@ mod tests {
     let prog =
       parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#)
         .unwrap();
-    let prog = super::super::uniquify::uniquify(prog);
-    let prog = super::super::anf::anf(prog);
-    let prog = super::super::explicate_control::explicate_control(prog);
-    let prog = super::super::select_instruction::select_instruction(prog);
-    let prog = super::super::liveness_analysis::analyze_liveness(
+    let prog = uniquify::uniquify(prog);
+    let prog = anf::anf(prog);
+    let prog = explicate_control::explicate_control(prog);
+    let prog = select_instruction::select_instruction(prog);
+    let prog = liveness_analysis::analyze_liveness(
       prog,
       hashmap! {
         Label::Conclusion => LocationSet::regs([Rax, Rbp])
       },
     );
-    let prog = super::super::interference::build_interference(prog);
+    let prog = interference::build_interference(prog);
     let prog = ch3::pass::move_biasing::build_move_graph(prog);
     let regs = &[
       Rbx, Rcx, Rdx, Rsi, Rdi, R8, R9, R10, R11, R12, R13, R14, R15,

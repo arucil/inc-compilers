@@ -427,6 +427,7 @@ fn prim(op: &str, mut args: Vec<(Range, Exp<IdxVar>)>) -> CPrim {
 
 #[cfg(test)]
 mod tests {
+  use super::super::*;
   use super::*;
   use insta::assert_snapshot;
 
@@ -435,8 +436,8 @@ mod tests {
     let prog =
       ast::parse(r#"(let ([y (let ([x 20]) (+ x (let ([x 22]) x)))]) y)"#)
         .unwrap();
-    let prog = super::super::uniquify::uniquify(prog);
-    let prog = super::super::anf::anf(prog);
+    let prog = uniquify::uniquify(prog);
+    let prog = anf::anf(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -447,8 +448,8 @@ mod tests {
       r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#,
     )
     .unwrap();
-    let prog = super::super::uniquify::uniquify(prog);
-    let prog = super::super::anf::anf(prog);
+    let prog = uniquify::uniquify(prog);
+    let prog = anf::anf(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -458,8 +459,8 @@ mod tests {
     let prog =
       ast::parse(r#"(if (> 3 (read)) (- 7 2) (- (let ([x 3]) (+ x (read)))))"#)
         .unwrap();
-    let prog = super::super::uniquify::uniquify(prog);
-    let prog = super::super::anf::anf(prog);
+    let prog = uniquify::uniquify(prog);
+    let prog = anf::anf(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -478,8 +479,8 @@ mod tests {
 "#,
     )
     .unwrap();
-    let prog = super::super::uniquify::uniquify(prog);
-    let prog = super::super::anf::anf(prog);
+    let prog = uniquify::uniquify(prog);
+    let prog = anf::anf(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -487,8 +488,8 @@ mod tests {
   #[test]
   fn const_cond() {
     let prog = ast::parse(r#"(if (not #t) 1 2)"#).unwrap();
-    let prog = super::super::uniquify::uniquify(prog);
-    let prog = super::super::anf::anf(prog);
+    let prog = uniquify::uniquify(prog);
+    let prog = anf::anf(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -499,8 +500,8 @@ mod tests {
       r#"(let ([x (if (>= (read) 3) 10 77)]) (if (not (eq? x 10)) 41 2))"#,
     )
     .unwrap();
-    let prog = super::super::uniquify::uniquify(prog);
-    let prog = super::super::anf::anf(prog);
+    let prog = uniquify::uniquify(prog);
+    let prog = anf::anf(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -509,8 +510,8 @@ mod tests {
   fn var_cond() {
     let prog =
       ast::parse(r#"(let ([x (eq? (read) 20)]) (if x 42 89))"#).unwrap();
-    let prog = super::super::uniquify::uniquify(prog);
-    let prog = super::super::anf::anf(prog);
+    let prog = uniquify::uniquify(prog);
+    let prog = anf::anf(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -519,9 +520,9 @@ mod tests {
   fn shrink_and() {
     let prog =
       ast::parse(r#"(if (and (eq? (read) 0) (eq? (read) 2)) 0 42)"#).unwrap();
-    let prog = super::super::shrink::shrink(prog);
-    let prog = super::super::uniquify::uniquify(prog);
-    let prog = super::super::anf::anf(prog);
+    let prog = shrink::shrink(prog);
+    let prog = uniquify::uniquify(prog);
+    let prog = anf::anf(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -543,10 +544,10 @@ mod tests {
       "#,
     )
     .unwrap();
-    let prog = super::super::typecheck::typecheck(prog).unwrap();
-    let prog = super::super::shrink::shrink(prog);
-    let prog = super::super::uniquify::uniquify(prog);
-    let prog = super::super::anf::anf(prog);
+    let prog = typecheck::typecheck(prog).unwrap();
+    let prog = shrink::shrink(prog);
+    let prog = uniquify::uniquify(prog);
+    let prog = anf::anf(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
   }

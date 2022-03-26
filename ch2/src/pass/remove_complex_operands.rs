@@ -96,6 +96,7 @@ fn atom_exp(
 
 #[cfg(test)]
 mod tests {
+  use super::super::*;
   use super::*;
   use ast::*;
   use insta::assert_snapshot;
@@ -105,7 +106,7 @@ mod tests {
     let prog =
       parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (- y (- 2))))"#)
         .unwrap();
-    let prog = super::super::uniquify::uniquify(prog).unwrap();
+    let prog = uniquify::uniquify(prog).unwrap();
     let result = remove_complex_operands(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -113,7 +114,7 @@ mod tests {
   #[test]
   fn init_with_var() {
     let prog = parse(r#"(let ([a 42]) (let ([b a]) b))"#).unwrap();
-    let prog = super::super::uniquify::uniquify(prog).unwrap();
+    let prog = uniquify::uniquify(prog).unwrap();
     let result = remove_complex_operands(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -135,7 +136,7 @@ mod tests {
       "#,
     )
     .unwrap();
-    let prog = super::super::uniquify::uniquify(prog).unwrap();
+    let prog = uniquify::uniquify(prog).unwrap();
     let result = remove_complex_operands(prog);
     assert_snapshot!(result.to_string_pretty());
   }

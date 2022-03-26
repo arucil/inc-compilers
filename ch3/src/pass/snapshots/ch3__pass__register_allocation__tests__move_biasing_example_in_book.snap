@@ -1,18 +1,17 @@
 ---
 source: ch3/src/pass/register_allocation.rs
 expression: result.to_string_pretty()
-
 ---
-locals: {}
+locals: {v.0, w.0, x.0, y.0, z.0, t.0}
 used_callee_saved_regs: {}
 stack_space: 0 bytes
 start:
-    mov rcx, 1
+    mov rdx, 1
     mov rsi, 42
-    mov rcx, rcx
-    add rcx, 7
-    mov rcx, rcx
-    mov rdx, rcx
+    mov rdx, rdx
+    add rdx, 7
+    mov rcx, rdx
+    mov rdx, rdx
     add rdx, rsi
     mov rcx, rcx
     neg rcx

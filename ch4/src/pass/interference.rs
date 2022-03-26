@@ -3,7 +3,7 @@ use asm::{Block, Instr, Program, Reg};
 use ast::IdxVar;
 use ch3::location_graph::LocationGraph;
 use ch3::location_set::{Location, LocationSet, VarStore};
-use ch3::pass::interference::Info;
+use ch3::pass::interference::{Info, Interference};
 
 pub fn build_interference(
   mut prog: Program<OldInfo, IdxVar>,
@@ -31,7 +31,7 @@ fn build_graph(
   block: &Block<IdxVar>,
   live: &[LocationSet],
   var_store: &mut VarStore,
-  graph: &mut LocationGraph,
+  graph: &mut LocationGraph<Interference>,
 ) {
   for (i, instr) in block.code.iter().enumerate() {
     add_instr_edges(instr, &live[i + 1], var_store, graph);
@@ -42,7 +42,7 @@ fn add_instr_edges(
   instr: &Instr<IdxVar>,
   after: &LocationSet,
   var_store: &mut VarStore,
-  graph: &mut LocationGraph,
+  graph: &mut LocationGraph<Interference>,
 ) {
   let mut add = |write_loc: Location| {
     let write_loc_node = graph.insert_node(write_loc);
@@ -100,6 +100,7 @@ fn add_instr_edges(
 
 #[cfg(test)]
 mod tests {
+  use super::super::*;
   use super::*;
   use asm::Label;
   use ch2::pass::select_instruction::Info as OldOldInfo;
@@ -138,8 +139,7 @@ mod tests {
       constants: Default::default(),
       blocks,
     };
-    let prog =
-      super::super::liveness_analysis::analyze_liveness(prog, label_live);
+    let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = build_interference(prog);
 
     assert_snapshot!(format!("{:?}", result.info));
@@ -171,8 +171,7 @@ mod tests {
       constants: Default::default(),
       blocks,
     };
-    let prog =
-      super::super::liveness_analysis::analyze_liveness(prog, label_live);
+    let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = build_interference(prog);
 
     assert_snapshot!(format!("{:?}", result.info));
@@ -198,8 +197,7 @@ mod tests {
       constants: Default::default(),
       blocks,
     };
-    let prog =
-      super::super::liveness_analysis::analyze_liveness(prog, label_live);
+    let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = build_interference(prog);
 
     assert_snapshot!(format!("{:?}", result.info));
@@ -248,8 +246,7 @@ block4:
       constants: Default::default(),
       blocks,
     };
-    let prog =
-      super::super::liveness_analysis::analyze_liveness(prog, label_live);
+    let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = build_interference(prog);
 
     assert_snapshot!(format!("{:?}", result.info));
@@ -297,8 +294,7 @@ block4:
       constants: Default::default(),
       blocks,
     };
-    let prog =
-      super::super::liveness_analysis::analyze_liveness(prog, label_live);
+    let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = build_interference(prog);
 
     assert_snapshot!(format!("{:?}", result.info));
@@ -371,8 +367,7 @@ block9:
       constants: Default::default(),
       blocks,
     };
-    let prog =
-      super::super::liveness_analysis::analyze_liveness(prog, label_live);
+    let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = build_interference(prog);
 
     assert_snapshot!(format!("{:?}", result.info));

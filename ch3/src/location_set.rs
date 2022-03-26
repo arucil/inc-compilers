@@ -1,11 +1,10 @@
 use asm::{Arg, Reg};
 use ast::IdxVar;
-use indexmap::map::Entry;
 use indexmap::IndexMap;
 use num_traits::{FromPrimitive, ToPrimitive};
 use smallvec::SmallVec;
 use std::fmt::{self, Debug, Write};
-use std::ops::{Deref, BitOrAssign};
+use std::ops::{BitOrAssign, Deref};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocationSet(SmallVec<[u32; 2]>);
@@ -149,12 +148,13 @@ impl VarStore {
     Self(IndexMap::new())
   }
 
-  pub fn get(&mut self, var: IdxVar) -> Var {
+  pub fn insert(&mut self, var: IdxVar) -> Var {
     let len = self.0.len();
-    match self.0.entry(var) {
-      Entry::Occupied(var) => *var.get(),
-      Entry::Vacant(entry) => *entry.insert(Var(len)),
-    }
+    *self.0.entry(var).or_insert(Var(len))
+  }
+
+  pub fn get(&self, var: IdxVar) -> Var {
+    self.0[&var]
   }
 }
 
@@ -181,7 +181,7 @@ impl Location {
     }
   }
 
-  pub fn from_arg(arg: Arg<IdxVar>, var_store: &mut VarStore) -> Option<Self> {
+  pub fn from_arg(arg: Arg<IdxVar>, var_store: &VarStore) -> Option<Self> {
     match arg {
       Arg::Deref(reg, _) | Arg::Reg(reg) => Some(reg.into()),
       Arg::Var(var) => Some(Self(var_store.get(var).0 + 16)),
@@ -207,5 +207,11 @@ impl Location {
 impl From<Reg> for Location {
   fn from(reg: Reg) -> Self {
     Self(reg.to_usize().unwrap())
+  }
+}
+
+impl From<Var> for Location {
+  fn from(var: Var) -> Self {
+    Self(var.0 + 16)
   }
 }

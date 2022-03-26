@@ -8,6 +8,7 @@ use std::collections::HashMap;
 pub struct Info {
   pub locals: IndexSet<IdxVar>,
   pub live: IndexMap<Label, Vec<LocationSet>>,
+  /// Includes all locals.
   pub var_store: VarStore,
 }
 
@@ -17,8 +18,13 @@ pub fn analyze_liveness(
   prog: Program<OldInfo, IdxVar>,
   label_live: HashMap<Label, LocationSet>,
 ) -> Program<Info, IdxVar> {
-  let mut state = AnalysisState {
-    var_store: VarStore::new(),
+  let mut var_store = VarStore::new();
+  for var in &prog.info.locals {
+    var_store.insert(var.clone());
+  }
+
+  let state = AnalysisState {
+    var_store: &var_store,
     label_live: &label_live,
   };
 
@@ -35,7 +41,7 @@ pub fn analyze_liveness(
     info: Info {
       locals: prog.info.locals,
       live,
-      var_store: state.var_store,
+      var_store,
     },
     constants: prog.constants,
     blocks: prog.blocks,
@@ -43,12 +49,12 @@ pub fn analyze_liveness(
 }
 
 struct AnalysisState<'a> {
-  var_store: VarStore,
+  var_store: &'a VarStore,
   label_live: &'a HashMap<Label, LocationSet>,
 }
 
 impl<'a> AnalysisState<'a> {
-  fn block_liveness(&mut self, block: &asm::Block<IdxVar>) -> Vec<LocationSet> {
+  fn block_liveness(&self, block: &asm::Block<IdxVar>) -> Vec<LocationSet> {
     let mut set = vec![LocationSet::new(); block.code.len() + 1];
     for (i, ins) in block.code.iter().enumerate().rev() {
       set[i] = set[i + 1].clone();
@@ -57,7 +63,7 @@ impl<'a> AnalysisState<'a> {
     set
   }
 
-  fn instr_liveness(&mut self, ins: &Instr<IdxVar>, before: &mut LocationSet) {
+  fn instr_liveness(&self, ins: &Instr<IdxVar>, before: &mut LocationSet) {
     match ins {
       Instr::Ret => {}
       Instr::Syscall => {}
@@ -72,8 +78,10 @@ impl<'a> AnalysisState<'a> {
         self.add_arg(before, dest);
       }
       Instr::Mov { src, dest } => {
-        self.remove_arg(before, dest);
-        self.add_arg(before, src);
+        if src != dest {
+          self.remove_arg(before, dest);
+          self.add_arg(before, src);
+        }
       }
       Instr::Neg(dest) => {
         self.add_arg(before, dest);
@@ -94,7 +102,7 @@ impl<'a> AnalysisState<'a> {
     }
   }
 
-  fn remove_arg(&mut self, set: &mut LocationSet, arg: &Arg<IdxVar>) {
+  fn remove_arg(&self, set: &mut LocationSet, arg: &Arg<IdxVar>) {
     match arg {
       Arg::Deref(reg, _) | Arg::Reg(reg) => {
         set.remove_reg(*reg);
@@ -107,7 +115,7 @@ impl<'a> AnalysisState<'a> {
     }
   }
 
-  fn add_arg(&mut self, set: &mut LocationSet, arg: &Arg<IdxVar>) {
+  fn add_arg(&self, set: &mut LocationSet, arg: &Arg<IdxVar>) {
     match arg {
       Arg::Deref(reg, _) | Arg::Reg(reg) => {
         set.add_reg(*reg);
@@ -124,6 +132,7 @@ impl<'a> AnalysisState<'a> {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use indexmap::indexset;
   use insta::assert_snapshot;
   use maplit::hashmap;
 
@@ -185,7 +194,14 @@ mod tests {
     };
     let prog = Program {
       info: OldInfo {
-        locals: IndexSet::new(),
+        locals: indexset! {
+          IdxVar::new("v"),
+          IdxVar::new("w"),
+          IdxVar::new("x"),
+          IdxVar::new("y"),
+          IdxVar::new("z"),
+          IdxVar::new("t"),
+        },
       },
       constants: Default::default(),
       blocks,
@@ -214,7 +230,10 @@ mod tests {
     };
     let prog = Program {
       info: OldInfo {
-        locals: IndexSet::new(),
+        locals: indexset! {
+          IdxVar::new("x"),
+          IdxVar::new("w"),
+        },
       },
       constants: Default::default(),
       blocks,
@@ -245,7 +264,10 @@ mod tests {
     };
     let prog = Program {
       info: OldInfo {
-        locals: IndexSet::new(),
+        locals: indexset! {
+          IdxVar::new("x"),
+          IdxVar::new("w"),
+        },
       },
       constants: Default::default(),
       blocks,
