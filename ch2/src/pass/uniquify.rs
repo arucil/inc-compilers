@@ -10,12 +10,25 @@ pub fn uniquify(prog: Program) -> Result<Program<IdxVar>, CompileError> {
     body: prog
       .body
       .into_iter()
-      .map(|exp| Ok((exp.0, uniquify_exp(exp, &mut env, &mut counter)?)))
+      .map(|exp| {
+        Ok((
+          exp.0,
+          uniquify_exp(uniquify_exp, exp, &mut env, &mut counter)?,
+        ))
+      })
       .collect::<Result<_, _>>()?,
   })
 }
 
-fn uniquify_exp(
+pub type uniquify_exp_fn = fn(
+  uniquify_exp_fn,
+  (Range, Exp),
+  &mut HashMap<String, usize>,
+  &mut usize,
+) -> Result<Exp<IdxVar>, CompileError>;
+
+pub fn uniquify_exp(
+  recur: uniquify_exp_fn,
   (range, exp): (Range, Exp),
   env: &mut HashMap<String, usize>,
   counter: &mut usize,
@@ -40,7 +53,7 @@ fn uniquify_exp(
       op,
       args: args
         .into_iter()
-        .map(|exp| Ok((exp.0, uniquify_exp(exp, env, counter)?)))
+        .map(|exp| Ok((exp.0, recur(recur, exp, env, counter)?)))
         .collect::<Result<_, _>>()?,
     }),
     Exp::Let {
@@ -48,11 +61,11 @@ fn uniquify_exp(
       init: box init @ (init_range, _),
       body: box body @ (body_range, _),
     } => {
-      let init = uniquify_exp(init, env, counter)?;
+      let init = recur(recur, init, env, counter)?;
       let index = *counter;
       *counter += 1;
       let old_value = env.insert(var.1.clone(), index);
-      let body = uniquify_exp(body, env, counter)?;
+      let body = recur(recur, body, env, counter)?;
       if let Some(v) = old_value {
         env.insert(var.1.clone(), v);
       }
@@ -62,7 +75,6 @@ fn uniquify_exp(
         body: box (body_range, body),
       })
     }
-    Exp::Str(_) => unimplemented!("string is not supported"),
     exp => unimplemented!("unsupported form {:?}", exp),
   }
 }

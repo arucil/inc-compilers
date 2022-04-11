@@ -1,4 +1,7 @@
 use ast::{Exp, IdxVar, Program};
+use ch2::pass::uniquify::uniquify_exp as ch2_uniquify_exp;
+use ch2::pass::uniquify::uniquify_exp_fn;
+use support::CompileError;
 use std::collections::HashMap;
 
 pub fn uniquify(prog: Program) -> Program<IdxVar> {
@@ -8,56 +11,31 @@ pub fn uniquify(prog: Program) -> Program<IdxVar> {
     body: prog
       .body
       .into_iter()
-      .map(|(range, exp)| (range, uniquify_exp(exp, &mut env, &mut counter)))
+      .map(|(range, exp)| {
+        (
+          range,
+          uniquify_exp(uniquify_exp, exp, &mut env, &mut counter).unwrap(),
+        )
+      })
       .collect(),
   }
 }
 
-fn uniquify_exp(
+pub fn uniquify_exp(
+  recur: uniquify_exp_fn,
   exp: Exp,
   env: &mut HashMap<String, usize>,
   counter: &mut usize,
-) -> Exp<IdxVar> {
+) -> Result<Exp<IdxVar>, CompileError> {
   match exp {
-    Exp::Int(n) => Exp::Int(n),
-    Exp::Var(var) => Exp::Var(IdxVar {
-      name: var.clone(),
-      index: env[&var],
+    Exp::Bool(b) => Ok(Exp::Bool(b)),
+    Exp::If { cond, conseq, alt } => Ok(Exp::If {
+      cond: box (cond.0, recur(recur, cond.1, env, counter)),
+      conseq: box (conseq.0, recur(recur, conseq.1, env, counter)),
+      alt: box (alt.0, recur(recur, alt.1, env, counter)),
     }),
-    Exp::Prim { op, args } => Exp::Prim {
-      op,
-      args: args
-        .into_iter()
-        .map(|(range, exp)| (range, uniquify_exp(exp, env, counter)))
-        .collect(),
-    },
-    Exp::Let {
-      var: var @ (var_range, _),
-      init,
-      body,
-    } => {
-      let init = (init.0, uniquify_exp(init.1, env, counter));
-      let index = *counter;
-      *counter += 1;
-      let old_value = env.insert(var.1.clone(), index);
-      let body = (body.0, uniquify_exp(body.1, env, counter));
-      if let Some(v) = old_value {
-        env.insert(var.1.clone(), v);
-      }
-      Exp::Let {
-        var: (var_range, IdxVar { name: var.1, index }),
-        init: box init,
-        body: box body,
-      }
-    }
-    Exp::Bool(b) => Exp::Bool(b),
-    Exp::If { cond, conseq, alt } => Exp::If {
-      cond: box (cond.0, uniquify_exp(cond.1, env, counter)),
-      conseq: box (conseq.0, uniquify_exp(conseq.1, env, counter)),
-      alt: box (alt.0, uniquify_exp(alt.1, env, counter)),
-    },
-    Exp::Str(s) => Exp::Str(s),
-    Exp::Set { var, exp } => Exp::Set {
+    Exp::Str(s) => Ok(Exp::Str(s)),
+    Exp::Set { var, exp } => Ok(Exp::Set {
       var: (
         var.0,
         IdxVar {
@@ -65,25 +43,25 @@ fn uniquify_exp(
           index: env[&var.1],
         },
       ),
-      exp: box (exp.0, uniquify_exp(exp.1, env, counter)),
-    },
-    Exp::Begin { seq, last } => Exp::Begin {
+      exp: box (exp.0, recur(recur, exp.1, env, counter)),
+    }),
+    Exp::Begin { seq, last } => Ok(Exp::Begin {
       seq: seq
         .into_iter()
-        .map(|exp| (exp.0, uniquify_exp(exp.1, env, counter)))
+        .map(|exp| (exp.0, recur(recur, exp.1, env, counter)))
         .collect(),
-      last: box (last.0, uniquify_exp(last.1, env, counter)),
-    },
-    Exp::While { cond, body } => Exp::While {
-      cond: box (cond.0, uniquify_exp(cond.1, env, counter)),
-      body: box (body.0, uniquify_exp(body.1, env, counter)),
-    },
-    Exp::Print { val, ty } => Exp::Print {
-      val: box (val.0, uniquify_exp(val.1, env, counter)),
+      last: box (last.0, recur(recur, last.1, env, counter)),
+    }),
+    Exp::While { cond, body } => Ok(Exp::While {
+      cond: box (cond.0, recur(recur, cond.1, env, counter)),
+      body: box (body.0, recur(recur, body.1, env, counter)),
+    }),
+    Exp::Print { val, ty } => Ok(Exp::Print {
+      val: box (val.0, recur(recur, val.1, env, counter)),
       ty,
-    },
-    Exp::NewLine => Exp::NewLine,
-    exp => unimplemented!("unsupported form {:?}", exp),
+    }),
+    Exp::NewLine => Ok(Exp::NewLine),
+    exp => ch2_uniquify_exp(recur, exp, env, counter),
   }
 }
 

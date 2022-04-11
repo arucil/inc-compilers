@@ -34,7 +34,13 @@ pub enum CTail {
   Seq(CStmt, Box<CTail>),
   Return(CExp),
   Goto(Label),
-  If(CCmpOp, CAtom, CAtom, Label, Label),
+  If {
+    cmp: CCmpOp,
+    lhs: CAtom,
+    rhs: CAtom,
+    conseq: Label,
+    alt: Label,
+  },
 }
 
 #[non_exhaustive]
@@ -104,11 +110,17 @@ impl Debug for CTail {
         }
         Self::Return(exp) => return write!(f, "    return {:?}", exp),
         Self::Goto(label) => return write!(f, "    goto {:?}", label),
-        Self::If(cmp, arg1, arg2, conseq, alt) => {
+        Self::If {
+          cmp,
+          lhs,
+          rhs,
+          conseq,
+          alt,
+        } => {
           return write!(
             f,
             "    if ({:?} {:?} {:?}) goto {:?} else goto {:?}",
-            cmp, arg1, arg2, conseq, alt
+            cmp, lhs, rhs, conseq, alt
           )
         }
       }
