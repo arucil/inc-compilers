@@ -1,4 +1,4 @@
-pub mod anf;
+pub mod remove_complex_operands;
 pub mod explicate_control;
 pub mod interference;
 pub mod liveness_analysis;

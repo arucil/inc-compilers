@@ -1,31 +1,33 @@
-use asm::{Arg, Block, Instr, Label, Program, Reg};
+use asm::{Block, Instr, Label, Program};
 use ast::IdxVar;
 use ch2::pass::select_instruction::Info as OldInfo;
 use ch3::location_set::{LocationSet, VarStore};
-use indexmap::{IndexMap, IndexSet};
+use ch3::pass::liveness_analysis::{AnalysisState, Info};
 use petgraph::algo::toposort;
 use petgraph::graph::NodeIndex;
 use petgraph::Graph;
 use std::collections::HashMap;
 
-pub struct Info {
-  pub locals: IndexSet<IdxVar>,
-  pub live: IndexMap<Label, Vec<LocationSet>>,
-  pub var_store: VarStore,
-}
-
+/// `label_live` is a map from labels to sets of live locations before the first
+/// instruction of the blocks.
 pub fn analyze_liveness(
   prog: Program<OldInfo, IdxVar>,
   mut label_live: HashMap<Label, LocationSet>,
 ) -> Program<Info, IdxVar> {
-  let mut state = AnalysisState::new();
+  let mut var_store = VarStore::new();
+  for var in &prog.info.locals {
+    var_store.insert(var.clone());
+  }
+
+  let state = AnalysisState {
+    var_store: &var_store,
+  };
 
   let live = sort_blocks(&prog.blocks)
-    .iter()
     .map(|(label, block)| {
       let live = state.block_liveness(block, &label_live);
-      label_live.insert(*label, live[0].clone());
-      (label.clone(), live)
+      label_live.insert(label, live[0].clone());
+      (label, live)
     })
     .collect();
 
@@ -33,7 +35,7 @@ pub fn analyze_liveness(
     info: Info {
       locals: prog.info.locals,
       live,
-      var_store: state.var_store,
+      var_store,
     },
     constants: prog.constants,
     blocks: prog.blocks,
@@ -42,7 +44,7 @@ pub fn analyze_liveness(
 
 fn sort_blocks(
   blocks: &[(Label, Block<IdxVar>)],
-) -> Vec<(Label, &Block<IdxVar>)> {
+) -> impl Iterator<Item = (Label, &Block<IdxVar>)> {
   let mut graph = Graph::new();
   let mut nodes = HashMap::<Label, NodeIndex>::new();
   for (label, block) in blocks {
@@ -69,126 +71,14 @@ fn sort_blocks(
     .unwrap()
     .into_iter()
     .rev()
-    .map(|node| graph[node])
-    .collect()
-}
-
-pub struct AnalysisState {
-  pub var_store: VarStore,
-}
-
-impl AnalysisState {
-  pub fn new() -> Self {
-    Self {
-      var_store: VarStore::new(),
-    }
-  }
-
-  pub fn block_liveness(
-    &mut self,
-    block: &asm::Block<IdxVar>,
-    mapping: &HashMap<Label, LocationSet>,
-  ) -> Vec<LocationSet> {
-    let mut set = vec![LocationSet::new(); block.code.len() + 2];
-    for (i, ins) in block.code.iter().enumerate().rev() {
-      set[i] = set[i + 1].clone();
-      self.instr_liveness(ins, &mut set[i], mapping);
-    }
-    set.pop();
-    set
-  }
-
-  fn instr_liveness(
-    &mut self,
-    ins: &Instr<IdxVar>,
-    before: &mut LocationSet,
-    mapping: &HashMap<Label, LocationSet>,
-  ) {
-    match ins {
-      Instr::Ret => {}
-      Instr::Syscall => {}
-      Instr::Pop(arg) => {
-        self.remove_arg(before, arg);
-      }
-      Instr::Push(arg) => {
-        self.add_arg(before, arg);
-      }
-      Instr::Add { src, dest }
-      | Instr::Sub { src, dest }
-      | Instr::Xor { src, dest } => {
-        self.add_arg(before, src);
-        self.add_arg(before, dest);
-      }
-      Instr::Mov { src, dest } | Instr::Movzx { src, dest } => {
-        self.remove_arg(before, dest);
-        self.add_arg(before, src);
-      }
-      Instr::Neg(dest) => {
-        self.add_arg(before, dest);
-      }
-      Instr::Cmp { src, dest } => {
-        self.add_arg(before, src);
-        self.add_arg(before, dest);
-      }
-      Instr::Jmp(label) => {
-        *before = mapping[label].clone();
-      }
-      Instr::SetIf { dest, .. } => {
-        self.remove_arg(before, dest);
-      }
-      Instr::JumpIf { label, .. } => {
-        *before |= &mapping[label];
-      }
-      Instr::Call { arity, .. } => {
-        assert!(*arity <= 6);
-        for reg in Reg::caller_saved_regs() {
-          before.remove_reg(reg);
-        }
-        for reg in Reg::argument_regs().into_iter().take(*arity) {
-          before.add_reg(reg);
-        }
-      }
-      _ => unimplemented!("{:?}", ins),
-    }
-  }
-
-  fn remove_arg(&mut self, set: &mut LocationSet, arg: &Arg<IdxVar>) {
-    match arg {
-      Arg::Deref(reg, _) | Arg::Reg(reg) => {
-        set.remove_reg(*reg);
-      }
-      Arg::ByteReg(reg) => {
-        set.remove_reg((*reg).into());
-      }
-      Arg::Var(var) => {
-        let var = self.var_store.get(var.clone());
-        set.remove_var(var);
-      }
-      _ => {}
-    }
-  }
-
-  fn add_arg(&mut self, set: &mut LocationSet, arg: &Arg<IdxVar>) {
-    match arg {
-      Arg::Deref(reg, _) | Arg::Reg(reg) => {
-        set.add_reg(*reg);
-      }
-      Arg::ByteReg(reg) => {
-        set.add_reg((*reg).into());
-      }
-      Arg::Var(var) => {
-        let var = self.var_store.get(var.clone());
-        set.add_var(var);
-      }
-      _ => {}
-    }
-  }
+    .map(move |node| graph[node])
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
   use asm::Label;
+  use indexmap::IndexSet;
   use insta::assert_snapshot;
   use maplit::hashmap;
 

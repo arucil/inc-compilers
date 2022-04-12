@@ -16,7 +16,7 @@ pub fn compile(
   let prog = self::pass::typecheck::typecheck(prog)?;
   let prog = self::pass::shrink::shrink(prog);
   let prog = self::pass::uniquify::uniquify(prog);
-  let prog = self::pass::anf::anf(prog);
+  let prog = ch2::pass::remove_complex_operands::remove_complex_operands(prog);
   let prog = self::pass::explicate_control::explicate_control(prog);
   let prog = self::pass::select_instruction::select_instruction(prog);
   let prog = self::pass::liveness_analysis::analyze_liveness(

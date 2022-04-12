@@ -1,7 +1,6 @@
 ---
-source: ch4/src/pass/anf.rs
+source: ch4/src/pass/remove_complex_operands.rs
 expression: result.to_string_pretty()
-
 ---
 (let
  [a.0 42]

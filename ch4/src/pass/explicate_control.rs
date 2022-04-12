@@ -54,7 +54,7 @@ impl State {
 }
 
 pub fn explicate_control(mut prog: Program<IdxVar>) -> CProgram<CInfo> {
-  let locals = collect_locals(&prog);
+  let locals = ch2::pass::explicate_control::collect_locals(&prog);
   let mut state = State {
     blocks: vec![],
     label_index: 0,
@@ -91,7 +91,11 @@ fn remove_unreachable_blocks(
             worklist.push_back((*goto_label, goto_block));
           }
         }
-        CTail::If(_, _, _, goto_label1, goto_label2) => {
+        CTail::If {
+          conseq: goto_label1,
+          alt: goto_label2,
+          ..
+        } => {
           if let Some(goto_block) = blocks.remove(goto_label1) {
             worklist.push_back((*goto_label1, goto_block));
           }
@@ -107,53 +111,6 @@ fn remove_unreachable_blocks(
   }
 
   reachable_blocks.into_iter().collect()
-}
-
-fn collect_locals(prog: &Program<IdxVar>) -> IndexSet<IdxVar> {
-  let mut locals = IndexSet::new();
-  for (_, exp) in &prog.body {
-    collect_exp_locals(exp, &mut locals);
-  }
-  locals
-}
-
-fn collect_exp_locals(exp: &Exp<IdxVar>, locals: &mut IndexSet<IdxVar>) {
-  match exp {
-    Exp::Int(_) | Exp::Var(_) | Exp::Str(_) | Exp::Bool(_) => {}
-    Exp::Let { var, init, body } => {
-      locals.insert(var.1.clone());
-      collect_exp_locals(&init.1, locals);
-      collect_exp_locals(&body.1, locals);
-    }
-    Exp::Prim { op: _, args } => {
-      for (_, arg) in args {
-        collect_exp_locals(arg, locals);
-      }
-    }
-    Exp::If { cond, conseq, alt } => {
-      collect_exp_locals(&cond.1, locals);
-      collect_exp_locals(&conseq.1, locals);
-      collect_exp_locals(&alt.1, locals);
-    }
-    Exp::Set { var: _, exp } => {
-      collect_exp_locals(&exp.1, locals);
-    }
-    Exp::Begin { seq, last } => {
-      for exp in seq {
-        collect_exp_locals(&exp.1, locals);
-      }
-      collect_exp_locals(&last.1, locals);
-    }
-    Exp::While { cond, body } => {
-      collect_exp_locals(&cond.1, locals);
-      collect_exp_locals(&body.1, locals);
-    }
-    Exp::Print { val, ty: _ } => {
-      collect_exp_locals(&val.1, locals);
-    }
-    Exp::NewLine => {}
-    _ => unimplemented!("{:?}", exp),
-  }
 }
 
 fn explicate_tail(state: &mut State, exp: Exp<IdxVar>) -> CTail {
@@ -178,7 +135,7 @@ fn explicate_tail(state: &mut State, exp: Exp<IdxVar>) -> CTail {
       explicate_effect(state, seq.into_iter(), cont)
     }
     Exp::While { .. } | Exp::Set { .. } | Exp::NewLine => unreachable!(),
-    exp => unimplemented!("unsupported form {:?}", exp),
+    _ => unimplemented!("unsupported form {:?}", exp),
   }
 }
 
@@ -244,7 +201,13 @@ fn explicate_pred(
     Exp::Var(_) => {
       let conseq = state.tail_to_label(conseq);
       let alt = state.tail_to_label(alt);
-      CTail::If(CCmpOp::Eq, atom(cond), CAtom::Bool(false), alt, conseq)
+      CTail::If {
+        cmp: CCmpOp::Eq,
+        lhs: atom(cond),
+        rhs: CAtom::Bool(false),
+        conseq: alt,
+        alt: conseq,
+      }
     }
     Exp::Let { var, init, body } => {
       let cont = explicate_pred(state, body.1, conseq, alt);
@@ -258,9 +221,15 @@ fn explicate_pred(
       let conseq = state.tail_to_label(conseq);
       let alt = state.tail_to_label(alt);
       let cmp = op.1.parse().unwrap();
-      let arg2 = args.pop().unwrap().1;
-      let arg1 = args.pop().unwrap().1;
-      CTail::If(cmp, atom(arg1), atom(arg2), conseq, alt)
+      let rhs = args.pop().unwrap().1;
+      let lhs = args.pop().unwrap().1;
+      CTail::If {
+        cmp,
+        lhs: atom(lhs),
+        rhs: atom(rhs),
+        conseq,
+        alt,
+      }
     }
     Exp::If {
       cond: cond1,
@@ -336,7 +305,6 @@ fn explicate_exp_effect(
       };
       explicate_print(state, val.1, ty, cont)
     }
-    _ => panic!("unimplemented {:?}", exp),
   }
 }
 
@@ -429,6 +397,7 @@ fn prim(op: &str, mut args: Vec<(Range, Exp<IdxVar>)>) -> CPrim {
 mod tests {
   use super::super::*;
   use super::*;
+  use ch2::pass::remove_complex_operands;
   use insta::assert_snapshot;
 
   #[test]
@@ -437,7 +406,7 @@ mod tests {
       ast::parse(r#"(let ([y (let ([x 20]) (+ x (let ([x 22]) x)))]) y)"#)
         .unwrap();
     let prog = uniquify::uniquify(prog);
-    let prog = anf::anf(prog);
+    let prog = remove_complex_operands::remove_complex_operands(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -449,7 +418,7 @@ mod tests {
     )
     .unwrap();
     let prog = uniquify::uniquify(prog);
-    let prog = anf::anf(prog);
+    let prog = remove_complex_operands::remove_complex_operands(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -460,7 +429,7 @@ mod tests {
       ast::parse(r#"(if (> 3 (read)) (- 7 2) (- (let ([x 3]) (+ x (read)))))"#)
         .unwrap();
     let prog = uniquify::uniquify(prog);
-    let prog = anf::anf(prog);
+    let prog = remove_complex_operands::remove_complex_operands(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -480,7 +449,7 @@ mod tests {
     )
     .unwrap();
     let prog = uniquify::uniquify(prog);
-    let prog = anf::anf(prog);
+    let prog = remove_complex_operands::remove_complex_operands(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -489,7 +458,7 @@ mod tests {
   fn const_cond() {
     let prog = ast::parse(r#"(if (not #t) 1 2)"#).unwrap();
     let prog = uniquify::uniquify(prog);
-    let prog = anf::anf(prog);
+    let prog = remove_complex_operands::remove_complex_operands(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -501,7 +470,7 @@ mod tests {
     )
     .unwrap();
     let prog = uniquify::uniquify(prog);
-    let prog = anf::anf(prog);
+    let prog = remove_complex_operands::remove_complex_operands(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -511,7 +480,7 @@ mod tests {
     let prog =
       ast::parse(r#"(let ([x (eq? (read) 20)]) (if x 42 89))"#).unwrap();
     let prog = uniquify::uniquify(prog);
-    let prog = anf::anf(prog);
+    let prog = remove_complex_operands::remove_complex_operands(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -522,7 +491,7 @@ mod tests {
       ast::parse(r#"(if (and (eq? (read) 0) (eq? (read) 2)) 0 42)"#).unwrap();
     let prog = shrink::shrink(prog);
     let prog = uniquify::uniquify(prog);
-    let prog = anf::anf(prog);
+    let prog = remove_complex_operands::remove_complex_operands(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -547,7 +516,7 @@ mod tests {
     let prog = typecheck::typecheck(prog).unwrap();
     let prog = shrink::shrink(prog);
     let prog = uniquify::uniquify(prog);
-    let prog = anf::anf(prog);
+    let prog = remove_complex_operands::remove_complex_operands(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
   }

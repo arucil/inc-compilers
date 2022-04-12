@@ -218,9 +218,6 @@ fn typecheck_exp(
       Ok(((range, Exp::Print { val: box val, ty }), Type::Void))
     }
     Exp::NewLine => Ok(((range, Exp::NewLine), Type::Void)),
-    _ => {
-      panic!("unimplemented {:?}", exp);
-    }
   }
 }
 

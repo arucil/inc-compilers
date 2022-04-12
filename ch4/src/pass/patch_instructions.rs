@@ -140,6 +140,7 @@ mod tests {
   use super::*;
   use asm::{Label, Reg::*};
   use ast::*;
+  use ch2::pass::remove_complex_operands;
   use ch3::location_set::LocationSet;
   use insta::assert_snapshot;
   use maplit::hashmap;
@@ -150,7 +151,7 @@ mod tests {
       parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#)
         .unwrap();
     let prog = uniquify::uniquify(prog);
-    let prog = anf::anf(prog);
+    let prog = remove_complex_operands::remove_complex_operands(prog);
     let prog = explicate_control::explicate_control(prog);
     let prog = select_instruction::select_instruction(prog);
     let prog = liveness_analysis::analyze_liveness(
