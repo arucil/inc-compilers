@@ -1,110 +1,12 @@
-use super::liveness_analysis::Info as OldInfo;
-use asm::{Block, Instr, Program, Reg};
-use ast::IdxVar;
-use ch3::location_graph::LocationGraph;
-use ch3::location_set::{Location, LocationSet, VarStore};
-use ch3::pass::interference::{Info, Interference};
-
-pub fn build_interference(
-  mut prog: Program<OldInfo, IdxVar>,
-) -> Program<Info, IdxVar> {
-  let var_store = &mut prog.info.var_store;
-  let live = &prog.info.live;
-  let mut conflicts = LocationGraph::new();
-  for (label, block) in &prog.blocks {
-    build_graph(block, &live[label], var_store, &mut conflicts);
-  }
-
-  Program {
-    info: Info {
-      locals: prog.info.locals,
-      conflicts,
-      moves: LocationGraph::new(),
-      var_store: prog.info.var_store,
-    },
-    constants: prog.constants,
-    blocks: prog.blocks,
-  }
-}
-
-fn build_graph(
-  block: &Block<IdxVar>,
-  live: &[LocationSet],
-  var_store: &mut VarStore,
-  graph: &mut LocationGraph<Interference>,
-) {
-  for (i, instr) in block.code.iter().enumerate() {
-    add_instr_edges(instr, &live[i + 1], var_store, graph);
-  }
-}
-
-fn add_instr_edges(
-  instr: &Instr<IdxVar>,
-  after: &LocationSet,
-  var_store: &mut VarStore,
-  graph: &mut LocationGraph<Interference>,
-) {
-  let mut add = |write_loc: Location| {
-    let write_loc_node = graph.insert_node(write_loc);
-    for after_loc in after {
-      if after_loc != write_loc {
-        let after_loc_node = graph.insert_node(after_loc);
-        graph.add_edge(write_loc_node, after_loc_node);
-      }
-    }
-  };
-
-  match instr {
-    Instr::Add { dest, .. }
-    | Instr::Sub { dest, .. }
-    | Instr::Xor { dest, .. }
-    | Instr::SetIf { dest, .. }
-    | Instr::Neg(dest)
-    | Instr::Pop(dest) => {
-      if let Some(dest_loc) = Location::from_arg(dest.clone(), var_store) {
-        add(dest_loc);
-      }
-    }
-    Instr::Call { .. } => {
-      add(Reg::Rax.into());
-      add(Reg::Rcx.into());
-      add(Reg::Rdx.into());
-      add(Reg::Rsi.into());
-      add(Reg::Rdi.into());
-      add(Reg::R8.into());
-      add(Reg::R9.into());
-      add(Reg::R10.into());
-      add(Reg::R11.into());
-    }
-    Instr::Mov { src, dest } | Instr::Movzx { src, dest } => {
-      if let Some(dest_loc) = Location::from_arg(dest.clone(), var_store) {
-        let src_loc = Location::from_arg(src.clone(), var_store);
-        let dest_loc_node = graph.insert_node(dest_loc);
-        for after_loc in after {
-          if after_loc != dest_loc && Some(after_loc) != src_loc {
-            let after_loc_node = graph.insert_node(after_loc);
-            graph.add_edge(dest_loc_node, after_loc_node);
-          }
-        }
-      }
-    }
-    Instr::Push(_)
-    | Instr::Ret
-    | Instr::Syscall
-    | Instr::Jmp(_)
-    | Instr::JumpIf { .. }
-    | Instr::Cmp { .. } => {}
-    _ => {}
-  }
-}
-
 #[cfg(test)]
 mod tests {
   use super::super::*;
-  use super::*;
-  use asm::Label;
+  use asm::{Label, Program};
+  use ast::IdxVar;
   use ch2::pass::select_instruction::Info as OldOldInfo;
-  use indexmap::IndexSet;
+  use ch3::location_set::LocationSet;
+  use ch3::pass::interference;
+  use indexmap::indexset;
   use insta::assert_snapshot;
   use maplit::hashmap;
 
@@ -134,13 +36,21 @@ mod tests {
     };
     let prog = Program {
       info: OldOldInfo {
-        locals: IndexSet::new(),
+        locals: indexset! {
+          IdxVar::new("v"),
+          IdxVar::new("i"),
+          IdxVar::new("w"),
+          IdxVar::new("x"),
+          IdxVar::new("y"),
+          IdxVar::new("z"),
+          IdxVar::new("t"),
+        },
       },
       constants: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
-    let result = build_interference(prog);
+    let result = interference::build_interference(prog);
 
     assert_snapshot!(format!("{:?}", result.info));
   }
@@ -166,13 +76,16 @@ mod tests {
     };
     let prog = Program {
       info: OldOldInfo {
-        locals: IndexSet::new(),
+        locals: indexset! {
+          IdxVar::new("x"),
+          IdxVar::new("w"),
+        },
       },
       constants: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
-    let result = build_interference(prog);
+    let result = interference::build_interference(prog);
 
     assert_snapshot!(format!("{:?}", result.info));
   }
@@ -192,13 +105,19 @@ mod tests {
     let label_live = hashmap! {};
     let prog = Program {
       info: OldOldInfo {
-        locals: IndexSet::new(),
+        locals: indexset! {
+          IdxVar::new("t"),
+          IdxVar::new("x"),
+          IdxVar::new("y"),
+          IdxVar::new("z"),
+          IdxVar::new("w"),
+        },
       },
       constants: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
-    let result = build_interference(prog);
+    let result = interference::build_interference(prog);
 
     assert_snapshot!(format!("{:?}", result.info));
   }
@@ -241,13 +160,17 @@ block4:
     };
     let prog = Program {
       info: OldOldInfo {
-        locals: IndexSet::new(),
+        locals: indexset! {
+          IdxVar::new("tmp.0"),
+          IdxVar::new("x.0"),
+          IdxVar::new("tmp.1"),
+        },
       },
       constants: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
-    let result = build_interference(prog);
+    let result = interference::build_interference(prog);
 
     assert_snapshot!(format!("{:?}", result.info));
   }
@@ -289,13 +212,17 @@ block4:
     };
     let prog = Program {
       info: OldOldInfo {
-        locals: IndexSet::new(),
+        locals: indexset! {
+          IdxVar::new("x"),
+          IdxVar::new("y"),
+          IdxVar::new("z"),
+        },
       },
       constants: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
-    let result = build_interference(prog);
+    let result = interference::build_interference(prog);
 
     assert_snapshot!(format!("{:?}", result.info));
   }
@@ -362,13 +289,18 @@ block9:
     };
     let prog = Program {
       info: OldOldInfo {
-        locals: IndexSet::new(),
+        locals: indexset! {
+          IdxVar::new("x.0"),
+          IdxVar::new("y.1"),
+          IdxVar::new("tmp.1"),
+          IdxVar::new("tmp.0"),
+        },
       },
       constants: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
-    let result = build_interference(prog);
+    let result = interference::build_interference(prog);
 
     assert_snapshot!(format!("{:?}", result.info));
   }

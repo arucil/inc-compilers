@@ -16,7 +16,7 @@ pub fn compile(
   let prog = ch4::pass::typecheck::typecheck(prog)?;
   let prog = ch4::pass::shrink::shrink(prog);
   let prog = ch4::pass::uniquify::uniquify(prog);
-  let prog = ch4::pass::anf::anf(prog);
+  let prog = ch2::pass::remove_complex_operands::remove_complex_operands(prog);
   let prog = ch4::pass::explicate_control::explicate_control(prog);
   let prog = ch4::pass::select_instruction::select_instruction(prog);
   let prog = self::pass::liveness_analysis::analyze_liveness(
@@ -25,16 +25,16 @@ pub fn compile(
       Label::Conclusion => LocationSet::regs([Rax, Rbp])
     },
   );
-  let prog = ch4::pass::interference::build_interference(prog);
+  let prog = ch3::pass::interference::build_interference(prog);
   let prog = ch3::pass::move_biasing::build_move_graph(prog);
   let regs = regs.unwrap_or(&[
     Rbx, Rcx, Rdx, Rsi, Rdi, R8, R9, R10, R11, R12, R13, R14, R15,
   ]);
   let prog = ch3::pass::register_allocation::allocate_registers(prog, regs);
-  let mut prog = ch4::pass::patch_instructions::patch_instructions(prog);
+  let mut prog = ch2::pass::patch_instructions::patch_instructions(prog);
   add_prologue(&mut prog);
   add_epilogue(&mut prog);
-  let prog = ch4::pass::merge_jumps::merge_jumps(prog);
+  let prog = ch4::pass::merge_blocks::merge_blocks(prog);
 
   Ok(prog.to_nasm())
 }

@@ -85,7 +85,7 @@ fn prim(op: &str, mut args: Vec<(Range, Exp<IdxVar>)>) -> CPrim {
   }
 }
 
-fn collect_locals(prog: &Program<IdxVar>) -> IndexSet<IdxVar> {
+pub fn collect_locals(prog: &Program<IdxVar>) -> IndexSet<IdxVar> {
   let mut locals = IndexSet::new();
   for (_, exp) in &prog.body {
     collect_exp_locals(exp, &mut locals);
@@ -95,11 +95,7 @@ fn collect_locals(prog: &Program<IdxVar>) -> IndexSet<IdxVar> {
 
 fn collect_exp_locals(exp: &Exp<IdxVar>, locals: &mut IndexSet<IdxVar>) {
   match exp {
-    Exp::Int(_) => {}
-    Exp::Var(var) => {
-      locals.insert(var.clone());
-    }
-    Exp::Str(_) => {}
+    Exp::Int(_) | Exp::Var(_) | Exp::Str(_) | Exp::Bool(_) => {}
     Exp::Let { var, init, body } => {
       locals.insert(var.1.clone());
       collect_exp_locals(&init.1, locals);
@@ -110,7 +106,28 @@ fn collect_exp_locals(exp: &Exp<IdxVar>, locals: &mut IndexSet<IdxVar>) {
         collect_exp_locals(arg, locals);
       }
     }
-    _ => unimplemented!(),
+    Exp::If { cond, conseq, alt } => {
+      collect_exp_locals(&cond.1, locals);
+      collect_exp_locals(&conseq.1, locals);
+      collect_exp_locals(&alt.1, locals);
+    }
+    Exp::Set { var: _, exp } => {
+      collect_exp_locals(&exp.1, locals);
+    }
+    Exp::Begin { seq, last } => {
+      for exp in seq {
+        collect_exp_locals(&exp.1, locals);
+      }
+      collect_exp_locals(&last.1, locals);
+    }
+    Exp::While { cond, body } => {
+      collect_exp_locals(&cond.1, locals);
+      collect_exp_locals(&body.1, locals);
+    }
+    Exp::Print { val, ty: _ } => {
+      collect_exp_locals(&val.1, locals);
+    }
+    Exp::NewLine => {}
   }
 }
 

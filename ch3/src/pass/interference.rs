@@ -78,6 +78,7 @@ fn add_instr_edges(
     Instr::Add { dest, .. }
     | Instr::Sub { dest, .. }
     | Instr::Xor { dest, .. }
+    | Instr::SetIf { dest, .. }
     | Instr::Neg(dest)
     | Instr::Pop(dest) => {
       if let Some(dest_loc) = Location::from_arg(dest.clone(), var_store) {
@@ -110,7 +111,7 @@ fn add_instr_edges(
     | Instr::Syscall
     | Instr::Jmp(_)
     | Instr::JumpIf { .. } => {}
-    _ => todo!(),
+    _ => unimplemented!(),
   }
 }
 

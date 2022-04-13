@@ -1,8 +1,8 @@
 use asm::{Instr, Label, Program};
 use ast::IdxVar;
 use ch2::pass::select_instruction::Info as OldInfo;
-use ch3::location_set::LocationSet;
-use ch4::pass::liveness_analysis::{AnalysisState, Info as NewInfo};
+use ch3::location_set::{LocationSet, VarStore};
+use ch3::pass::liveness_analysis::{AnalysisState, Info as NewInfo};
 use indexmap::IndexMap;
 use petgraph::graph::NodeIndex;
 use petgraph::{Direction, Graph};
@@ -13,6 +13,11 @@ pub fn analyze_liveness(
   prog: Program<OldInfo, IdxVar>,
   label_live: HashMap<Label, LocationSet>,
 ) -> Program<NewInfo, IdxVar> {
+  let mut var_store = VarStore::new();
+  for var in &prog.info.locals {
+    var_store.insert(var.clone());
+  }
+
   let blocks: HashMap<_, _> = prog
     .blocks
     .iter()
@@ -40,7 +45,9 @@ pub fn analyze_liveness(
     }
   }
 
-  let mut state = AnalysisState::new();
+  let state = AnalysisState {
+    var_store: &var_store,
+  };
   let mut live = IndexMap::<Label, Vec<LocationSet>>::new();
 
   analyze_dataflow(
@@ -63,7 +70,7 @@ pub fn analyze_liveness(
     info: NewInfo {
       locals: prog.info.locals,
       live,
-      var_store: state.var_store,
+      var_store,
     },
     constants: prog.constants,
     blocks: prog.blocks,

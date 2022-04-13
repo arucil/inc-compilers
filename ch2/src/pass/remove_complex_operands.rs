@@ -24,6 +24,8 @@ struct TmpVar {
 /// `mon` stands for Monadic Normal Form.
 fn mon_exp(range: Range, exp: Exp<IdxVar>, counter: &mut usize) -> Exp<IdxVar> {
   match exp {
+    Exp::Int(..) => exp,
+    Exp::Var(..) => exp,
     Exp::Let { var, init, body } => Exp::Let {
       var,
       init: box (init.0, mon_exp(init.0, init.1, counter)),
@@ -52,7 +54,34 @@ fn mon_exp(range: Range, exp: Exp<IdxVar>, counter: &mut usize) -> Exp<IdxVar> {
         )
         .1
     }
-    exp => exp,
+    // ch4
+    Exp::If { cond, conseq, alt } => Exp::If {
+      cond: box (cond.0, mon_exp(cond.0, cond.1, counter)),
+      conseq: box (conseq.0, mon_exp(conseq.0, conseq.1, counter)),
+      alt: box (alt.0, mon_exp(alt.0, alt.1, counter)),
+    },
+    Exp::Set { var, exp } => Exp::Set {
+      var,
+      exp: box (exp.0, mon_exp(exp.0, exp.1, counter)),
+    },
+    Exp::Begin { seq, last } => Exp::Begin {
+      seq: seq
+        .into_iter()
+        .map(|exp| (exp.0, mon_exp(exp.0, exp.1, counter)))
+        .collect(),
+      last: box (last.0, mon_exp(last.0, last.1, counter)),
+    },
+    Exp::While { cond, body } => Exp::While {
+      cond: box (cond.0, mon_exp(cond.0, cond.1, counter)),
+      body: box (body.0, mon_exp(body.0, body.1, counter)),
+    },
+    Exp::Print { val, ty } => Exp::Print {
+      val: box (val.0, mon_exp(val.0, val.1, counter)),
+      ty,
+    },
+    Exp::Str(..) => exp,
+    Exp::Bool(..) => exp,
+    Exp::NewLine => exp,
   }
 }
 
@@ -78,20 +107,36 @@ fn atom_exp(
         .map(|(range, arg)| (range, atom_exp(range, arg, tmps, counter)))
         .collect();
       let exp = Exp::Prim { op, args };
-      let tmp = IdxVar {
-        name: "tmp".to_owned(),
-        index: *counter,
-      };
-      *counter += 1;
-      tmps.push(TmpVar {
-        range,
-        name: tmp.clone(),
-        init: exp,
-      });
-      Exp::Var(tmp)
+      assign_var(range, exp, tmps, counter)
     }
-    exp => exp,
+    Exp::Bool(..) | Exp::Int(..) | Exp::Var(..) => exp,
+    // ch4
+    Exp::If { .. } | Exp::Begin { .. } => {
+      let exp = mon_exp(range, exp, counter);
+      assign_var(range, exp, tmps, counter)
+    }
+    Exp::Str(..) => exp,
+    _ => unimplemented!("{:?}", exp),
   }
+}
+
+fn assign_var(
+  range: Range,
+  exp: Exp<IdxVar>,
+  tmps: &mut Vec<TmpVar>,
+  counter: &mut usize,
+) -> Exp<IdxVar> {
+  let tmp = IdxVar {
+    name: "tmp".to_owned(),
+    index: *counter,
+  };
+  *counter += 1;
+  tmps.push(TmpVar {
+    range,
+    name: tmp.clone(),
+    init: exp,
+  });
+  Exp::Var(tmp)
 }
 
 #[cfg(test)]

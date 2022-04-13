@@ -102,6 +102,15 @@ pub enum ByteReg {
   Dh,
 }
 
+impl<VAR: Clone> Arg<VAR> {
+  pub fn bytereg_to_reg(&self) -> Self {
+    match self {
+      Self::ByteReg(reg) => Self::Reg((*reg).into()),
+      _ => (*self).clone(),
+    }
+  }
+}
+
 impl<INFO: Debug, VAR: Debug> Program<INFO, VAR> {
   pub fn to_string_pretty(&self) -> String {
     let mut buf = format!("{:?}", self.info);

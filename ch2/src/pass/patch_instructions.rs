@@ -3,7 +3,7 @@ use asm::{Arg, Block, Instr, Program, Reg};
 pub fn patch_instructions<T>(prog: Program<T>) -> Program<T> {
   Program {
     info: prog.info,
-    constants: Default::default(),
+    constants: prog.constants,
     blocks: prog
       .blocks
       .into_iter()
@@ -65,7 +65,66 @@ fn patch_block(block: Block) -> Block {
           code.push(instr);
         }
       }
-      instr => {
+      Instr::Mov {
+        src: Arg::Imm(0),
+        dest: dest @ Arg::Reg(_),
+      } => {
+        code.push(Instr::Xor {
+          src: dest.clone(),
+          dest,
+        });
+      }
+      // ch4
+      Instr::Movzx { src, dest } if !matches!(dest, Arg::Reg(_)) => {
+        code.push(Instr::Movzx {
+          src,
+          dest: Arg::Reg(Reg::Rax),
+        });
+        code.push(Instr::Mov {
+          src: Arg::Reg(Reg::Rax),
+          dest,
+        })
+      }
+      Instr::Xor {
+        src: src @ Arg::Deref(..),
+        dest: dest @ Arg::Deref(..),
+      } => {
+        code.push(Instr::Mov {
+          src,
+          dest: Arg::Reg(Reg::Rax),
+        });
+        code.push(Instr::Xor {
+          src: Arg::Reg(Reg::Rax),
+          dest,
+        });
+      }
+      Instr::Cmp {
+        src: src @ Arg::Deref(..),
+        dest: dest @ Arg::Deref(..),
+      } => {
+        code.push(Instr::Mov {
+          src,
+          dest: Arg::Reg(Reg::Rax),
+        });
+        code.push(Instr::Cmp {
+          src: Arg::Reg(Reg::Rax),
+          dest,
+        });
+      }
+      Instr::Cmp {
+        src,
+        dest: dest @ Arg::Imm(_),
+      } => {
+        code.push(Instr::Mov {
+          src: dest,
+          dest: Arg::Reg(Reg::Rax),
+        });
+        code.push(Instr::Cmp {
+          src,
+          dest: Arg::Reg(Reg::Rax),
+        });
+      }
+      _ => {
         code.push(instr);
       }
     }

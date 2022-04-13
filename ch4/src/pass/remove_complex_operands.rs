@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
   use super::super::*;
-  use ch2::pass::remove_complex_operands;
   use ast::*;
+  use ch2::pass::remove_complex_operands;
   use insta::assert_snapshot;
 
   #[test]

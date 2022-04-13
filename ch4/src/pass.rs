@@ -1,9 +1,9 @@
-pub mod remove_complex_operands;
 pub mod explicate_control;
 pub mod interference;
 pub mod liveness_analysis;
-pub mod merge_jumps;
+pub mod merge_blocks;
 pub mod patch_instructions;
+pub mod remove_complex_operands;
 pub mod select_instruction;
 pub mod shrink;
 pub mod typecheck;

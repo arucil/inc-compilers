@@ -78,7 +78,7 @@ fn sort_blocks(
 mod tests {
   use super::*;
   use asm::Label;
-  use indexmap::IndexSet;
+  use indexmap::indexset;
   use insta::assert_snapshot;
   use maplit::hashmap;
 
@@ -137,7 +137,14 @@ mod tests {
     };
     let prog = Program {
       info: OldInfo {
-        locals: IndexSet::new(),
+        locals: indexset! {
+          IdxVar::new("v"),
+          IdxVar::new("w"),
+          IdxVar::new("x"),
+          IdxVar::new("y"),
+          IdxVar::new("z"),
+          IdxVar::new("t"),
+        },
       },
       constants: Default::default(),
       blocks,
@@ -166,7 +173,10 @@ mod tests {
     };
     let prog = Program {
       info: OldInfo {
-        locals: IndexSet::new(),
+        locals: indexset! {
+          IdxVar::new("x"),
+          IdxVar::new("w"),
+        },
       },
       constants: Default::default(),
       blocks,
@@ -197,7 +207,10 @@ mod tests {
     };
     let prog = Program {
       info: OldInfo {
-        locals: IndexSet::new(),
+        locals: indexset! {
+          IdxVar::new("x"),
+          IdxVar::new("w"),
+        },
       },
       constants: Default::default(),
       blocks,
@@ -225,7 +238,7 @@ mod tests {
     let label_live = HashMap::new();
     let prog = Program {
       info: OldInfo {
-        locals: IndexSet::new(),
+        locals: indexset! {},
       },
       constants: Default::default(),
       blocks,
@@ -272,7 +285,11 @@ mod tests {
     };
     let prog = Program {
       info: OldInfo {
-        locals: IndexSet::new(),
+        locals: indexset! {
+          IdxVar::new("x"),
+          IdxVar::new("y"),
+          IdxVar::new("z"),
+        },
       },
       constants: Default::default(),
       blocks,
@@ -321,7 +338,11 @@ block4:
     };
     let prog = Program {
       info: OldInfo {
-        locals: IndexSet::new(),
+        locals: indexset! {
+          IdxVar::new("tmp.0"),
+          IdxVar::new("x.0"),
+          IdxVar::new("tmp.1"),
+        },
       },
       constants: Default::default(),
       blocks,
@@ -393,7 +414,12 @@ block9:
     };
     let prog = Program {
       info: OldInfo {
-        locals: IndexSet::new(),
+        locals: indexset! {
+          IdxVar::new("x.0"),
+          IdxVar::new("y.1"),
+          IdxVar::new("tmp.1"),
+          IdxVar::new("tmp.0"),
+        },
       },
       constants: Default::default(),
       blocks,

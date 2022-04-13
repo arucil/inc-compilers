@@ -25,14 +25,13 @@ pub fn analyze_liveness(
 
   let state = AnalysisState {
     var_store: &var_store,
-    label_live: &label_live,
   };
 
   let live = prog
     .blocks
     .iter()
     .map(|(label, block)| {
-      let live = state.block_liveness(block);
+      let live = state.block_liveness(block, &label_live);
       (label.clone(), live)
     })
     .collect();
@@ -48,22 +47,30 @@ pub fn analyze_liveness(
   }
 }
 
-struct AnalysisState<'a> {
-  var_store: &'a VarStore,
-  label_live: &'a HashMap<Label, LocationSet>,
+pub struct AnalysisState<'a> {
+  pub var_store: &'a VarStore,
 }
 
 impl<'a> AnalysisState<'a> {
-  fn block_liveness(&self, block: &asm::Block<IdxVar>) -> Vec<LocationSet> {
+  pub fn block_liveness(
+    &self,
+    block: &asm::Block<IdxVar>,
+    label_live: &HashMap<Label, LocationSet>,
+  ) -> Vec<LocationSet> {
     let mut set = vec![LocationSet::new(); block.code.len() + 1];
     for (i, ins) in block.code.iter().enumerate().rev() {
       set[i] = set[i + 1].clone();
-      self.instr_liveness(ins, &mut set[i]);
+      self.instr_liveness(ins, &mut set[i], label_live);
     }
     set
   }
 
-  fn instr_liveness(&self, ins: &Instr<IdxVar>, before: &mut LocationSet) {
+  fn instr_liveness(
+    &self,
+    ins: &Instr<IdxVar>,
+    before: &mut LocationSet,
+    label_live: &HashMap<Label, LocationSet>,
+  ) {
     match ins {
       Instr::Ret => {}
       Instr::Syscall => {}
@@ -73,7 +80,9 @@ impl<'a> AnalysisState<'a> {
       Instr::Push(arg) => {
         self.add_arg(before, arg);
       }
-      Instr::Add { src, dest } | Instr::Sub { src, dest } => {
+      Instr::Add { src, dest }
+      | Instr::Sub { src, dest }
+      | Instr::Xor { src, dest } => {
         self.add_arg(before, src);
         self.add_arg(before, dest);
       }
@@ -83,11 +92,27 @@ impl<'a> AnalysisState<'a> {
           self.add_arg(before, src);
         }
       }
+      Instr::Movzx { src, dest } => {
+        if src.bytereg_to_reg() != dest.bytereg_to_reg() {
+          self.remove_arg(before, dest);
+          self.add_arg(before, src);
+        }
+      }
       Instr::Neg(dest) => {
         self.add_arg(before, dest);
       }
+      Instr::Cmp { src, dest } => {
+        self.add_arg(before, src);
+        self.add_arg(before, dest);
+      }
+      Instr::SetIf { dest, .. } => {
+        self.remove_arg(before, dest);
+      }
+      Instr::JumpIf { label, .. } => {
+        *before |= &label_live[label];
+      }
       Instr::Jmp(label) => {
-        *before = self.label_live[label].clone();
+        *before = label_live[label].clone();
       }
       Instr::Call { arity, .. } => {
         assert!(*arity <= 6);
@@ -107,6 +132,9 @@ impl<'a> AnalysisState<'a> {
       Arg::Deref(reg, _) | Arg::Reg(reg) => {
         set.remove_reg(*reg);
       }
+      Arg::ByteReg(reg) => {
+        set.remove_reg((*reg).into());
+      }
       Arg::Var(var) => {
         let var = self.var_store.get(var.clone());
         set.remove_var(var);
@@ -119,6 +147,9 @@ impl<'a> AnalysisState<'a> {
     match arg {
       Arg::Deref(reg, _) | Arg::Reg(reg) => {
         set.add_reg(*reg);
+      }
+      Arg::ByteReg(reg) => {
+        set.add_reg((*reg).into());
       }
       Arg::Var(var) => {
         let var = self.var_store.get(var.clone());

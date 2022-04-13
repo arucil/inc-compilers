@@ -1,8 +1,8 @@
 use super::explicate_control::CInfo;
-use asm::{Arg, Block, Instr, Label, Program, Reg};
+use asm::{Arg, Block, ByteReg, Instr, Label, Program, Reg};
 use ast::IdxVar;
 use control::*;
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use std::fmt::{self, Debug, Formatter};
 
 pub struct Info {
@@ -16,29 +16,37 @@ impl Debug for Info {
 }
 
 pub fn select_instruction(prog: CProgram<CInfo>) -> Program<Info, IdxVar> {
+  let mut constants = IndexMap::default();
   Program {
     info: Info {
       locals: prog.info.locals,
     },
-    constants: Default::default(),
     blocks: prog
       .body
       .into_iter()
-      .map(|(label, tail)| (label, tail_block(tail)))
+      .map(|(label, tail)| (label, tail_block(tail, &mut constants)))
       .collect(),
+    constants,
   }
 }
 
-fn tail_block(tail: CTail) -> Block<IdxVar> {
+pub fn tail_block(
+  tail: CTail,
+  constants: &mut IndexMap<String, String>,
+) -> Block<IdxVar> {
   let mut code = vec![];
-  tail_instructions(tail, &mut code);
+  tail_instructions(tail, &mut code, constants);
   Block {
     global: false,
     code,
   }
 }
 
-fn tail_instructions(mut tail: CTail, code: &mut Vec<Instr<IdxVar>>) {
+fn tail_instructions(
+  mut tail: CTail,
+  code: &mut Vec<Instr<IdxVar>>,
+  constants: &mut IndexMap<String, String>,
+) {
   loop {
     match tail {
       CTail::Return(exp) => {
@@ -47,18 +55,99 @@ fn tail_instructions(mut tail: CTail, code: &mut Vec<Instr<IdxVar>>) {
         return;
       }
       CTail::Seq(stmt, new_tail) => {
-        stmt_instructions(stmt, code);
+        stmt_instructions(stmt, code, constants);
         tail = *new_tail;
+      }
+      // ch4
+      CTail::Goto(label) => {
+        code.push(Instr::Jmp(label));
+        return;
+      }
+      CTail::If {
+        cmp,
+        lhs,
+        rhs,
+        conseq,
+        alt,
+      } => {
+        let lhs = atom_to_arg(lhs);
+        let rhs = atom_to_arg(rhs);
+        code.push(Instr::Cmp {
+          dest: lhs,
+          src: rhs,
+        });
+        code.push(Instr::JumpIf {
+          cmp: cmp.into(),
+          label: conseq,
+        });
+        code.push(Instr::Jmp(alt));
+        return;
       }
       _ => unimplemented!(),
     }
   }
 }
 
-fn stmt_instructions(stmt: CStmt, code: &mut Vec<Instr<IdxVar>>) {
+fn stmt_instructions(
+  stmt: CStmt,
+  code: &mut Vec<Instr<IdxVar>>,
+  constants: &mut IndexMap<String, String>,
+) {
   match stmt {
     CStmt::Assign { var, exp } => exp_instructions(Arg::Var(var), exp, code),
-    _ => unimplemented!(),
+    // ch4
+    CStmt::Print {
+      val,
+      ty: CType::Int,
+    } => {
+      exp_instructions(Arg::Reg(Reg::Rax), val, code);
+      code.push(Instr::Call {
+        label: "print_int".to_owned(),
+        arity: 0,
+      });
+    }
+    CStmt::Print {
+      val,
+      ty: CType::Bool,
+    } => {
+      exp_instructions(Arg::Reg(Reg::Rax), val, code);
+      code.push(Instr::Call {
+        label: "print_bool".to_owned(),
+        arity: 0,
+      });
+    }
+    CStmt::Print {
+      val,
+      ty: CType::Str,
+    } => match val {
+      CExp::Atom(CAtom::Str(s)) => {
+        let label = format!("const_{}", constants.len() + 1);
+        let len = s.len();
+        constants.insert(label.clone(), s);
+        code.push(Instr::Mov {
+          src: Arg::Label(label),
+          dest: Arg::Reg(Reg::Rsi),
+        });
+        code.push(Instr::Mov {
+          src: Arg::Imm(len as i64),
+          dest: Arg::Reg(Reg::Rdx),
+        });
+        code.push(Instr::Call {
+          label: "print_str".to_owned(),
+          arity: 0,
+        });
+      }
+      _ => unreachable!(),
+    },
+    CStmt::NewLine => code.push(Instr::Call {
+      label: "print_newline".to_owned(),
+      arity: 0,
+    }),
+    CStmt::Read => code.push(Instr::Call {
+      label: "read_int".to_owned(),
+      arity: 0,
+    }),
+    _ => unimplemented!("{:?}", stmt),
   }
 }
 
@@ -68,10 +157,18 @@ fn exp_instructions(
   code: &mut Vec<Instr<IdxVar>>,
 ) {
   match exp {
-    CExp::Atom(atom) => {
-      atom_instructions(target, atom, code);
-    }
-    CExp::Prim(CPrim::Read) => {
+    CExp::Atom(atom) => atom_instructions(target, atom, code),
+    CExp::Prim(prim) => prim_instructions(target, prim, code),
+  }
+}
+
+fn prim_instructions(
+  target: Arg<IdxVar>,
+  prim: CPrim,
+  code: &mut Vec<Instr<IdxVar>>,
+) {
+  match prim {
+    CPrim::Read => {
       code.push(Instr::Call {
         label: "read_int".to_owned(),
         arity: 0,
@@ -81,34 +178,60 @@ fn exp_instructions(
         dest: target,
       });
     }
-    CExp::Prim(CPrim::Neg(atom)) => {
+    CPrim::Neg(atom) => {
       atom_instructions(target.clone(), atom, code);
       code.push(Instr::Neg(target));
     }
-    CExp::Prim(CPrim::Add(atom1, atom2)) => {
+    CPrim::Add(atom1, atom2) => {
       atom_instructions(target.clone(), atom1, code);
-      let arg = match atom2 {
-        CAtom::Int(n) => Arg::Imm(n),
-        CAtom::Var(var) => Arg::Var(var),
-        _ => unimplemented!(),
-      };
+      let arg = atom_to_arg(atom2);
       code.push(Instr::Add {
         src: arg,
         dest: target,
       });
     }
-    CExp::Prim(CPrim::Sub(atom1, atom2)) => {
+    CPrim::Sub(atom1, atom2) => {
       atom_instructions(target.clone(), atom1, code);
-      let arg = match atom2 {
-        CAtom::Int(n) => Arg::Imm(n),
-        CAtom::Var(var) => Arg::Var(var),
-        _ => unimplemented!(),
-      };
+      let arg = atom_to_arg(atom2);
       code.push(Instr::Sub {
         src: arg,
         dest: target,
       });
     }
+    // ch4
+    CPrim::Not(atom) => {
+      atom_instructions(target.clone(), atom, code);
+      code.push(Instr::Xor {
+        src: Arg::Imm(1),
+        dest: target,
+      });
+    }
+    CPrim::Cmp(cmp, atom1, atom2) => {
+      let arg1 = atom_to_arg(atom1);
+      let arg2 = atom_to_arg(atom2);
+      code.push(Instr::Cmp {
+        dest: arg1,
+        src: arg2,
+      });
+      code.push(Instr::SetIf {
+        cmp: cmp.into(),
+        dest: Arg::ByteReg(ByteReg::Al),
+      });
+      code.push(Instr::Movzx {
+        src: Arg::ByteReg(ByteReg::Al),
+        dest: target,
+      });
+    }
+    _ => unimplemented!(),
+  }
+}
+
+fn atom_to_arg(atom: CAtom) -> Arg<IdxVar> {
+  match atom {
+    CAtom::Int(n) => Arg::Imm(n),
+    CAtom::Var(var) => Arg::Var(var),
+    CAtom::Bool(true) => Arg::Imm(1),
+    CAtom::Bool(false) => Arg::Imm(0),
     _ => unimplemented!(),
   }
 }
@@ -128,6 +251,19 @@ fn atom_instructions(
     CAtom::Var(var) => {
       code.push(Instr::Mov {
         src: Arg::Var(var),
+        dest: target,
+      });
+    }
+    // ch4
+    CAtom::Bool(true) => {
+      code.push(Instr::Mov {
+        src: Arg::Imm(1),
+        dest: target,
+      });
+    }
+    CAtom::Bool(false) => {
+      code.push(Instr::Mov {
+        src: Arg::Imm(0),
         dest: target,
       });
     }

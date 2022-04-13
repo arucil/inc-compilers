@@ -1,7 +1,7 @@
 use asm::{Block, Instr, Label, Program};
 use indexmap::IndexMap;
 
-pub fn merge_jumps<INFO>(prog: Program<INFO>) -> Program<INFO> {
+pub fn merge_blocks<INFO>(prog: Program<INFO>) -> Program<INFO> {
   let mut refs = IndexMap::<Label, usize>::new();
   let mut blocks = IndexMap::<Label, Block>::new();
   for (label, block) in prog.blocks {
