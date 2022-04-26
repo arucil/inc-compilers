@@ -79,6 +79,15 @@ pub fn analyze_liveness(
   }
 }
 
+/// `mapping` - initial map from labels to live label sets
+/// 
+/// `g` - control flow graph
+/// 
+/// `transfer` - apply the analysis to one block
+/// 
+/// `bottom` - bottom for the lattice of abstract states (location sets)
+/// 
+/// `join` - join operator for the lattice of abstract states
 pub fn analyze_dataflow<N, T, F, J>(
   mut mapping: HashMap<N, T>,
   g: Graph<N, ()>,
