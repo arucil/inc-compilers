@@ -14,25 +14,26 @@ pub enum Type {
   Void,
 }
 
-static PRIM_TYPES: Lazy<HashMap<&'static str, Vec<(Vec<Type>, Type)>>> =
-  Lazy::new(|| {
-    use Type::*;
-    hashmap! {
-      "+" => vec![(vec![Int, Int], Int)],
-      "-" => vec![
-        (vec![Int], Int),
-        (vec![Int, Int], Int)
-      ],
-      "read" => vec![(vec![], Int)],
-      "and" => vec![(vec![Bool, Bool], Bool)],
-      "or" => vec![(vec![Bool, Bool], Bool)],
-      "not" => vec![(vec![Bool], Bool)],
-      ">" => vec![(vec![Int, Int], Bool)],
-      ">=" => vec![(vec![Int, Int], Bool)],
-      "<" => vec![(vec![Int, Int], Bool)],
-      "<=" => vec![(vec![Int, Int], Bool)],
-    }
-  });
+type PrimType = Vec<(Vec<Type>, Type)>;
+
+static PRIM_TYPES: Lazy<HashMap<&'static str, PrimType>> = Lazy::new(|| {
+  use Type::*;
+  hashmap! {
+    "+" => vec![(vec![Int, Int], Int)],
+    "-" => vec![
+      (vec![Int], Int),
+      (vec![Int, Int], Int)
+    ],
+    "read" => vec![(vec![], Int)],
+    "and" => vec![(vec![Bool, Bool], Bool)],
+    "or" => vec![(vec![Bool, Bool], Bool)],
+    "not" => vec![(vec![Bool], Bool)],
+    ">" => vec![(vec![Int, Int], Bool)],
+    ">=" => vec![(vec![Int, Int], Bool)],
+    "<" => vec![(vec![Int, Int], Bool)],
+    "<=" => vec![(vec![Int, Int], Bool)],
+  }
+});
 
 pub fn typecheck(prog: Program) -> Result<Program> {
   let body = prog
@@ -61,6 +62,7 @@ fn typecheck_exp(
     Exp::Int(_) => Ok(((range, exp), Type::Int)),
     Exp::Bool(_) => Ok(((range, exp), Type::Bool)),
     Exp::Str(_) => Ok(((range, exp), Type::Str)),
+    Exp::Void => Ok(((range, exp), Type::Void)),
     Exp::Var(ref var) => {
       if let Some(&ty) = env.get(var) {
         Ok(((range, exp), ty))
@@ -78,7 +80,7 @@ fn typecheck_exp(
         .collect::<Result<Vec<_>>>()?;
       let arg_types = args.iter().map(|(_, ty)| *ty).collect::<Vec<_>>();
       let args = args.into_iter().map(|(arg, _)| arg).collect();
-      let ty = typecheck_op(range.clone(), op.1, &arg_types)?;
+      let ty = typecheck_op(range, op.1, &arg_types)?;
       Ok(((range, Exp::Prim { op, args }), ty))
     }
     Exp::Let { var, init, body } => {
@@ -238,7 +240,7 @@ fn typecheck_op(range: Range, op: &str, arg_types: &[Type]) -> Result<Type> {
     } else {
       Err(CompileError {
         range,
-        message: format!("arity mismatch"),
+        message: "arity mismatch".to_owned(),
       })
     }
   } else if let Some(tys) = PRIM_TYPES.get(&op) {
@@ -262,7 +264,7 @@ fn typecheck_op(range: Range, op: &str, arg_types: &[Type]) -> Result<Type> {
     } else {
       Err(CompileError {
         range,
-        message: format!("arity mismatch"),
+        message: "arity mismatch".to_owned(),
       })
     }
   } else {
@@ -323,7 +325,7 @@ mod tests {
       result,
       Err(CompileError {
         range: Range { start: 0, end: 29 },
-        message: format!("type mismatch, Int != Bool"),
+        message: "type mismatch, Int != Bool".to_owned(),
       })
     );
   }
@@ -336,7 +338,7 @@ mod tests {
       result,
       Err(CompileError {
         range: Range { start: 4, end: 10 },
-        message: format!("expected Bool, found Int"),
+        message: "expected Bool, found Int".to_owned(),
       })
     );
   }
@@ -349,7 +351,7 @@ mod tests {
       result,
       Err(CompileError {
         range: Range { start: 0, end: 2 },
-        message: format!("variable x1 not found"),
+        message: "variable x1 not found".to_owned(),
       })
     );
   }
@@ -362,7 +364,7 @@ mod tests {
       result,
       Err(CompileError {
         range: Range { start: 0, end: 16 },
-        message: format!("type mismatch, Bool != Int"),
+        message: "type mismatch, Bool != Int".to_owned(),
       })
     );
   }
@@ -375,7 +377,7 @@ mod tests {
       result,
       Err(CompileError {
         range: Range { start: 7, end: 16 },
-        message: format!("arity mismatch"),
+        message: "arity mismatch".to_owned(),
       })
     );
   }
@@ -388,7 +390,7 @@ mod tests {
       result,
       Err(CompileError {
         range: Range { start: 0, end: 14 },
-        message: format!("invalid \"+\" operation"),
+        message: "invalid \"+\" operation".to_owned(),
       })
     );
   }
@@ -408,7 +410,7 @@ mod tests {
       result.map(|_| ()),
       Err(CompileError {
         range: Range { start: 0, end: 30 },
-        message: format!("expected Int, found Void"),
+        message: "expected Int, found Void".to_owned(),
       })
     );
   }
@@ -421,7 +423,7 @@ mod tests {
       result.map(|_| ()),
       Err(CompileError {
         range: Range { start: 0, end: 37 },
-        message: format!("expected Int, found Bool"),
+        message: "expected Int, found Bool".to_owned(),
       })
     );
   }
@@ -435,7 +437,7 @@ mod tests {
       result.map(|_| ()),
       Err(CompileError {
         range: Range { start: 0, end: 50 },
-        message: format!("expected Int, found Void"),
+        message: "expected Int, found Void".to_owned(),
       })
     );
   }
@@ -449,7 +451,7 @@ mod tests {
       result.map(|_| ()),
       Err(CompileError {
         range: Range { start: 20, end: 27 },
-        message: format!("expected Bool, found Int"),
+        message: "expected Bool, found Int".to_owned(),
       })
     );
   }

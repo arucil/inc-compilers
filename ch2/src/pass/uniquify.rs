@@ -70,6 +70,7 @@ pub fn uniquify_exp(
       alt: box (alt.0, uniquify_exp(*alt, env, counter)?),
     }),
     Exp::Str(s) => Ok(Exp::Str(s)),
+    // ch5
     Exp::Set { var, exp } => Ok(Exp::Set {
       var: (
         var.0,
@@ -91,6 +92,7 @@ pub fn uniquify_exp(
       cond: box (cond.0, uniquify_exp(*cond, env, counter)?),
       body: box (body.0, uniquify_exp(*body, env, counter)?),
     }),
+    Exp::Void => Ok(Exp::Void),
     Exp::Print { val, ty } => Ok(Exp::Print {
       val: box (val.0, uniquify_exp(*val, env, counter)?),
       ty,

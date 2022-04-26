@@ -6,10 +6,10 @@ pub fn merge_blocks<INFO>(prog: Program<INFO>) -> Program<INFO> {
   let mut blocks = IndexMap::<Label, Block>::new();
   for (label, block) in prog.blocks {
     if let Instr::Jmp(label) = block.code.last().unwrap() {
-      *refs.entry(label.clone()).or_default() += 1;
+      *refs.entry(*label).or_default() += 1;
       if block.code.len() > 1 {
         if let Instr::JumpIf { label, .. } = &block.code[block.code.len() - 2] {
-          *refs.entry(label.clone()).or_default() += 1;
+          *refs.entry(*label).or_default() += 1;
         }
       }
     }
@@ -36,15 +36,13 @@ pub fn merge_blocks<INFO>(prog: Program<INFO>) -> Program<INFO> {
         let mut next_block = blocks.remove(&next_label).unwrap();
         block.code.pop();
         block.code.append(&mut next_block.code);
+      } else if let Some(next_block) = blocks.remove(&next_label) {
+        block.code.pop();
+        new_blocks.push((label, block));
+        label = next_label;
+        block = next_block;
       } else {
-        if let Some(next_block) = blocks.remove(&next_label) {
-          block.code.pop();
-          new_blocks.push((label, block));
-          label = next_label;
-          block = next_block;
-        } else {
-          break;
-        }
+        break;
       }
     }
     new_blocks.push((label, block));

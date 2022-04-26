@@ -18,6 +18,12 @@ pub struct VarStore(IndexMap<IdxVar, Var>);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Var(usize);
 
+impl Default for LocationSet {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl LocationSet {
   pub fn new() -> Self {
     Self(SmallVec::new())
@@ -70,7 +76,7 @@ impl LocationSet {
   }
 
   pub fn iter(&self) -> LocationIter {
-    let current = if self.0.len() > 0 { self.0[0] } else { 0 };
+    let current = if self.0.is_empty() { 0 } else { self.0[0] };
     LocationIter {
       set: self,
       index: 0,
@@ -141,6 +147,12 @@ fn reg_index(reg: Reg) -> usize {
 
 fn var_index(var: Var) -> usize {
   var.0 + 16
+}
+
+impl Default for VarStore {
+  fn default() -> Self {
+    Self::new()
+  }
 }
 
 impl VarStore {

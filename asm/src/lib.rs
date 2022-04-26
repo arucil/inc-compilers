@@ -2,6 +2,7 @@
 
 use indexmap::IndexMap;
 use num_derive::{FromPrimitive, ToPrimitive};
+use std::cmp::Ordering;
 use std::fmt::{self, Debug, Formatter, Write};
 use std::iter::IntoIterator;
 
@@ -122,9 +123,9 @@ impl<INFO: Debug, VAR: Debug> Program<INFO, VAR> {
   }
 
   pub fn to_nasm(&self) -> String {
-    let mut buf = format!(
+    let mut buf =
       "extern read_int, print_int, print_str, print_bool, print_newline\n"
-    );
+        .to_owned();
     if !self.constants.is_empty() {
       buf += "section .rodata\n";
       for (name, str) in &self.constants {
@@ -190,15 +191,11 @@ impl<VAR: Debug> Debug for Arg<VAR> {
     match self {
       Self::Imm(n) => write!(f, "{}", n),
       Self::Var(var) => var.fmt(f),
-      Self::Deref(r, i) => {
-        if *i > 0 {
-          write!(f, "qword [{:?} + {}]", r, i)
-        } else if *i == 0 {
-          write!(f, "qword [{:?}]", r)
-        } else {
-          write!(f, "qword [{:?} - {}]", r, -i)
-        }
-      }
+      Self::Deref(r, i) => match i.cmp(&0) {
+        Ordering::Greater => write!(f, "qword [{:?} + {}]", r, i),
+        Ordering::Equal => write!(f, "qword [{:?}]", r),
+        Ordering::Less => write!(f, "qword [{:?} - {}]", r, -i),
+      },
       Self::Reg(r) => r.fmt(f),
       Self::ByteReg(r) => r.fmt(f),
       Self::Label(l) => write!(f, "{}", l),
@@ -208,16 +205,16 @@ impl<VAR: Debug> Debug for Arg<VAR> {
 
 impl Reg {
   pub fn is_callee_saved(&self) -> bool {
-    match self {
+    matches!(
+      self,
       Reg::Rsp
-      | Reg::Rbp
-      | Reg::Rbx
-      | Reg::R12
-      | Reg::R13
-      | Reg::R14
-      | Reg::R15 => true,
-      _ => false,
-    }
+        | Reg::Rbp
+        | Reg::Rbx
+        | Reg::R12
+        | Reg::R13
+        | Reg::R14
+        | Reg::R15
+    )
   }
 
   pub fn caller_saved_regs() -> impl IntoIterator<Item = Self> {
@@ -334,8 +331,8 @@ fn parse_label(label: &str) -> Label {
     "start" => Label::Start,
     "_start" => Label::EntryPoint,
     _ => {
-      if label.starts_with("block") {
-        Label::Tmp(label[5..].parse().unwrap())
+      if let Some(index) = label.strip_prefix("block") {
+        Label::Tmp(index.parse().unwrap())
       } else {
         panic!("invalid label {}", label)
       }
@@ -359,8 +356,8 @@ pub fn parse_code<VAR: Clone>(
       let delim = arg.find(|c: char| !c.is_alphanumeric()).unwrap();
       let reg = Reg::from_str(&arg[..delim]).unwrap();
       let arg = arg[delim..].trim();
-      let off = if arg.starts_with('-') {
-        -arg[1..].trim().parse::<i32>().unwrap()
+      let off = if let Some(offset) = arg.strip_prefix('-') {
+        -offset.trim().parse::<i32>().unwrap()
       } else {
         arg[1..].trim().parse::<i32>().unwrap()
       };
@@ -463,7 +460,7 @@ pub fn parse_code<VAR: Clone>(
               cmp,
               dest: args[0].clone(),
             }
-          } else if ops[0].starts_with("j") {
+          } else if ops[0].starts_with('j') {
             let cmp = CmpResult::from_str(&ops[0][1..]).unwrap();
             let label = parse_label(ops[1]);
             Instr::JumpIf { cmp, label }

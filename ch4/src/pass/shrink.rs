@@ -60,14 +60,14 @@ fn shrink_exp((range, exp): (Range, Exp)) -> (Range, Exp) {
           Exp::If {
             cond: box args[0].clone(),
             conseq: box args[1].clone(),
-            alt: box (range.clone(), Exp::Bool(false)),
+            alt: box (range, Exp::Bool(false)),
           },
         ),
         "or" => (
           range,
           Exp::If {
             cond: box args[0].clone(),
-            conseq: box (range.clone(), Exp::Bool(true)),
+            conseq: box (range, Exp::Bool(true)),
             alt: box args[1].clone(),
           },
         ),

@@ -35,10 +35,10 @@ fn pe_prim(op: (Range, &'static str), args: Vec<(Range, Exp)>) -> Exp {
     ("+", [(_, Exp::Int(a)), (_, Exp::Int(b))]) => Exp::Int(*a + *b),
     ("-", [(_, Exp::Int(a)), (_, Exp::Int(b))]) => Exp::Int(*a - *b),
     ("+", [(range1, Exp::Int(a)), rhs] | [rhs, (range1, Exp::Int(a))]) => {
-      pe_add(op.0, (range1.clone(), *a), rhs.clone())
+      pe_add(op.0, (*range1, *a), rhs.clone())
     }
     ("-", [(range1, Exp::Int(a)), rhs]) => {
-      pe_sub(op.0, (range1.clone(), *a), rhs.clone())
+      pe_sub(op.0, (*range1, *a), rhs.clone())
     }
     ("-", [(_, Exp::Int(a))]) => Exp::Int(-*a),
     _ => Exp::Prim { op, args },

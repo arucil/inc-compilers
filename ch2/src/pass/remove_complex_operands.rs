@@ -60,6 +60,8 @@ fn mon_exp(range: Range, exp: Exp<IdxVar>, counter: &mut usize) -> Exp<IdxVar> {
       conseq: box (conseq.0, mon_exp(conseq.0, conseq.1, counter)),
       alt: box (alt.0, mon_exp(alt.0, alt.1, counter)),
     },
+    Exp::Bool(..) => exp,
+    // ch5
     Exp::Set { var, exp } => Exp::Set {
       var,
       exp: box (exp.0, mon_exp(exp.0, exp.1, counter)),
@@ -75,12 +77,12 @@ fn mon_exp(range: Range, exp: Exp<IdxVar>, counter: &mut usize) -> Exp<IdxVar> {
       cond: box (cond.0, mon_exp(cond.0, cond.1, counter)),
       body: box (body.0, mon_exp(body.0, body.1, counter)),
     },
+    Exp::Void => exp,
     Exp::Print { val, ty } => Exp::Print {
       val: box (val.0, mon_exp(val.0, val.1, counter)),
       ty,
     },
     Exp::Str(..) => exp,
-    Exp::Bool(..) => exp,
     Exp::NewLine => exp,
   }
 }

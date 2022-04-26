@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use crate::{Exp, PrintType, Program};
 use support::{CompileError, Range};
 
@@ -70,7 +72,7 @@ impl<'a> Parser<'a> {
             None => {
               return Err(CompileError {
                 range: (start, self.i).into(),
-                message: format!("unclosed string"),
+                message: "unclosed string".to_owned(),
               })
             }
             _ => {}
@@ -92,7 +94,7 @@ impl<'a> Parser<'a> {
           _ => {
             return Err(CompileError {
               range: (start, self.i).into(),
-              message: format!("unrecognized hashtag"),
+              message: "unrecognized hashtag".to_owned(),
             })
           }
         };
@@ -148,7 +150,7 @@ impl<'a> Parser<'a> {
       Token::SymOrNum => self.parse_sym(self.token.0),
       Token::Eof => Err(CompileError {
         range: self.token.0,
-        message: format!("unexpected EOF"),
+        message: "unexpected EOF".to_owned(),
       }),
       Token::Punc(c) => Err(CompileError {
         range: self.token.0,
@@ -168,15 +170,15 @@ impl<'a> Parser<'a> {
       use std::num::IntErrorKind;
       if let IntErrorKind::PosOverflow | IntErrorKind::NegOverflow = err.kind()
       {
-        return Err(CompileError {
+        Err(CompileError {
           range,
-          message: format!("integer overflow"),
-        });
+          message: "integer overflow".to_owned(),
+        })
       } else {
-        return Ok(Cst::Symbol(range));
+        Ok(Cst::Symbol(range))
       }
     } else {
-      return Ok(Cst::Number(range));
+      Ok(Cst::Number(range))
     }
   }
 
@@ -218,8 +220,9 @@ fn build_exp(input: &str, cst: Cst) -> Result<(Range, Exp)> {
           "set!" => build_set(input, xs, range),
           "while" => build_while(input, xs, range),
           "print" => build_print(input, xs, range),
+          "void" => build_void(input, xs, range),
           _ => {
-            const OPERATORS: &[&'static str] = &[
+            const OPERATORS: &[&str] = &[
               "read", "+", "-", "and", "or", "not", "eq?", ">", "<", ">=", "<=",
             ];
             if let Some(&op) = OPERATORS.iter().find(|&&s| s == op) {
@@ -233,16 +236,16 @@ fn build_exp(input: &str, cst: Cst) -> Result<(Range, Exp)> {
             } else {
               Err(CompileError {
                 range,
-                message: format!("unrecognized form"),
+                message: "unrecognized form".to_owned(),
               })
             }
           }
         }
       } else {
-        return Err(CompileError {
+        Err(CompileError {
           range,
-          message: format!("unrecognized form"),
-        });
+          message: "unrecognized form".to_owned(),
+        })
       }
     }
     Cst::Symbol(range) => {
@@ -260,7 +263,7 @@ fn build_exp(input: &str, cst: Cst) -> Result<(Range, Exp)> {
             _ => {
               return Err(CompileError {
                 range: (range.start + i, range.start + i + 2).into(),
-                message: format!("unrecognized escape sequence"),
+                message: "unrecognized escape sequence".to_owned(),
               })
             }
           });
@@ -320,19 +323,19 @@ fn build_let(
               } else {
                 Err(CompileError {
                   range,
-                  message: format!("invalid let form"),
+                  message: "invalid let form".to_owned(),
                 })
               }
             } else {
               Err(CompileError {
                 range,
-                message: format!("invalid let form"),
+                message: "invalid let form".to_owned(),
               })
             }
           } else {
             Err(CompileError {
               range,
-              message: format!("invalid let form"),
+              message: "invalid let form".to_owned(),
             })
           }
         })
@@ -340,7 +343,7 @@ fn build_let(
     } else {
       return Err(CompileError {
         range,
-        message: format!("invalid let form"),
+        message: "invalid let form".to_owned(),
       });
     };
     Ok(inits.into_iter().rev().fold(body, |body, (var, init)| {
@@ -356,7 +359,7 @@ fn build_let(
   } else {
     Err(CompileError {
       range,
-      message: format!("invalid let form"),
+      message: "invalid let form".to_owned(),
     })
   }
 }
@@ -381,7 +384,7 @@ fn build_if(
   } else {
     Err(CompileError {
       range,
-      message: format!("invalid if form"),
+      message: "invalid if form".to_owned(),
     })
   }
 }
@@ -408,7 +411,7 @@ fn build_begin(
   } else {
     Err(CompileError {
       range,
-      message: format!("invalid begin form"),
+      message: "invalid begin form".to_owned(),
     })
   }
 }
@@ -432,13 +435,13 @@ fn build_set(
     } else {
       Err(CompileError {
         range,
-        message: format!("invalid set! form"),
+        message: "invalid set! form".to_owned(),
       })
     }
   } else {
     Err(CompileError {
       range,
-      message: format!("invalid set! form"),
+      message: "invalid set! form".to_owned(),
     })
   }
 }
@@ -448,45 +451,47 @@ fn build_while(
   mut xs: Vec<Cst>,
   range: Range,
 ) -> Result<(Range, Exp)> {
-  if xs.len() == 3 {
-    let body = build_exp(input, xs.pop().unwrap())?;
-    let cond = build_exp(input, xs.pop().unwrap())?;
-    Ok((
+  match xs.len().cmp(&3) {
+    Ordering::Equal => {
+      let body = build_exp(input, xs.pop().unwrap())?;
+      let cond = build_exp(input, xs.pop().unwrap())?;
+      Ok((
+        range,
+        Exp::While {
+          cond: box cond,
+          body: box body,
+        },
+      ))
+    }
+    Ordering::Greater => {
+      let last = build_exp(input, xs.pop().unwrap())?;
+      let seq: Vec<_> = xs
+        .drain(2..)
+        .map(|exp| build_exp(input, exp))
+        .collect::<Result<_>>()?;
+      let seq_range = Range {
+        start: seq[0].0.start,
+        end: seq.last().unwrap().0.end,
+      };
+      let cond = build_exp(input, xs.pop().unwrap())?;
+      Ok((
+        range,
+        Exp::While {
+          cond: box cond,
+          body: box (
+            seq_range,
+            Exp::Begin {
+              seq,
+              last: box last,
+            },
+          ),
+        },
+      ))
+    }
+    Ordering::Less => Err(CompileError {
       range,
-      Exp::While {
-        cond: box cond,
-        body: box body,
-      },
-    ))
-  } else if xs.len() > 3 {
-    let last = build_exp(input, xs.pop().unwrap())?;
-    let seq: Vec<_> = xs
-      .drain(2..)
-      .map(|exp| build_exp(input, exp))
-      .collect::<Result<_>>()?;
-    let seq_range = Range {
-      start: seq[0].0.start,
-      end: seq.last().unwrap().0.end,
-    };
-    let cond = build_exp(input, xs.pop().unwrap())?;
-    Ok((
-      range,
-      Exp::While {
-        cond: box cond,
-        body: box (
-          seq_range,
-          Exp::Begin {
-            seq,
-            last: box last,
-          },
-        ),
-      },
-    ))
-  } else {
-    Err(CompileError {
-      range,
-      message: format!("invalid while form"),
-    })
+      message: "invalid while form".to_owned(),
+    }),
   }
 }
 
@@ -543,6 +548,21 @@ fn build_print(
   }
 }
 
+fn build_void(
+  _: &str,
+  xs: Vec<Cst>,
+  range: Range,
+) -> Result<(Range, Exp)> {
+  if xs.len() == 1 {
+    Ok((range, Exp::Void))
+  } else {
+    Err(CompileError {
+      range,
+      message: "too many arguments".to_owned(),
+    })
+  }
+}
+
 pub fn parse<S: AsRef<str>>(input: S) -> Result<Program> {
   let input = input.as_ref();
   let cst = Parser::new(input).parse()?;
@@ -573,7 +593,7 @@ mod tests {
     let result = Parser::new(r#"123456789012345678901234567890"#).parse();
     let err = CompileError {
       range: (0, 30).into(),
-      message: format!("integer overflow"),
+      message: "integer overflow".to_owned(),
     };
     assert_eq!(result, Result::Err(err));
   }

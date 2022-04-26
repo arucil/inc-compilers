@@ -223,14 +223,14 @@ impl FromStr for CCmpOp {
   }
 }
 
-impl Into<CmpResult> for CCmpOp {
-  fn into(self) -> CmpResult {
-    match self {
-      CCmpOp::Eq => CmpResult::Eq,
-      CCmpOp::Gt => CmpResult::Gt,
-      CCmpOp::Ge => CmpResult::Ge,
-      CCmpOp::Lt => CmpResult::Lt,
-      CCmpOp::Le => CmpResult::Le,
+impl From<CCmpOp> for CmpResult {
+  fn from(x: CCmpOp) -> Self {
+    match x {
+      CCmpOp::Eq => Self::Eq,
+      CCmpOp::Gt => Self::Gt,
+      CCmpOp::Ge => Self::Ge,
+      CCmpOp::Lt => Self::Lt,
+      CCmpOp::Le => Self::Le,
     }
   }
 }

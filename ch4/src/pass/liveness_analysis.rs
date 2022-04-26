@@ -52,7 +52,7 @@ fn sort_blocks(
     nodes.insert(*label, ix);
   }
 
-  for (_, node) in &nodes {
+  for node in nodes.values() {
     let last = graph[*node].1.code.last().unwrap().clone();
     if let Instr::Jmp(label) = last {
       if let Some(&node1) = nodes.get(&label) {
@@ -92,9 +92,9 @@ mod tests {
       for (label, block) in &self.blocks {
         buf += &format!("{:?}:\n", label);
         let live = &self.info.live[label];
-        for i in 0..block.code.len() {
+        for (i, l) in live.iter().enumerate().take(block.code.len()) {
           buf += "                    ";
-          live[i].write(&mut buf, &self.info.var_store).unwrap();
+          l.write(&mut buf, &self.info.var_store).unwrap();
           buf += "\n";
           buf += &format!("    {:?}", block.code[i]);
           buf += "\n";

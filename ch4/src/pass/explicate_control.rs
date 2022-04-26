@@ -266,7 +266,7 @@ fn explicate_exp_effect(
   cont: CTail,
 ) -> CTail {
   match exp {
-    Exp::Bool(_) | Exp::Int(_) | Exp::Var(_) | Exp::Str(_) => cont,
+    Exp::Bool(_) | Exp::Int(_) | Exp::Var(_) | Exp::Str(_) | Exp::Void => cont,
     Exp::Prim {
       op: (_, "read"),
       args: _,
@@ -340,7 +340,7 @@ fn explicate_print(
     Exp::If { cond, conseq, alt } => {
       let cont = state.tail_to_goto(cont);
       let conseq = explicate_print(state, conseq.1, ty, cont.clone());
-      let alt = explicate_print(state, alt.1, ty, cont.clone());
+      let alt = explicate_print(state, alt.1, ty, cont);
       explicate_pred(state, cond.1, conseq, alt)
     }
     Exp::Begin { seq, last } => {

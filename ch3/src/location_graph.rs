@@ -15,6 +15,12 @@ pub struct NodeIndex<T> {
   _marker: PhantomData<T>,
 }
 
+impl<T> Default for LocationGraph<T> {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl<T> LocationGraph<T> {
   pub fn new() -> Self {
     Self {

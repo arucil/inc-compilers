@@ -37,7 +37,7 @@ pub fn allocate_registers(
     .enumerate()
     .map(|(i, &reg)| (reg, i as _))
     .collect();
-  let mut var_store = prog.info.var_store;
+  let var_store = prog.info.var_store;
   let conflicts = prog.info.conflicts;
   let moves = prog.info.moves;
   let locals: Vec<_> = prog
@@ -47,22 +47,22 @@ pub fn allocate_registers(
     .map(|var| var_store.get(var.clone()))
     .collect();
   let mut max_locals = 0;
-  let mut used_callee_saved_regs = IndexSet::new();
+
+  let mut alloc = RegisterAlloc {
+    locals: &locals,
+    var_store,
+    conflicts: &conflicts,
+    moves: &moves,
+    reg_colors: &reg_colors,
+    available_regs,
+    used_callee_saved_regs: IndexSet::new(),
+  };
 
   let blocks = prog
     .blocks
     .into_iter()
     .map(|(label, block)| {
-      let (block, locals) = allocate_registers_block(
-        block,
-        &locals,
-        &mut var_store,
-        &conflicts,
-        &moves,
-        &reg_colors,
-        available_regs,
-        &mut used_callee_saved_regs,
-      );
+      let (block, locals) = alloc.allocate_registers_block(block);
       if locals > max_locals {
         max_locals = locals;
       }
@@ -74,116 +74,120 @@ pub fn allocate_registers(
     info: Info {
       locals: prog.info.locals,
       stack_space: max_locals * 8,
-      used_callee_saved_regs,
+      used_callee_saved_regs: alloc.used_callee_saved_regs,
     },
     constants: prog.constants,
     blocks,
   }
 }
 
-fn allocate_registers_block(
-  block: Block<IdxVar>,
-  locals: &[Var],
-  var_store: &mut VarStore,
-  conflicts: &LocationGraph<Interference>,
-  moves: &LocationGraph<Moves>,
-  reg_colors: &HashMap<Reg, u32>,
-  available_regs: &[Reg],
-  used_callee_saved_regs: &mut IndexSet<Reg>,
-) -> (Block, usize) {
-  let var_colors = color_graph(conflicts, moves, locals, reg_colors);
-
-  for (_, c) in &var_colors {
-    if let Some(&reg) = available_regs.get(c.0 as usize) {
-      if reg.is_callee_saved() {
-        used_callee_saved_regs.insert(reg);
-      }
-    }
-  }
-
-  let block = Block {
-    global: block.global,
-    code: block
-      .code
-      .into_iter()
-      .map(|instr| {
-        assign_instr_var(instr, var_store, &var_colors, available_regs)
-      })
-      .collect(),
-  };
-
-  let num_locals = var_colors
-    .values()
-    .filter(|c| c.0 as usize >= reg_colors.len())
-    .collect::<HashSet<_>>()
-    .len();
-
-  (block, num_locals)
+struct RegisterAlloc<'a> {
+  locals: &'a [Var],
+  var_store: VarStore,
+  conflicts: &'a LocationGraph<Interference>,
+  moves: &'a LocationGraph<Moves>,
+  reg_colors: &'a HashMap<Reg, u32>,
+  available_regs: &'a [Reg],
+  used_callee_saved_regs: IndexSet<Reg>,
 }
 
-fn assign_instr_var(
-  instr: Instr<IdxVar>,
-  var_store: &mut VarStore,
-  var_colors: &IndexMap<Var, Color>,
-  available_regs: &[Reg],
-) -> Instr {
-  let assign = |arg: Arg<IdxVar>| match arg {
-    Arg::Deref(reg, i) => Arg::Deref(reg, i),
-    Arg::Reg(reg) => Arg::Reg(reg),
-    Arg::Imm(i) => Arg::Imm(i),
-    Arg::Var(var) => {
-      let i = var_colors[&var_store.get(var)].0 as usize;
-      if let Some(&reg) = available_regs.get(i) {
-        Arg::Reg(reg)
-      } else {
-        let local = i - available_regs.len() + 1;
-        Arg::Deref(Reg::Rbp, -8 * local as i32)
+impl<'a> RegisterAlloc<'a> {
+  fn allocate_registers_block(
+    &mut self,
+    block: Block<IdxVar>,
+  ) -> (Block, usize) {
+    let var_colors =
+      color_graph(self.conflicts, self.moves, self.locals, self.reg_colors);
+
+    for (_, c) in &var_colors {
+      if let Some(&reg) = self.available_regs.get(c.0 as usize) {
+        if reg.is_callee_saved() {
+          self.used_callee_saved_regs.insert(reg);
+        }
       }
     }
-    Arg::ByteReg(reg) => Arg::ByteReg(reg),
-    Arg::Label(l) => Arg::Label(l),
-  };
 
-  let instr = match instr {
-    Instr::Add { src, dest } => Instr::Add {
-      src: assign(src),
-      dest: assign(dest),
-    },
-    Instr::Call { label, arity } => Instr::Call { label, arity },
-    Instr::Jmp(label) => Instr::Jmp(label),
-    Instr::Mov { src, dest } => Instr::Mov {
-      src: assign(src),
-      dest: assign(dest),
-    },
-    Instr::Neg(dest) => Instr::Neg(assign(dest)),
-    Instr::Pop(dest) => Instr::Pop(assign(dest)),
-    Instr::Push(src) => Instr::Push(assign(src)),
-    Instr::Ret => Instr::Ret,
-    Instr::Sub { src, dest } => Instr::Sub {
-      src: assign(src),
-      dest: assign(dest),
-    },
-    Instr::Syscall => Instr::Syscall,
-    Instr::Cmp { src, dest } => Instr::Cmp {
-      src: assign(src),
-      dest: assign(dest),
-    },
-    Instr::JumpIf { cmp, label } => Instr::JumpIf { cmp, label },
-    Instr::Movzx { src, dest } => Instr::Movzx {
-      src: assign(src),
-      dest: assign(dest),
-    },
-    Instr::SetIf { cmp, dest } => Instr::SetIf {
-      cmp,
-      dest: assign(dest),
-    },
-    Instr::Xor { src, dest } => Instr::Xor {
-      src: assign(src),
-      dest: assign(dest),
-    },
-    _ => unreachable!("{:?}", instr),
-  };
-  instr
+    let block = Block {
+      global: block.global,
+      code: block
+        .code
+        .into_iter()
+        .map(|instr| self.assign_instr_var(instr, &var_colors))
+        .collect(),
+    };
+
+    let num_locals = var_colors
+      .values()
+      .filter(|c| c.0 as usize >= self.reg_colors.len())
+      .collect::<HashSet<_>>()
+      .len();
+
+    (block, num_locals)
+  }
+
+  fn assign_instr_var(
+    &mut self,
+    instr: Instr<IdxVar>,
+    var_colors: &IndexMap<Var, Color>,
+  ) -> Instr {
+    let assign = |arg: Arg<IdxVar>| match arg {
+      Arg::Deref(reg, i) => Arg::Deref(reg, i),
+      Arg::Reg(reg) => Arg::Reg(reg),
+      Arg::Imm(i) => Arg::Imm(i),
+      Arg::Var(var) => {
+        let i = var_colors[&self.var_store.get(var)].0 as usize;
+        if let Some(&reg) = self.available_regs.get(i) {
+          Arg::Reg(reg)
+        } else {
+          let local = i - self.available_regs.len() + 1;
+          Arg::Deref(Reg::Rbp, -8 * local as i32)
+        }
+      }
+      Arg::ByteReg(reg) => Arg::ByteReg(reg),
+      Arg::Label(l) => Arg::Label(l),
+    };
+
+    let instr = match instr {
+      Instr::Add { src, dest } => Instr::Add {
+        src: assign(src),
+        dest: assign(dest),
+      },
+      Instr::Call { label, arity } => Instr::Call { label, arity },
+      Instr::Jmp(label) => Instr::Jmp(label),
+      Instr::Mov { src, dest } => Instr::Mov {
+        src: assign(src),
+        dest: assign(dest),
+      },
+      Instr::Neg(dest) => Instr::Neg(assign(dest)),
+      Instr::Pop(dest) => Instr::Pop(assign(dest)),
+      Instr::Push(src) => Instr::Push(assign(src)),
+      Instr::Ret => Instr::Ret,
+      Instr::Sub { src, dest } => Instr::Sub {
+        src: assign(src),
+        dest: assign(dest),
+      },
+      Instr::Syscall => Instr::Syscall,
+      Instr::Cmp { src, dest } => Instr::Cmp {
+        src: assign(src),
+        dest: assign(dest),
+      },
+      Instr::JumpIf { cmp, label } => Instr::JumpIf { cmp, label },
+      Instr::Movzx { src, dest } => Instr::Movzx {
+        src: assign(src),
+        dest: assign(dest),
+      },
+      Instr::SetIf { cmp, dest } => Instr::SetIf {
+        cmp,
+        dest: assign(dest),
+      },
+      Instr::Xor { src, dest } => Instr::Xor {
+        src: assign(src),
+        dest: assign(dest),
+      },
+      _ => unreachable!("{:?}", instr),
+    };
+    instr
+  }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -324,7 +328,7 @@ fn color_graph(
     // move biasing: prefer color that is move-related, but should not override
     // the preference for registers over stack locations.
     let color_is_reg = (color.0 as usize) < reg_colors.len();
-    if let Some(node) = moves.node_index(state.location.clone()) {
+    if let Some(node) = moves.node_index(state.location) {
       for neighbor in moves.neighbors(node) {
         if let Some(&neighbor_color) = assigned_nodes.get(&neighbor) {
           let neighbor_color_is_reg =

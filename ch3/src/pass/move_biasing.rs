@@ -12,7 +12,7 @@ pub fn build_move_graph(
   let moves = &mut prog.info.moves;
   let var_store = &mut prog.info.var_store;
   for (_, block) in &prog.blocks {
-    build_block_move_graph(&block, moves, var_store);
+    build_block_move_graph(block, moves, var_store);
   }
   prog
 }
@@ -23,20 +23,18 @@ fn build_block_move_graph(
   var_store: &mut VarStore,
 ) {
   for instr in &block.code {
-    match instr {
-      Instr::Mov {
-        src: src @ Arg::Var(_),
-        dest: dest @ Arg::Var(_),
-      } => {
-        if src != dest {
-          let src = moves
-            .insert_node(Location::from_arg(src.clone(), var_store).unwrap());
-          let dest = moves
-            .insert_node(Location::from_arg(dest.clone(), var_store).unwrap());
-          moves.add_edge(src, dest);
-        }
+    if let Instr::Mov {
+      src: src @ Arg::Var(_),
+      dest: dest @ Arg::Var(_),
+    } = instr
+    {
+      if src != dest {
+        let src = moves
+          .insert_node(Location::from_arg(src.clone(), var_store).unwrap());
+        let dest = moves
+          .insert_node(Location::from_arg(dest.clone(), var_store).unwrap());
+        moves.add_edge(src, dest);
       }
-      _ => {}
     }
   }
 }

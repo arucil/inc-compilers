@@ -9,6 +9,8 @@ use petgraph::{Direction, Graph};
 use std::collections::{HashMap, VecDeque};
 use std::hash::Hash;
 
+/// `label_live` is a map from labels to sets of live locations before the first
+/// instruction of the blocks.
 pub fn analyze_liveness(
   prog: Program<OldInfo, IdxVar>,
   label_live: HashMap<Label, LocationSet>,
@@ -30,7 +32,7 @@ pub fn analyze_liveness(
     nodes.insert(*label, ix);
   }
 
-  for (_, node) in &nodes {
+  for node in nodes.values() {
     let last = blocks[&graph[*node]].code.last().unwrap().clone();
     if let Instr::Jmp(label) = last {
       if let Some(&node1) = nodes.get(&label) {
@@ -100,9 +102,9 @@ where
     let input = g
       .neighbors_directed(node_ix, Direction::Incoming)
       .map(|node_ix| &mapping[&g[node_ix]])
-      .fold(bottom.clone(), |input, x| join(input, x));
+      .fold(bottom.clone(), &join);
     let output = transfer(&mapping, label, input);
-    if &output != &mapping[&label] {
+    if output != mapping[&label] {
       mapping.insert(label, output);
       for node_ix in g.neighbors_directed(node_ix, Direction::Outgoing) {
         worklist.push_back(node_ix);
@@ -131,9 +133,9 @@ mod tests {
       for (label, block) in &self.blocks {
         buf += &format!("{:?}:\n", label);
         let live = &self.info.live[label];
-        for i in 0..block.code.len() {
+        for (i, l) in live.iter().enumerate().take(block.code.len()) {
           buf += "                    ";
-          live[i].write(&mut buf, &self.info.var_store).unwrap();
+          l.write(&mut buf, &self.info.var_store).unwrap();
           buf += "\n";
           buf += &format!("    {:?}", block.code[i]);
           buf += "\n";

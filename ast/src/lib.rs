@@ -46,6 +46,7 @@ pub enum Exp<VAR = String> {
     cond: Box<(Range, Exp<VAR>)>,
     body: Box<(Range, Exp<VAR>)>,
   },
+  Void,
   Print {
     val: Box<(Range, Exp<VAR>)>,
     ty: PrintType,
@@ -77,10 +78,7 @@ impl IdxVar {
         };
       }
     }
-    Self {
-      name: name.to_string(),
-      index: 0,
-    }
+    Self { name, index: 0 }
   }
 }
 
@@ -198,6 +196,7 @@ impl<VAR: Debug> Exp<VAR> {
             .group(),
         )
         .append(RcDoc::text(")")),
+      Exp::Void => RcDoc::text("(void)"),
       Exp::Print { val, ty: _ty } => RcDoc::text("(")
         .append(
           RcDoc::text("print")
@@ -207,9 +206,7 @@ impl<VAR: Debug> Exp<VAR> {
             .group(),
         )
         .append(RcDoc::text(")")),
-      Exp::NewLine => RcDoc::text("(")
-        .append(RcDoc::text("print").nest(1).group())
-        .append(RcDoc::text(")")),
+      Exp::NewLine => RcDoc::text("(print"),
     }
   }
 }

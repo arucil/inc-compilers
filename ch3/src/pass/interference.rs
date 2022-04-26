@@ -29,7 +29,7 @@ pub fn build_interference(
   let live = &prog.info.live;
   let mut conflicts = LocationGraph::new();
   for (_, var) in var_store.iter() {
-    conflicts.insert_node(Location::from(var.clone()));
+    conflicts.insert_node(Location::from(*var));
   }
   for (label, block) in &prog.blocks {
     build_graph(block, &live[label], var_store, &mut conflicts);

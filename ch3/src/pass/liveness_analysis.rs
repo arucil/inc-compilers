@@ -32,7 +32,7 @@ pub fn analyze_liveness(
     .iter()
     .map(|(label, block)| {
       let live = state.block_liveness(block, &label_live);
-      (label.clone(), live)
+      (*label, live)
     })
     .collect();
 
@@ -179,9 +179,9 @@ mod tests {
           continue;
         }
         let live = &self.info.live[label];
-        for i in 0..block.code.len() {
+        for (i, l) in live.iter().enumerate().take(block.code.len()) {
           buf += "                ";
-          live[i].write(&mut buf, &self.info.var_store).unwrap();
+          l.write(&mut buf, &self.info.var_store).unwrap();
           buf += "\n";
           buf += &format!("{:?}", block.code[i]);
           buf += "\n";
