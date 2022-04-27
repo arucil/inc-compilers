@@ -13,6 +13,7 @@ pub fn compile(
 ) -> Result<String, CompileError> {
   use Reg::*;
   let prog = ast::parse(input)?;
+  // TODO use ch5::typecheck
   let prog = ch4::pass::typecheck::typecheck(prog)?;
   let prog = ch4::pass::shrink::shrink(prog);
   let prog = ch4::pass::uniquify::uniquify(prog);

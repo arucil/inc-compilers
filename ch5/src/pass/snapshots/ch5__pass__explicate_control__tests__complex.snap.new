@@ -1,0 +1,53 @@
+---
+source: ch5/src/pass/explicate_control.rs
+expression: result.to_string_pretty()
+
+---
+locals: {x.0, y.1, step.2, z.3, tmp.1, tmp.0, tmp.2, t.4, tmp.3}
+
+start:
+    x.0 = 0
+    y.1 = 10
+    step.2 = (- y.1 7)
+    z.3 = (read)
+    print Str "start"
+    newline
+    tmp.0 = (eq? y.1 z.3)
+    if (eq? tmp.0 #f) goto block9 else goto block8
+block9:
+    tmp.1 = "y!=z "
+    goto block7
+block8:
+    tmp.1 = "y=z"
+    goto block7
+block7:
+    print Str tmp.1
+    tmp.2 = (eq? z.3 y.1)
+    print Bool tmp.2
+    newline
+    goto block0
+block0:
+    if (< x.0 y.1) goto block5 else goto block6
+block5:
+    t.4 = (+ x.0 step.2)
+    x.0 = t.4
+    print Str "?="
+    if (> x.0 5) goto block4 else goto block3
+block6:
+    return #<void>
+block4:
+    if (< x.0 9) goto block2 else goto block3
+block3:
+    tmp.3 = z.3
+    goto block1
+block2:
+    print Str "neg!"
+    newline
+    z.3 = (+ z.3 1)
+    tmp.3 = (- step.2)
+    goto block1
+block1:
+    print Int tmp.3
+    newline
+    goto block0
+

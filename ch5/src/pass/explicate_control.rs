@@ -32,4 +32,5 @@ mod tests {
     let result = explicate_control::explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
   }
+
 }
