@@ -45,11 +45,11 @@ fn shrink_exp((range, exp): (Range, Exp)) -> (Range, Exp) {
         body: box shrink_exp(*body),
       },
     ),
-    Exp::Print { val, ty } => (
+    Exp::Print { args, types } => (
       range,
       Exp::Print {
-        val: box shrink_exp(*val),
-        ty,
+        args: args.into_iter().map(shrink_exp).collect(),
+        types,
       },
     ),
     Exp::Prim { op, args } => {

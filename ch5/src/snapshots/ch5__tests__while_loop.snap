@@ -31,15 +31,15 @@ block3:
     add rbx, 1
     cmp rbx, rcx
     je block1
-    mov rbx, const_2
+    mov rcx, const_2
 
 block0:
-    mov rdi, rbx
+    mov rbx, 1
+    xor rbx, 1
+    mov rdi, rcx
     call print_str
     mov rdi, const_3
     call print_str
-    mov rbx, 1
-    xor rbx, 1
     mov rax, rbx
     call print_bool
     mov rdi, const_4
@@ -60,7 +60,7 @@ block0:
     syscall
 
 block1:
-    mov rbx, const_1
+    mov rcx, const_1
     jmp block0
 
 block6:

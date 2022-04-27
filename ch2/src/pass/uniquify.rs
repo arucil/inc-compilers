@@ -93,9 +93,12 @@ pub fn uniquify_exp(
       body: box (body.0, uniquify_exp(*body, env, counter)?),
     }),
     Exp::Void => Ok(Exp::Void),
-    Exp::Print { val, ty } => Ok(Exp::Print {
-      val: box (val.0, uniquify_exp(*val, env, counter)?),
-      ty,
+    Exp::Print { args, types } => Ok(Exp::Print {
+      args: args
+        .into_iter()
+        .map(|exp| Ok((exp.0, uniquify_exp(exp, env, counter)?)))
+        .collect::<Result<_, _>>()?,
+      types,
     }),
     Exp::NewLine => Ok(Exp::NewLine),
   }

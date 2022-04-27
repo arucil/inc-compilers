@@ -59,15 +59,9 @@ fn mon_exp(range: Range, exp: Exp<IdxVar>, counter: &mut usize) -> Exp<IdxVar> {
       body: box (body.0, mon_exp(body.0, body.1, counter)),
     },
     Exp::Void => exp,
-    Exp::Print { val, ty } => mon_prim(
-      range,
-      vec![*val],
-      |mut args| Exp::Print {
-        val: box args.pop().unwrap(),
-        ty,
-      },
-      counter,
-    ),
+    Exp::Print { args, types } => {
+      mon_prim(range, args, |args| Exp::Print { args, types }, counter)
+    }
     Exp::Str(..) => exp,
     Exp::NewLine => exp,
   }

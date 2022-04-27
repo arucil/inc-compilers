@@ -319,18 +319,28 @@ fn explicate_exp_effect(
       CTail::Goto(loop_start)
     }
     Exp::NewLine => CTail::Seq(CStmt::NewLine, box cont),
-    Exp::Print { val, ty } => {
-      let ty = match ty {
-        PrintType::Int => CType::Int,
-        PrintType::Bool => CType::Bool,
-        PrintType::Str => CType::Str,
-      };
-      CTail::Seq(
-        CStmt::Print {
-          val: atom(val.1),
-          ty,
+    Exp::Print {
+      mut args,
+      mut types,
+    } => {
+      args.reverse();
+      types.reverse();
+      args.into_iter().zip(types).fold(
+        CTail::Seq(CStmt::NewLine, box cont),
+        |cont, (exp, ty)| {
+          let ty = match ty {
+            PrintType::Int => CType::Int,
+            PrintType::Bool => CType::Bool,
+            PrintType::Str => CType::Str,
+          };
+          CTail::Seq(
+            CStmt::Print {
+              val: atom(exp.1),
+              ty,
+            },
+            box cont,
+          )
         },
-        box cont,
       )
     }
   }

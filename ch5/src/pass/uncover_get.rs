@@ -63,11 +63,14 @@ fn mark_mutable_vars(
           .collect(),
       },
     ),
-    Exp::Print { val, ty } => (
+    Exp::Print { args, types } => (
       range,
       Exp::Print {
-        val: box mark_mutable_vars(*val, set_vars),
-        ty,
+        args: args
+          .into_iter()
+          .map(|exp| mark_mutable_vars(exp, set_vars))
+          .collect(),
+        types,
       },
     ),
     Exp::Set { var, exp } => (
@@ -115,8 +118,10 @@ fn collect_set_vars(
         collect_set_vars(exp, set_vars);
       }
     }
-    Exp::Print { val, .. } => {
-      collect_set_vars(val, set_vars);
+    Exp::Print { args, .. } => {
+      for exp in args {
+        collect_set_vars(exp, set_vars);
+      }
     }
     Exp::Set { var, exp } => {
       set_vars.insert(var.1.clone());

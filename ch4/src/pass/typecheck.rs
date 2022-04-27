@@ -196,20 +196,27 @@ pub fn typecheck_exp(
         Type::Void,
       ))
     }
-    Exp::Print { val, ty: _ } => {
-      let (val, ty) = typecheck_exp(env, *val)?;
-      let ty = match ty {
-        Type::Int => PrintType::Int,
-        Type::Bool => PrintType::Bool,
-        Type::Str => PrintType::Str,
-        _ => {
-          return Err(CompileError {
-            range,
-            message: format!("expected Int, Bool, or Str, found {:?}", ty),
-          });
-        }
-      };
-      Ok(((range, Exp::Print { val: box val, ty }), Type::Void))
+    Exp::Print { args, types: _ } => {
+      let tys = args
+        .into_iter()
+        .map(|exp| {
+          let (val, ty) = typecheck_exp(env, exp)?;
+          let ty = match ty {
+            Type::Int => PrintType::Int,
+            Type::Bool => PrintType::Bool,
+            Type::Str => PrintType::Str,
+            _ => {
+              return Err(CompileError {
+                range,
+                message: format!("expected Int, Bool, or Str, found {:?}", ty),
+              });
+            }
+          };
+          Ok((val, ty))
+        })
+        .collect::<Result<Vec<_>>>()?;
+      let (args, types) = tys.into_iter().unzip();
+      Ok(((range, Exp::Print { args, types }), Type::Void))
     }
     Exp::NewLine => Ok(((range, Exp::NewLine), Type::Void)),
   }

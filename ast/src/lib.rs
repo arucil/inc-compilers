@@ -49,8 +49,9 @@ pub enum Exp<VAR = String> {
   },
   Void,
   Print {
-    val: Box<(Range, Exp<VAR>)>,
-    ty: PrintType,
+    /// nonempty
+    args: Vec<(Range, Exp<VAR>)>,
+    types: Vec<PrintType>,
   },
   NewLine,
 }
@@ -198,16 +199,17 @@ impl<VAR: Debug> Exp<VAR> {
         )
         .append(RcDoc::text(")")),
       Exp::Void => RcDoc::text("(void)"),
-      Exp::Print { val, ty: _ty } => RcDoc::text("(")
+      Exp::Print { args, .. } => RcDoc::text("(")
         .append(
-          RcDoc::text("print")
-            .append(Doc::line())
-            .append(val.1.to_doc())
-            .nest(1)
-            .group(),
+          RcDoc::intersperse(
+            args.iter().map(|(_, arg)| arg.to_doc()),
+            Doc::line(),
+          )
+          .nest(1)
+          .group(),
         )
         .append(RcDoc::text(")")),
-      Exp::NewLine => RcDoc::text("(print"),
+      Exp::NewLine => RcDoc::text("(newline)"),
     }
   }
 }

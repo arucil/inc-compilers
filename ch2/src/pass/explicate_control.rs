@@ -129,8 +129,10 @@ fn collect_exp_locals(exp: &Exp<IdxVar>, locals: &mut IndexSet<IdxVar>) {
       collect_exp_locals(&cond.1, locals);
       collect_exp_locals(&body.1, locals);
     }
-    Exp::Print { val, ty: _ } => {
-      collect_exp_locals(&val.1, locals);
+    Exp::Print { args, types: _ } => {
+      for (_, arg) in args {
+        collect_exp_locals(arg, locals);
+      }
     }
     Exp::NewLine => {}
   }

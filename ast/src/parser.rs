@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use crate::{Exp, PrintType, Program};
+use crate::{Exp, Program};
 use support::{CompileError, Range};
 
 pub type Result<T> = std::result::Result<T, CompileError>;
@@ -497,62 +497,28 @@ fn build_while(
 
 fn build_print(
   input: &str,
-  mut xs: Vec<Cst>,
+  xs: Vec<Cst>,
   range: Range,
 ) -> Result<(Range, Exp)> {
   if xs.len() == 1 {
     Ok((range, Exp::NewLine))
-  } else if xs.len() == 2 {
-    let exp = build_exp(input, xs.pop().unwrap())?;
-    Ok((
-      range,
-      Exp::Begin {
-        seq: vec![(
-          range,
-          Exp::Print {
-            val: box exp,
-            ty: PrintType::Int,
-          },
-        )],
-        last: box (range, Exp::NewLine),
-      },
-    ))
   } else {
-    let seq: Vec<_> = xs
+    let args = xs
       .into_iter()
       .skip(1)
-      .map(|exp| {
-        build_exp(input, exp).map(|(range, exp)| {
-          (
-            range,
-            Exp::Print {
-              val: box (range, exp),
-              ty: PrintType::Int,
-            },
-          )
-        })
-      })
+      .map(|exp| build_exp(input, exp))
       .collect::<Result<_>>()?;
-    let last = (range, Exp::NewLine);
-    let seq_range = Range {
-      start: seq[0].0.start,
-      end: seq.last().unwrap().0.end,
-    };
     Ok((
-      seq_range,
-      Exp::Begin {
-        seq,
-        last: box last,
+      range,
+      Exp::Print {
+        args,
+        types: vec![],
       },
     ))
   }
 }
 
-fn build_void(
-  _: &str,
-  xs: Vec<Cst>,
-  range: Range,
-) -> Result<(Range, Exp)> {
+fn build_void(_: &str, xs: Vec<Cst>, range: Range) -> Result<(Range, Exp)> {
   if xs.len() == 1 {
     Ok((range, Exp::Void))
   } else {
