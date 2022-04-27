@@ -131,6 +131,12 @@ impl<INFO: Debug, VAR: Debug> Program<INFO, VAR> {
       for (name, str) in &self.constants {
         buf += "    ";
         buf += name;
+        buf += " dq ";
+        buf += &format!("{}", str.len());
+        buf += "\n    ";
+        for _ in 0..name.len() {
+          buf += " ";
+        }
         buf += " db ";
         buf.push('`');
         let str = format!("{:?}", str);

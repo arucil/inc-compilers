@@ -18,7 +18,7 @@ start:
     mov r10, -12
     mov r11, -50
     mov r12, 1
-    mov r13, 0
+    xor r13, r13
     mov r14, 21
     mov r15, 77
     mov qword [rbp - 8], 13

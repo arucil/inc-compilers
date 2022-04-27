@@ -95,7 +95,12 @@ pub fn collect_locals(prog: &Program<IdxVar>) -> IndexSet<IdxVar> {
 
 fn collect_exp_locals(exp: &Exp<IdxVar>, locals: &mut IndexSet<IdxVar>) {
   match exp {
-    Exp::Int(_) | Exp::Var(_) | Exp::Str(_) | Exp::Bool(_) | Exp::Void => {}
+    Exp::Int(_)
+    | Exp::Var(_)
+    | Exp::Str(_)
+    | Exp::Bool(_)
+    | Exp::Void
+    | Exp::Get(_) => {}
     Exp::Let { var, init, body } => {
       locals.insert(var.1.clone());
       collect_exp_locals(&init.1, locals);

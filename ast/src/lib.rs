@@ -38,6 +38,7 @@ pub enum Exp<VAR = String> {
     var: (Range, VAR),
     exp: Box<(Range, Exp<VAR>)>,
   },
+  Get(VAR),
   Begin {
     seq: Vec<(Range, Exp<VAR>)>,
     last: Box<(Range, Exp<VAR>)>,
@@ -109,7 +110,7 @@ impl<VAR: Debug> Exp<VAR> {
     match self {
       Exp::Int(n) => RcDoc::text(format!("{}", n)),
       Exp::Str(s) => RcDoc::text(format!("{:?}", s)),
-      Exp::Var(var) => RcDoc::text(format!("{:?}", var)),
+      Exp::Var(var) | Exp::Get(var) => RcDoc::text(format!("{:?}", var)),
       Exp::Prim { op, args } => RcDoc::text("(")
         .append(
           RcDoc::intersperse(

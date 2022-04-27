@@ -1,5 +1,5 @@
 ---
-source: ch4/src/pass/select_instruction.rs
+source: ch4/src/pass/instruction_selection.rs
 expression: result.to_string_pretty()
 
 ---

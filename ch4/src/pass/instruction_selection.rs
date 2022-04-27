@@ -1,12 +1,11 @@
 use super::explicate_control::CInfo;
 use asm::Program;
 use ast::IdxVar;
-use ch2::pass::select_instruction::{tail_block, Info};
+use ch2::pass::instruction_selection::{CodeGen, Info};
 use control::*;
-use indexmap::IndexMap;
 
 pub fn select_instruction(prog: CProgram<CInfo>) -> Program<Info, IdxVar> {
-  let mut constants = IndexMap::default();
+  let mut code_gen = CodeGen::new();
   Program {
     info: Info {
       locals: prog.info.locals,
@@ -14,9 +13,9 @@ pub fn select_instruction(prog: CProgram<CInfo>) -> Program<Info, IdxVar> {
     blocks: prog
       .body
       .into_iter()
-      .map(|(label, tail)| (label, tail_block(tail, &mut constants)))
+      .map(|(label, tail)| (label, code_gen.tail_block(tail)))
       .collect(),
-    constants,
+    constants: code_gen.into_constants(),
   }
 }
 

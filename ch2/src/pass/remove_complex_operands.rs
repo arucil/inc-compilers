@@ -32,27 +32,7 @@ fn mon_exp(range: Range, exp: Exp<IdxVar>, counter: &mut usize) -> Exp<IdxVar> {
       body: box (body.0, mon_exp(body.0, body.1, counter)),
     },
     Exp::Prim { op, args } => {
-      let mut tmps = vec![];
-      let args = args
-        .into_iter()
-        .map(|(range, arg)| (range, atom_exp(range, arg, &mut tmps, counter)))
-        .collect();
-      tmps
-        .into_iter()
-        .rfold(
-          (range, Exp::Prim { op, args }),
-          |(body_range, body), tmp| {
-            (
-              body_range,
-              Exp::Let {
-                var: (tmp.range, tmp.name),
-                init: box (range, tmp.init),
-                body: box (body_range, body),
-              },
-            )
-          },
-        )
-        .1
+      mon_prim(range, args, |args| Exp::Prim { op, args }, counter)
     }
     // ch4
     Exp::If { cond, conseq, alt } => Exp::If {
@@ -62,6 +42,7 @@ fn mon_exp(range: Range, exp: Exp<IdxVar>, counter: &mut usize) -> Exp<IdxVar> {
     },
     Exp::Bool(..) => exp,
     // ch5
+    Exp::Get(..) => exp,
     Exp::Set { var, exp } => Exp::Set {
       var,
       exp: box (exp.0, mon_exp(exp.0, exp.1, counter)),
@@ -78,13 +59,44 @@ fn mon_exp(range: Range, exp: Exp<IdxVar>, counter: &mut usize) -> Exp<IdxVar> {
       body: box (body.0, mon_exp(body.0, body.1, counter)),
     },
     Exp::Void => exp,
-    Exp::Print { val, ty } => Exp::Print {
-      val: box (val.0, mon_exp(val.0, val.1, counter)),
-      ty,
-    },
+    Exp::Print { val, ty } => mon_prim(
+      range,
+      vec![*val],
+      |mut args| Exp::Print {
+        val: box args.pop().unwrap(),
+        ty,
+      },
+      counter,
+    ),
     Exp::Str(..) => exp,
     Exp::NewLine => exp,
   }
+}
+
+fn mon_prim(
+  range: Range,
+  args: Vec<(Range, Exp<IdxVar>)>,
+  build_exp: impl FnOnce(Vec<(Range, Exp<IdxVar>)>) -> Exp<IdxVar>,
+  counter: &mut usize,
+) -> Exp<IdxVar> {
+  let mut tmps = vec![];
+  let args = args
+    .into_iter()
+    .map(|(range, arg)| (range, atom_exp(range, arg, &mut tmps, counter)))
+    .collect();
+  tmps
+    .into_iter()
+    .rfold((range, build_exp(args)), |(body_range, body), tmp| {
+      (
+        body_range,
+        Exp::Let {
+          var: (tmp.range, tmp.name),
+          init: box (range, tmp.init),
+          body: box (body_range, body),
+        },
+      )
+    })
+    .1
 }
 
 /// Process expressions that need to be atomic.
@@ -113,12 +125,22 @@ fn atom_exp(
     }
     Exp::Bool(..) | Exp::Int(..) | Exp::Var(..) => exp,
     // ch4
-    Exp::If { .. } | Exp::Begin { .. } => {
+    Exp::If { .. } => {
       let exp = mon_exp(range, exp, counter);
       assign_var(range, exp, tmps, counter)
     }
+    // ch5
+    Exp::Get(..)
+    | Exp::Begin { .. }
+    | Exp::While { .. }
+    | Exp::Set { .. }
+    | Exp::Print { .. } => {
+      let exp = mon_exp(range, exp, counter);
+      assign_var(range, exp, tmps, counter)
+    }
+    Exp::Void => exp,
     Exp::Str(..) => exp,
-    _ => unimplemented!("{:?}", exp),
+    Exp::NewLine => exp,
   }
 }
 

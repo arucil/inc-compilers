@@ -367,7 +367,7 @@ mod tests {
   use super::*;
   use crate::location_set::LocationSet;
   use asm::Label;
-  use ch2::pass::select_instruction::Info as OldOldInfo;
+  use ch2::pass::instruction_selection::Info as OldOldInfo;
   use indexmap::indexset;
   use insta::{assert_debug_snapshot, assert_snapshot};
   use maplit::hashmap;

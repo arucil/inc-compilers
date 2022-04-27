@@ -178,10 +178,11 @@ print_int:
     ret
 
 ;; args
-;;   rsi: buffer address
-;;   rdx: length
+;;   rdi: string address (string length followed by string data)
     global print_str
 print_str:
+    mov rdx, [rdi]
+    lea rsi, [rdi + 8]
     mov rax, 1
     mov rdi, 1
     syscall

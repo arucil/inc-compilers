@@ -22,7 +22,7 @@ pub fn uniquify_exp(
 ) -> Result<Exp<IdxVar>, CompileError> {
   match exp {
     Exp::Int(n) => Ok(Exp::Int(n)),
-    Exp::Var(var) => env.get(&var).map_or_else(
+    Exp::Var(var) | Exp::Get(var) => env.get(&var).map_or_else(
       || {
         Err(CompileError {
           range,

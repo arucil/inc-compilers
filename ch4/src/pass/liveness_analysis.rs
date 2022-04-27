@@ -1,6 +1,6 @@
 use asm::{Block, Instr, Label, Program};
 use ast::IdxVar;
-use ch2::pass::select_instruction::Info as OldInfo;
+use ch2::pass::instruction_selection::Info as OldInfo;
 use ch3::location_set::{LocationSet, VarStore};
 use ch3::pass::liveness_analysis::{AnalysisState, Info};
 use petgraph::algo::toposort;

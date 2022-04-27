@@ -17,7 +17,7 @@ mod tests {
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let prog = explicate_control::explicate_control(prog);
-    let prog = select_instruction::select_instruction(prog);
+    let prog = instruction_selection::select_instruction(prog);
     let prog = liveness_analysis::analyze_liveness(
       prog,
       hashmap! {

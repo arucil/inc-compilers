@@ -4,10 +4,14 @@ expression: prog
 ---
 extern read_int, print_int, print_str, print_bool, print_newline
 section .rodata
-    const_1 db `x`
-    const_2 db `Y`
-    const_3 db `abc`
-    const_4 db `def`
+    const_1 dq 1
+            db `x`
+    const_2 dq 1
+            db `Y`
+    const_3 dq 3
+            db `abc`
+    const_4 dq 3
+            db `def`
 section .text
 
     global _start
@@ -16,30 +20,29 @@ _start:
     mov rbp, rsp
     sub rsp, 8
     push rbx
-    mov rcx, 1
-    mov rbx, 2
+    mov rbx, 1
+    mov rcx, 2
 
 block3:
-    mov rdx, rbx
+    mov rdx, rcx
     neg rdx
-    cmp rcx, rdx
+    cmp rbx, rdx
     jl block6
-    add rcx, 1
-    cmp rcx, rbx
+    add rbx, 1
+    cmp rbx, rcx
     je block1
-    mov rsi, const_2
-    mov rdx, 1
-    call print_str
+    mov rbx, const_2
 
 block0:
-    mov rsi, const_3
-    mov rdx, 3
+    mov rdi, rbx
     call print_str
-    mov rax, 1
-    xor rax, 1
+    mov rdi, const_3
+    call print_str
+    mov rbx, 1
+    xor rbx, 1
+    mov rax, rbx
     call print_bool
-    mov rsi, const_4
-    mov rdx, 3
+    mov rdi, const_4
     call print_str
     call print_newline
     call read_int
@@ -57,20 +60,18 @@ block0:
     syscall
 
 block1:
-    mov rsi, const_1
-    mov rdx, 1
-    call print_str
+    mov rbx, const_1
     jmp block0
 
 block6:
-    add rcx, rbx
-    cmp rcx, 10
+    add rbx, rcx
+    cmp rbx, 10
     jg block4
-    mov rbx, rcx
+    mov rcx, rbx
     jmp block3
 
 block4:
-    mov rbx, rcx
-    sub rbx, 1
+    mov rcx, rbx
+    sub rcx, 1
     jmp block3
 

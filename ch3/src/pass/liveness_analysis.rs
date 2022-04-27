@@ -1,7 +1,7 @@
 use crate::location_set::{LocationSet, VarStore};
 use asm::{Arg, Instr, Label, Program, Reg};
 use ast::IdxVar;
-use ch2::pass::select_instruction::Info as OldInfo;
+use ch2::pass::instruction_selection::Info as OldInfo;
 use indexmap::{IndexMap, IndexSet};
 use std::collections::HashMap;
 

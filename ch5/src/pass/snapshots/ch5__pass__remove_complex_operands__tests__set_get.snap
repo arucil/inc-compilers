@@ -1,0 +1,17 @@
+---
+source: ch5/src/pass/remove_complex_operands.rs
+expression: result.to_string_pretty()
+---
+(let
+ [x.0 2]
+ (let
+  [y.1 0]
+  (let
+   [tmp.0 x.0]
+   (let
+    [tmp.1
+     (begin
+     (set! x.0 40) x.0)]
+    (let
+     [tmp.2 (+ tmp.0 tmp.1)]
+     (+ y.1 tmp.2))))))

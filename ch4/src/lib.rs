@@ -18,7 +18,7 @@ pub fn compile(
   let prog = self::pass::uniquify::uniquify(prog);
   let prog = ch2::pass::remove_complex_operands::remove_complex_operands(prog);
   let prog = self::pass::explicate_control::explicate_control(prog);
-  let prog = self::pass::select_instruction::select_instruction(prog);
+  let prog = self::pass::instruction_selection::select_instruction(prog);
   let prog = self::pass::liveness_analysis::analyze_liveness(
     prog,
     hashmap! {

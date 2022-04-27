@@ -28,6 +28,7 @@ static PRIM_TYPES: Lazy<HashMap<&'static str, PrimType>> = Lazy::new(|| {
     "and" => vec![(vec![Bool, Bool], Bool)],
     "or" => vec![(vec![Bool, Bool], Bool)],
     "not" => vec![(vec![Bool], Bool)],
+    // TODO compare strings
     ">" => vec![(vec![Int, Int], Bool)],
     ">=" => vec![(vec![Int, Int], Bool)],
     "<" => vec![(vec![Int, Int], Bool)],
@@ -54,7 +55,7 @@ pub fn typecheck(prog: Program) -> Result<Program> {
   Ok(Program { body })
 }
 
-fn typecheck_exp(
+pub fn typecheck_exp(
   env: &mut HashMap<String, Type>,
   (range, exp): (Range, Exp),
 ) -> Result<((Range, Exp), Type)> {
@@ -63,7 +64,7 @@ fn typecheck_exp(
     Exp::Bool(_) => Ok(((range, exp), Type::Bool)),
     Exp::Str(_) => Ok(((range, exp), Type::Str)),
     Exp::Void => Ok(((range, exp), Type::Void)),
-    Exp::Var(ref var) => {
+    Exp::Var(ref var) | Exp::Get(ref var) => {
       if let Some(&ty) = env.get(var) {
         Ok(((range, exp), ty))
       } else {
@@ -85,15 +86,6 @@ fn typecheck_exp(
     }
     Exp::Let { var, init, body } => {
       let (init, init_ty) = typecheck_exp(env, *init)?;
-      if !matches!(init_ty, Type::Int | Type::Bool) {
-        return Err(CompileError {
-          range: init.0,
-          message: format!(
-            "variable can only be Int or Bool, found {:?}",
-            init_ty
-          ),
-        });
-      }
       let old_var_ty = env.insert(var.1.clone(), init_ty);
       let (body, ty) = typecheck_exp(env, *body)?;
       if let Some(old_var_ty) = old_var_ty {

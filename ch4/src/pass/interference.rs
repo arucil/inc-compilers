@@ -3,7 +3,7 @@ mod tests {
   use super::super::*;
   use asm::{Label, Program};
   use ast::IdxVar;
-  use ch2::pass::select_instruction::Info as OldOldInfo;
+  use ch2::pass::instruction_selection::Info as OldOldInfo;
   use ch3::location_set::LocationSet;
   use ch3::pass::interference;
   use indexmap::indexset;

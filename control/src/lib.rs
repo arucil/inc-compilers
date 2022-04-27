@@ -47,7 +47,7 @@ pub enum CTail {
 #[derive(Clone)]
 pub enum CStmt {
   Assign { var: IdxVar, exp: CExp },
-  Print { val: CExp, ty: CType },
+  Print { val: CAtom, ty: CType },
   NewLine,
   Read,
 }
@@ -78,13 +78,13 @@ pub enum CCmpOp {
   Ge,
 }
 
-#[non_exhaustive]
 #[derive(Clone)]
 pub enum CAtom {
   Int(i64),
   Var(IdxVar),
   Bool(bool),
   Str(String),
+  Void,
 }
 
 impl<INFO: Debug> CProgram<INFO> {
@@ -201,6 +201,7 @@ impl Debug for CAtom {
       Self::Bool(true) => write!(f, "#t"),
       Self::Bool(false) => write!(f, "#f"),
       Self::Str(s) => write!(f, "{:?}", s),
+      Self::Void => write!(f, "#<void>"),
     }
   }
 }

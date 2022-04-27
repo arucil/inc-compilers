@@ -18,7 +18,7 @@ impl Debug for Info {
 }
 
 pub fn assign_home(
-  prog: Program<super::select_instruction::Info, IdxVar>,
+  prog: Program<super::instruction_selection::Info, IdxVar>,
 ) -> Program<Info> {
   let local_spaces = prog
     .info
@@ -111,7 +111,7 @@ mod tests {
     let prog = uniquify::uniquify(prog).unwrap();
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let prog = explicate_control::explicate_control(prog);
-    let prog = select_instruction::select_instruction(prog);
+    let prog = instruction_selection::select_instruction(prog);
     let result = assign_home(prog);
     assert_snapshot!(result.to_string_pretty());
   }
