@@ -13,8 +13,7 @@ pub fn compile(
 ) -> Result<String, CompileError> {
   use Reg::*;
   let prog = ast::parse(input)?;
-  // TODO use ch5::typecheck
-  let prog = ch4::pass::typecheck::typecheck(prog)?;
+  let prog = self::pass::typecheck::typecheck(prog)?;
   let prog = ch4::pass::shrink::shrink(prog);
   let prog = ch4::pass::uniquify::uniquify(prog);
   let prog = self::pass::uncover_get::uncover_get(prog);
@@ -78,14 +77,6 @@ fn add_epilogue(prog: &mut Program<ch3::pass::register_allocation::Info>) {
     .map(|&reg| Pop(Arg::Reg(reg)))
     .collect();
   code.extend_from_slice(&[
-    Call {
-      label: "print_int".to_owned(),
-      arity: 0,
-    },
-    Call {
-      label: "print_newline".to_owned(),
-      arity: 0,
-    },
     Mov {
       src: Arg::Reg(Rbp),
       dest: Arg::Reg(Rsp),
@@ -115,7 +106,7 @@ mod tests {
 
   #[test]
   fn if_form() {
-    let prog = compile(r#"(if (eq? (read) 1) 42 0)"#, None).unwrap();
+    let prog = compile(r#"(print (if (eq? (read) 1) 42 0))"#, None).unwrap();
     assert_snapshot!(prog);
   }
 
@@ -125,11 +116,12 @@ mod tests {
       r#"
 (let ([x (read)]
       [y (read)])
-  (if (if (< x 1)
-        (eq? x 0)
-        (eq? x 2))
-    (+ y 2)
-    (+ y 10)))"#,
+  (print
+    (if (if (< x 1)
+          (eq? x 0)
+          (eq? x 2))
+      (+ y 2)
+      (+ y 10))))"#,
       None,
     )
     .unwrap();
@@ -139,7 +131,7 @@ mod tests {
   #[test]
   fn if_in_init() {
     let prog = compile(
-      r#"(let ([x (if (>= (read) 3) 10 77)]) (if (not (eq? x 10)) 41 2))"#,
+      r#"(let ([x (if (>= (read) 3) 10 77)]) (print (if (not (eq? x 10)) 41 2)))"#,
       None,
     )
     .unwrap();
@@ -156,7 +148,7 @@ mod tests {
     (set! y (if (> x 10) (- x 1) x)))
   (print (begin (set! x (+ x 1)) (if (eq? x y) "x" "Y")) "abc" (not #t) "def")
   (+ 77 (- (let ([k (read)]) (+ k 1)) 4))
-  17)
+  (void))
       "#,
       None,
     )

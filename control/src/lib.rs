@@ -1,5 +1,5 @@
 use asm::{CmpResult, Label};
-use ast::IdxVar;
+use ast::{IdxVar, Type};
 use std::fmt::{self, Debug, Formatter, Write};
 use std::str::FromStr;
 
@@ -11,21 +11,13 @@ pub struct CProgram<INFO> {
 pub struct CDef {
   pub label: String,
   pub params: Vec<CParam>,
-  pub ty: CType,
+  pub ty: Type,
   pub body: Vec<(Label, CTail)>,
 }
 
 pub struct CParam {
   pub name: IdxVar,
-  pub ty: CType,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CType {
-  Int,
-  Bool,
-  Str,
-  Void,
+  pub ty: Type,
 }
 
 #[non_exhaustive]
@@ -47,7 +39,7 @@ pub enum CTail {
 #[derive(Clone)]
 pub enum CStmt {
   Assign { var: IdxVar, exp: CExp },
-  Print { val: CAtom, ty: CType },
+  Print { val: CAtom, ty: Type },
   NewLine,
   Read,
 }

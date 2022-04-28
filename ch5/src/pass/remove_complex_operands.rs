@@ -3,8 +3,8 @@ mod tests {
   use super::super::*;
   use ast::*;
   use ch2::pass::remove_complex_operands;
-  use ch4::pass::uniquify;
   use ch4::pass::shrink;
+  use ch4::pass::uniquify;
   use insta::assert_snapshot;
 
   #[test]

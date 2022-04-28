@@ -49,10 +49,7 @@ block0:
     mov rbx, rax
     add rbx, 1
     sub rbx, 4
-    mov rax, 17
     pop rbx
-    call print_int
-    call print_newline
     mov rsp, rbp
     pop rbp
     mov rax, 60

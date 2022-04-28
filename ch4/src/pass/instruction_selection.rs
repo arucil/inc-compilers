@@ -32,6 +32,7 @@ mod tests {
     let prog =
       parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#)
         .unwrap();
+    let prog = typecheck::typecheck(prog).unwrap();
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let prog = explicate_control::explicate_control(prog);
@@ -53,6 +54,7 @@ mod tests {
     "#,
     )
     .unwrap();
+    let prog = typecheck::typecheck(prog).unwrap();
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let prog = explicate_control::explicate_control(prog);
@@ -66,6 +68,7 @@ mod tests {
       r#"(let ([x (if (>= (read) 3) 10 77)]) (if (not (eq? x 10)) 41 2))"#,
     )
     .unwrap();
+    let prog = typecheck::typecheck(prog).unwrap();
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let prog = explicate_control::explicate_control(prog);
@@ -90,6 +93,7 @@ mod tests {
       "#,
     )
     .unwrap();
+    let prog = typecheck::typecheck(prog).unwrap();
     let prog = shrink::shrink(prog);
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);

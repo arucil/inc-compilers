@@ -33,4 +33,17 @@ mod tests {
     assert_snapshot!(result.to_string_pretty());
   }
 
+  #[test]
+  fn assign_void() {
+    let prog = ast::parse(
+      r#"(let ([x (void)] [y 1]) (set! x (print)) (set! x (set! y 10)))"#,
+    )
+    .unwrap();
+    let prog = typecheck::typecheck(prog).unwrap();
+    let prog = shrink::shrink(prog);
+    let prog = uniquify::uniquify(prog);
+    let prog = remove_complex_operands::remove_complex_operands(prog);
+    let result = explicate_control::explicate_control(prog);
+    assert_snapshot!(result.to_string_pretty());
+  }
 }

@@ -1,6 +1,6 @@
 use super::explicate_control::CInfo;
 use asm::{Arg, Block, ByteReg, Instr, Label, Program, Reg};
-use ast::IdxVar;
+use ast::{IdxVar, Type};
 use control::*;
 use indexmap::{IndexMap, IndexSet};
 use std::fmt::{self, Debug, Formatter};
@@ -103,10 +103,7 @@ impl CodeGen {
     match stmt {
       CStmt::Assign { var, exp } => self.exp_instructions(Arg::Var(var), exp),
       // ch4
-      CStmt::Print {
-        val,
-        ty: CType::Int,
-      } => {
+      CStmt::Print { val, ty: Type::Int } => {
         self.atom_instructions(Arg::Reg(Reg::Rax), val);
         self.code.push(Instr::Call {
           label: "print_int".to_owned(),
@@ -115,7 +112,7 @@ impl CodeGen {
       }
       CStmt::Print {
         val,
-        ty: CType::Bool,
+        ty: Type::Bool,
       } => {
         self.atom_instructions(Arg::Reg(Reg::Rax), val);
         self.code.push(Instr::Call {
@@ -123,10 +120,7 @@ impl CodeGen {
           arity: 0,
         });
       }
-      CStmt::Print {
-        val,
-        ty: CType::Str,
-      } => {
+      CStmt::Print { val, ty: Type::Str } => {
         self.atom_instructions(Arg::Reg(Reg::Rdi), val);
         self.code.push(Instr::Call {
           label: "print_str".to_owned(),

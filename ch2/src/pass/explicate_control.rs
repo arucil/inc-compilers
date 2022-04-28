@@ -1,9 +1,8 @@
 use asm::Label;
-use ast::{Exp, IdxVar, Program};
+use ast::{Exp, ExpKind, IdxVar, Program};
 use control::{CAtom, CExp, CPrim, CProgram, CStmt, CTail};
 use indexmap::IndexSet;
 use std::fmt::{self, Debug, Formatter};
-use support::Range;
 
 pub struct CInfo {
   pub locals: IndexSet<IdxVar>,
@@ -19,33 +18,33 @@ pub fn explicate_control(mut prog: Program<IdxVar>) -> CProgram<CInfo> {
   let locals = collect_locals(&prog);
   CProgram {
     info: CInfo { locals },
-    body: vec![(Label::Start, explicate_tail(prog.body.pop().unwrap().1))],
+    body: vec![(Label::Start, explicate_tail(prog.body.pop().unwrap()))],
   }
 }
 
 fn explicate_tail(exp: Exp<IdxVar>) -> CTail {
-  match exp {
-    exp @ (Exp::Int(_) | Exp::Var(_)) => CTail::Return(CExp::Atom(atom(exp))),
-    Exp::Prim { op: (_, op), args } => {
+  match exp.kind {
+    ExpKind::Int(_) | ExpKind::Var(_) => CTail::Return(CExp::Atom(atom(exp))),
+    ExpKind::Prim { op: (_, op), args } => {
       CTail::Return(CExp::Prim(prim(op, args)))
     }
-    Exp::Let { var, init, body } => {
-      explicate_assign(var.1, init.1, explicate_tail(body.1))
+    ExpKind::Let { var, init, body } => {
+      explicate_assign(var.1, *init, explicate_tail(*body))
     }
     exp => unimplemented!("unsupported form {:?}", exp),
   }
 }
 
 fn explicate_assign(var: IdxVar, init: ast::Exp<IdxVar>, cont: CTail) -> CTail {
-  match init {
-    Exp::Int(_) | Exp::Var(_) => {
+  match init.kind {
+    ExpKind::Int(_) | ExpKind::Var(_) => {
       let assign = CStmt::Assign {
         var,
         exp: CExp::Atom(atom(init)),
       };
       CTail::Seq(assign, box cont)
     }
-    Exp::Prim { op: (_, op), args } => {
+    ExpKind::Prim { op: (_, op), args } => {
       let prim = prim(op, args);
       let assign = CStmt::Assign {
         var,
@@ -53,88 +52,91 @@ fn explicate_assign(var: IdxVar, init: ast::Exp<IdxVar>, cont: CTail) -> CTail {
       };
       CTail::Seq(assign, box cont)
     }
-    Exp::Let {
+    ExpKind::Let {
       var: (_, var1),
-      init: box (_, init1),
+      init: box init1,
       body,
-    } => explicate_assign(var1, init1, explicate_assign(var, body.1, cont)),
+    } => explicate_assign(var1, init1, explicate_assign(var, *body, cont)),
     exp => unimplemented!("unsupported form {:?}", exp),
   }
 }
 
 fn atom(exp: Exp<IdxVar>) -> CAtom {
-  match exp {
-    Exp::Int(n) => CAtom::Int(n),
-    Exp::Var(var) => CAtom::Var(var),
+  match exp.kind {
+    ExpKind::Int(n) => CAtom::Int(n),
+    ExpKind::Var(var) => CAtom::Var(var),
     exp => unreachable!("{:?}", exp),
   }
 }
 
-fn prim(op: &str, mut args: Vec<(Range, Exp<IdxVar>)>) -> CPrim {
+fn prim(op: &str, mut args: Vec<Exp<IdxVar>>) -> CPrim {
   match op {
     "read" => CPrim::Read,
     "-" => {
       if args.len() == 1 {
-        CPrim::Neg(atom(args.pop().unwrap().1))
+        CPrim::Neg(atom(args.pop().unwrap()))
       } else {
-        CPrim::Sub(atom(args[0].1.clone()), atom(args.pop().unwrap().1))
+        CPrim::Sub(atom(args[0].clone()), atom(args.pop().unwrap()))
       }
     }
-    "+" => CPrim::Add(atom(args[0].1.clone()), atom(args.pop().unwrap().1)),
+    "+" => CPrim::Add(atom(args[0].clone()), atom(args.pop().unwrap())),
     _ => unreachable!("{}", op),
   }
 }
 
-pub fn collect_locals(prog: &Program<IdxVar>) -> IndexSet<IdxVar> {
+fn collect_locals<TYPE>(prog: &Program<IdxVar, TYPE>) -> IndexSet<IdxVar> {
   let mut locals = IndexSet::new();
-  for (_, exp) in &prog.body {
+  for exp in &prog.body {
     collect_exp_locals(exp, &mut locals);
   }
   locals
 }
 
-fn collect_exp_locals(exp: &Exp<IdxVar>, locals: &mut IndexSet<IdxVar>) {
-  match exp {
-    Exp::Int(_)
-    | Exp::Var(_)
-    | Exp::Str(_)
-    | Exp::Bool(_)
-    | Exp::Void
-    | Exp::Get(_) => {}
-    Exp::Let { var, init, body } => {
+fn collect_exp_locals<TYPE>(
+  exp: &Exp<IdxVar, TYPE>,
+  locals: &mut IndexSet<IdxVar>,
+) {
+  match &exp.kind {
+    ExpKind::Int(_)
+    | ExpKind::Var(_)
+    | ExpKind::Str(_)
+    | ExpKind::Bool(_)
+    | ExpKind::Void
+    | ExpKind::Get(_) => {}
+    ExpKind::Let { var, init, body } => {
       locals.insert(var.1.clone());
-      collect_exp_locals(&init.1, locals);
-      collect_exp_locals(&body.1, locals);
+      collect_exp_locals(&*init, locals);
+      collect_exp_locals(&*body, locals);
     }
-    Exp::Prim { op: _, args } => {
-      for (_, arg) in args {
+    ExpKind::Prim { op: _, args } => {
+      for arg in args {
         collect_exp_locals(arg, locals);
       }
     }
-    Exp::If { cond, conseq, alt } => {
-      collect_exp_locals(&cond.1, locals);
-      collect_exp_locals(&conseq.1, locals);
-      collect_exp_locals(&alt.1, locals);
+    ExpKind::If { cond, conseq, alt } => {
+      collect_exp_locals(&*cond, locals);
+      collect_exp_locals(&*conseq, locals);
+      collect_exp_locals(&*alt, locals);
     }
-    Exp::Set { var: _, exp } => {
-      collect_exp_locals(&exp.1, locals);
+    ExpKind::Set { var: _, exp } => {
+      collect_exp_locals(&*exp, locals);
     }
-    Exp::Begin { seq, last } => {
+    ExpKind::Begin { seq, last } => {
       for exp in seq {
-        collect_exp_locals(&exp.1, locals);
+        collect_exp_locals(&*exp, locals);
       }
-      collect_exp_locals(&last.1, locals);
+      collect_exp_locals(&*last, locals);
     }
-    Exp::While { cond, body } => {
-      collect_exp_locals(&cond.1, locals);
-      collect_exp_locals(&body.1, locals);
+    ExpKind::While { cond, body } => {
+      collect_exp_locals(&*cond, locals);
+      collect_exp_locals(&*body, locals);
     }
-    Exp::Print { args, types: _ } => {
-      for (_, arg) in args {
+    ExpKind::Print(args) => {
+      for arg in args {
         collect_exp_locals(arg, locals);
       }
     }
-    Exp::NewLine => {}
+    ExpKind::NewLine => {}
   }
 }
 

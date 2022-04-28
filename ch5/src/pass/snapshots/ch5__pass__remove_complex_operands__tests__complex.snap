@@ -1,6 +1,5 @@
 ---
 source: ch5/src/pass/remove_complex_operands.rs
-assertion_line: 46
 expression: result.to_string_pretty()
 ---
 (let
@@ -12,7 +11,7 @@ expression: result.to_string_pretty()
    (let
     [z.3 (read)]
     (begin
-    ("start")
+    (print "start")
      (let
       [tmp.1
        (if
@@ -23,7 +22,7 @@ expression: result.to_string_pretty()
         "y=z")]
       (let
        [tmp.2 (eq? z.3 y.1)]
-       (tmp.1 tmp.2)))
+       (print tmp.1 tmp.2)))
      (while (< x.0 y.1)
       (let
        [t.4 (+ x.0 step.2)]
@@ -36,10 +35,12 @@ expression: result.to_string_pretty()
             (< x.0 9)
             #f)
            (begin
-           ("neg!")
+           (print "neg!")
             (set!
              z.3
              (+ z.3 1))
             (- step.2))
            z.3)]
-         ("?=" tmp.3))))))))))
+         (print
+          "?="
+          tmp.3))))))))))

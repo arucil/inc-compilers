@@ -1,10 +1,9 @@
 use asm::Label;
-use ast::{Exp, IdxVar, PrintType, Program};
-use control::{CAtom, CCmpOp, CExp, CPrim, CProgram, CStmt, CTail, CType};
+use ast::{Exp, ExpKind, IdxVar, Program, Type};
+use control::{CAtom, CCmpOp, CExp, CPrim, CProgram, CStmt, CTail};
 use indexmap::{IndexMap, IndexSet};
 use std::collections::VecDeque;
 use std::fmt::{self, Debug, Formatter};
-use support::Range;
 
 pub struct CInfo {
   pub locals: IndexSet<IdxVar>,
@@ -53,13 +52,13 @@ impl State {
   }
 }
 
-pub fn explicate_control(mut prog: Program<IdxVar>) -> CProgram<CInfo> {
-  let locals = ch2::pass::explicate_control::collect_locals(&prog);
+pub fn explicate_control(mut prog: Program<IdxVar, Type>) -> CProgram<CInfo> {
+  let locals = collect_locals(&prog);
   let mut state = State {
     blocks: vec![],
     label_index: 0,
   };
-  let start = explicate_tail(&mut state, prog.body.pop().unwrap().1);
+  let start = explicate_tail(&mut state, prog.body.pop().unwrap());
   state.blocks.insert(0, (Label::Start, start));
 
   let blocks = remove_unreachable_blocks(state.blocks);
@@ -67,6 +66,61 @@ pub fn explicate_control(mut prog: Program<IdxVar>) -> CProgram<CInfo> {
   CProgram {
     info: CInfo { locals },
     body: blocks,
+  }
+}
+
+pub fn collect_locals(prog: &Program<IdxVar, Type>) -> IndexSet<IdxVar> {
+  let mut locals = IndexSet::new();
+  for exp in &prog.body {
+    collect_exp_locals(exp, &mut locals);
+  }
+  locals
+}
+
+fn collect_exp_locals(exp: &Exp<IdxVar, Type>, locals: &mut IndexSet<IdxVar>) {
+  match &exp.kind {
+    ExpKind::Int(_)
+    | ExpKind::Var(_)
+    | ExpKind::Str(_)
+    | ExpKind::Bool(_)
+    | ExpKind::Void
+    | ExpKind::Get(_) => {}
+    ExpKind::Let { var, init, body } => {
+      if init.ty != Type::Void {
+        locals.insert(var.1.clone());
+      }
+      collect_exp_locals(&*init, locals);
+      collect_exp_locals(&*body, locals);
+    }
+    ExpKind::Prim { op: _, args } => {
+      for arg in args {
+        collect_exp_locals(arg, locals);
+      }
+    }
+    ExpKind::If { cond, conseq, alt } => {
+      collect_exp_locals(&*cond, locals);
+      collect_exp_locals(&*conseq, locals);
+      collect_exp_locals(&*alt, locals);
+    }
+    ExpKind::Set { var: _, exp } => {
+      collect_exp_locals(&*exp, locals);
+    }
+    ExpKind::Begin { seq, last } => {
+      for exp in seq {
+        collect_exp_locals(&*exp, locals);
+      }
+      collect_exp_locals(&*last, locals);
+    }
+    ExpKind::While { cond, body } => {
+      collect_exp_locals(&*cond, locals);
+      collect_exp_locals(&*body, locals);
+    }
+    ExpKind::Print(args) => {
+      for arg in args {
+        collect_exp_locals(arg, locals);
+      }
+    }
+    ExpKind::NewLine => {}
   }
 }
 
@@ -113,31 +167,34 @@ fn remove_unreachable_blocks(
   reachable_blocks.into_iter().collect()
 }
 
-fn explicate_tail(state: &mut State, exp: Exp<IdxVar>) -> CTail {
-  match exp {
-    Exp::Int(_)
-    | Exp::Var(_)
-    | Exp::Bool(_)
-    | Exp::Str(_)
-    | Exp::Void
-    | Exp::Get(_) => CTail::Return(CExp::Atom(atom(exp))),
-    Exp::Prim { op: (_, op), args } => {
+fn explicate_tail(state: &mut State, exp: Exp<IdxVar, Type>) -> CTail {
+  match exp.kind {
+    ExpKind::Int(_)
+    | ExpKind::Var(_)
+    | ExpKind::Bool(_)
+    | ExpKind::Str(_)
+    | ExpKind::Void
+    | ExpKind::Get(_) => CTail::Return(CExp::Atom(atom(exp))),
+    ExpKind::Prim { op: (_, op), args } => {
       CTail::Return(CExp::Prim(prim(op, args)))
     }
-    Exp::Let { var, init, body } => {
-      let cont = explicate_tail(state, body.1);
-      explicate_assign(state, var.1, init.1, cont)
+    ExpKind::Let { var, init, body } => {
+      let cont = explicate_tail(state, *body);
+      explicate_assign(state, var.1, *init, cont)
     }
-    Exp::If { cond, conseq, alt } => {
-      let conseq = explicate_tail(state, conseq.1);
-      let alt = explicate_tail(state, alt.1);
-      explicate_pred(state, cond.1, conseq, alt)
+    ExpKind::If { cond, conseq, alt } => {
+      let conseq = explicate_tail(state, *conseq);
+      let alt = explicate_tail(state, *alt);
+      explicate_pred(state, *cond, conseq, alt)
     }
-    Exp::Begin { seq, last } => {
-      let cont = explicate_tail(state, last.1);
+    ExpKind::Begin { seq, last } => {
+      let cont = explicate_tail(state, *last);
       explicate_effect(state, seq.into_iter(), cont)
     }
-    Exp::While { .. } | Exp::Set { .. } | Exp::Print { .. } | Exp::NewLine => {
+    ExpKind::While { .. }
+    | ExpKind::Set { .. }
+    | ExpKind::Print { .. }
+    | ExpKind::NewLine => {
       explicate_exp_effect(state, exp, CTail::Return(CExp::Atom(CAtom::Void)))
     }
   }
@@ -146,23 +203,30 @@ fn explicate_tail(state: &mut State, exp: Exp<IdxVar>) -> CTail {
 fn explicate_assign(
   state: &mut State,
   var: IdxVar,
-  init: Exp<IdxVar>,
+  init: Exp<IdxVar, Type>,
   cont: CTail,
 ) -> CTail {
-  match init {
-    Exp::Int(_)
-    | Exp::Var(_)
-    | Exp::Bool(_)
-    | Exp::Str(_)
-    | Exp::Get(_)
-    | Exp::Void => {
+  match init.kind {
+    ExpKind::Int(_) | ExpKind::Bool(_) | ExpKind::Str(_) => {
       let assign = CStmt::Assign {
         var,
         exp: CExp::Atom(atom(init)),
       };
       CTail::Seq(assign, box cont)
     }
-    Exp::Prim { op: (_, op), args } => {
+    ExpKind::Var(_) | ExpKind::Get(_) => {
+      if init.ty == Type::Void {
+        cont
+      } else {
+        let assign = CStmt::Assign {
+          var,
+          exp: CExp::Atom(atom(init)),
+        };
+        CTail::Seq(assign, box cont)
+      }
+    }
+    ExpKind::Void => cont,
+    ExpKind::Prim { op: (_, op), args } => {
       let prim = prim(op, args);
       let assign = CStmt::Assign {
         var,
@@ -170,45 +234,46 @@ fn explicate_assign(
       };
       CTail::Seq(assign, box cont)
     }
-    Exp::Let {
+    ExpKind::Let {
       var: (_, var1),
-      init: box (_, init1),
+      init: init1,
       body,
     } => {
-      let cont = explicate_assign(state, var, body.1, cont);
-      explicate_assign(state, var1, init1, cont)
+      let cont = explicate_assign(state, var, *body, cont);
+      explicate_assign(state, var1, *init1, cont)
     }
-    Exp::If { cond, conseq, alt } => {
+    ExpKind::If { cond, conseq, alt } => {
       let cont = state.tail_to_goto(cont);
-      let conseq = explicate_assign(state, var.clone(), conseq.1, cont.clone());
-      let alt = explicate_assign(state, var, alt.1, cont);
-      explicate_pred(state, cond.1, conseq, alt)
+      let conseq = explicate_assign(state, var.clone(), *conseq, cont.clone());
+      let alt = explicate_assign(state, var, *alt, cont);
+      explicate_pred(state, *cond, conseq, alt)
     }
-    Exp::Begin { seq, last } => {
-      let cont = explicate_assign(state, var, last.1, cont);
+    ExpKind::Begin { seq, last } => {
+      let cont = explicate_assign(state, var, *last, cont);
       explicate_effect(state, seq.into_iter(), cont)
     }
-    Exp::While { .. } | Exp::Print { .. } | Exp::NewLine | Exp::Set { .. } => {
-      explicate_exp_effect(state, init, cont)
-    }
+    ExpKind::While { .. }
+    | ExpKind::Print { .. }
+    | ExpKind::NewLine
+    | ExpKind::Set { .. } => explicate_exp_effect(state, init, cont),
   }
 }
 
 fn explicate_pred(
   state: &mut State,
-  cond: Exp<IdxVar>,
+  cond: Exp<IdxVar, Type>,
   conseq: CTail,
   alt: CTail,
 ) -> CTail {
-  match cond {
-    Exp::Bool(v) => {
+  match cond.kind {
+    ExpKind::Bool(v) => {
       if v {
         conseq
       } else {
         alt
       }
     }
-    Exp::Var(_) | Exp::Get(_) => {
+    ExpKind::Var(_) | ExpKind::Get(_) => {
       let conseq = state.tail_to_label(conseq);
       let alt = state.tail_to_label(alt);
       CTail::If {
@@ -219,20 +284,20 @@ fn explicate_pred(
         alt: conseq,
       }
     }
-    Exp::Let { var, init, body } => {
-      let cont = explicate_pred(state, body.1, conseq, alt);
-      explicate_assign(state, var.1, init.1, cont)
+    ExpKind::Let { var, init, body } => {
+      let cont = explicate_pred(state, *body, conseq, alt);
+      explicate_assign(state, var.1, *init, cont)
     }
-    Exp::Prim {
+    ExpKind::Prim {
       op: (_, "not"),
       mut args,
-    } => explicate_pred(state, args.pop().unwrap().1, alt, conseq),
-    Exp::Prim { op, mut args } => {
+    } => explicate_pred(state, args.pop().unwrap(), alt, conseq),
+    ExpKind::Prim { op, mut args } => {
       let conseq = state.tail_to_label(conseq);
       let alt = state.tail_to_label(alt);
       let cmp = op.1.parse().unwrap();
-      let rhs = args.pop().unwrap().1;
-      let lhs = args.pop().unwrap().1;
+      let rhs = args.pop().unwrap();
+      let lhs = args.pop().unwrap();
       CTail::If {
         cmp,
         lhs: atom(lhs),
@@ -241,7 +306,7 @@ fn explicate_pred(
         alt,
       }
     }
-    Exp::If {
+    ExpKind::If {
       cond: cond1,
       conseq: conseq1,
       alt: alt1,
@@ -249,21 +314,21 @@ fn explicate_pred(
       let conseq = state.tail_to_goto(conseq);
       let alt = state.tail_to_goto(alt);
       let conseq1 =
-        explicate_pred(state, conseq1.1, conseq.clone(), alt.clone());
-      let alt1 = explicate_pred(state, alt1.1, conseq, alt);
-      explicate_pred(state, cond1.1, conseq1, alt1)
+        explicate_pred(state, *conseq1, conseq.clone(), alt.clone());
+      let alt1 = explicate_pred(state, *alt1, conseq, alt);
+      explicate_pred(state, *cond1, conseq1, alt1)
     }
-    Exp::Begin { seq, last } => {
-      let cont = explicate_pred(state, last.1, conseq, alt);
+    ExpKind::Begin { seq, last } => {
+      let cont = explicate_pred(state, *last, conseq, alt);
       explicate_effect(state, seq.into_iter(), cont)
     }
-    Exp::Void
-    | Exp::Int(_)
-    | Exp::Str(_)
-    | Exp::While { .. }
-    | Exp::Print { .. }
-    | Exp::NewLine
-    | Exp::Set { .. } => {
+    ExpKind::Void
+    | ExpKind::Int(_)
+    | ExpKind::Str(_)
+    | ExpKind::While { .. }
+    | ExpKind::Print { .. }
+    | ExpKind::NewLine
+    | ExpKind::Set { .. } => {
       unreachable!()
     }
   }
@@ -271,117 +336,105 @@ fn explicate_pred(
 
 fn explicate_effect(
   state: &mut State,
-  seq: impl DoubleEndedIterator<Item = (Range, Exp<IdxVar>)>,
+  seq: impl DoubleEndedIterator<Item = Exp<IdxVar, Type>>,
   cont: CTail,
 ) -> CTail {
-  seq.rfold(cont, |cont, exp| explicate_exp_effect(state, exp.1, cont))
+  seq.rfold(cont, |cont, exp| explicate_exp_effect(state, exp, cont))
 }
 
 fn explicate_exp_effect(
   state: &mut State,
-  exp: Exp<IdxVar>,
+  exp: Exp<IdxVar, Type>,
   cont: CTail,
 ) -> CTail {
-  match exp {
-    Exp::Bool(_)
-    | Exp::Int(_)
-    | Exp::Var(_)
-    | Exp::Str(_)
-    | Exp::Void
-    | Exp::Get(_) => cont,
-    Exp::Prim {
+  match exp.kind {
+    ExpKind::Bool(_)
+    | ExpKind::Int(_)
+    | ExpKind::Var(_)
+    | ExpKind::Str(_)
+    | ExpKind::Void
+    | ExpKind::Get(_) => cont,
+    ExpKind::Prim {
       op: (_, "read"),
       args: _,
     } => CTail::Seq(CStmt::Read, box cont),
-    Exp::Prim { op: _, args } => {
+    ExpKind::Prim { op: _, args } => {
       explicate_effect(state, args.into_iter(), cont)
     }
-    Exp::Let { var, init, body } => {
-      let body = explicate_exp_effect(state, body.1, cont);
-      explicate_assign(state, var.1, init.1, body)
+    ExpKind::Let { var, init, body } => {
+      let body = explicate_exp_effect(state, *body, cont);
+      explicate_assign(state, var.1, *init, body)
     }
-    Exp::If { cond, conseq, alt } => {
+    ExpKind::If { cond, conseq, alt } => {
       let cont = state.tail_to_goto(cont);
-      let conseq = explicate_exp_effect(state, conseq.1, cont.clone());
-      let alt = explicate_exp_effect(state, alt.1, cont);
-      explicate_pred(state, cond.1, conseq, alt)
+      let conseq = explicate_exp_effect(state, *conseq, cont.clone());
+      let alt = explicate_exp_effect(state, *alt, cont);
+      explicate_pred(state, *cond, conseq, alt)
     }
-    Exp::Set { var, exp } => explicate_assign(state, var.1, exp.1, cont),
-    Exp::Begin { seq, last } => {
-      let cont = explicate_exp_effect(state, last.1, cont);
+    ExpKind::Set { var, exp } => explicate_assign(state, var.1, *exp, cont),
+    ExpKind::Begin { seq, last } => {
+      let cont = explicate_exp_effect(state, *last, cont);
       explicate_effect(state, seq.into_iter(), cont)
     }
-    Exp::While { cond, body } => {
+    ExpKind::While { cond, body } => {
       let loop_start = state.new_label();
-      let body = explicate_exp_effect(state, body.1, CTail::Goto(loop_start));
-      let block = explicate_pred(state, cond.1, body, cont);
+      let body = explicate_exp_effect(state, *body, CTail::Goto(loop_start));
+      let block = explicate_pred(state, *cond, body, cont);
       state.add_label_block(loop_start, block);
       CTail::Goto(loop_start)
     }
-    Exp::NewLine => CTail::Seq(CStmt::NewLine, box cont),
-    Exp::Print {
-      mut args,
-      mut types,
-    } => {
-      args.reverse();
-      types.reverse();
-      args.into_iter().zip(types).fold(
-        CTail::Seq(CStmt::NewLine, box cont),
-        |cont, (exp, ty)| {
-          let ty = match ty {
-            PrintType::Int => CType::Int,
-            PrintType::Bool => CType::Bool,
-            PrintType::Str => CType::Str,
-          };
-          CTail::Seq(
-            CStmt::Print {
-              val: atom(exp.1),
-              ty,
-            },
-            box cont,
-          )
-        },
-      )
-    }
+    ExpKind::NewLine => CTail::Seq(CStmt::NewLine, box cont),
+    ExpKind::Print(args) => args.into_iter().rfold(
+      CTail::Seq(CStmt::NewLine, box cont),
+      |cont, exp| {
+        CTail::Seq(
+          CStmt::Print {
+            ty: exp.ty,
+            val: atom(exp),
+          },
+          box cont,
+        )
+      },
+    ),
   }
 }
 
-fn atom(exp: Exp<IdxVar>) -> CAtom {
-  match exp {
-    Exp::Int(n) => CAtom::Int(n),
-    Exp::Var(var) | Exp::Get(var) => CAtom::Var(var),
-    Exp::Bool(v) => CAtom::Bool(v),
-    Exp::Str(s) => CAtom::Str(s),
-    Exp::Void => CAtom::Void,
+fn atom(exp: Exp<IdxVar, Type>) -> CAtom {
+  match exp.kind {
+    ExpKind::Int(n) => CAtom::Int(n),
+    ExpKind::Var(var) | ExpKind::Get(var) => CAtom::Var(var),
+    ExpKind::Bool(v) => CAtom::Bool(v),
+    ExpKind::Str(s) => CAtom::Str(s),
+    ExpKind::Void => CAtom::Void,
     _ => unreachable!("{:?}", exp),
   }
 }
 
-fn prim(op: &str, mut args: Vec<(Range, Exp<IdxVar>)>) -> CPrim {
+fn prim(op: &str, mut args: Vec<Exp<IdxVar, Type>>) -> CPrim {
   match op {
     "read" => CPrim::Read,
     "-" => {
       if args.len() == 1 {
-        let arg = args.pop().unwrap().1;
+        let arg = args.pop().unwrap();
         CPrim::Neg(atom(arg))
       } else {
-        let arg2 = args.pop().unwrap().1;
-        let arg1 = args.pop().unwrap().1;
+        let arg2 = args.pop().unwrap();
+        let arg1 = args.pop().unwrap();
         CPrim::Sub(atom(arg1), atom(arg2))
       }
     }
     "+" => {
-      let arg2 = args.pop().unwrap().1;
-      let arg1 = args.pop().unwrap().1;
+      let arg2 = args.pop().unwrap();
+      let arg1 = args.pop().unwrap();
       CPrim::Add(atom(arg1), atom(arg2))
     }
     "not" => {
-      let arg = args.pop().unwrap().1;
+      let arg = args.pop().unwrap();
       CPrim::Not(atom(arg))
     }
     "eq?" | ">" | ">=" | "<" | "<=" => {
-      let arg2 = args.pop().unwrap().1;
-      let arg1 = args.pop().unwrap().1;
+      let arg2 = args.pop().unwrap();
+      let arg1 = args.pop().unwrap();
       CPrim::Cmp(op.parse().unwrap(), atom(arg1), atom(arg2))
     }
     _ => unreachable!("{}", op),
@@ -400,6 +453,7 @@ mod tests {
     let prog =
       ast::parse(r#"(let ([y (let ([x 20]) (+ x (let ([x 22]) x)))]) y)"#)
         .unwrap();
+    let prog = typecheck::typecheck(prog).unwrap();
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let result = explicate_control(prog);
@@ -412,6 +466,7 @@ mod tests {
       r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#,
     )
     .unwrap();
+    let prog = typecheck::typecheck(prog).unwrap();
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let result = explicate_control(prog);
@@ -423,6 +478,7 @@ mod tests {
     let prog =
       ast::parse(r#"(if (> 3 (read)) (- 7 2) (- (let ([x 3]) (+ x (read)))))"#)
         .unwrap();
+    let prog = typecheck::typecheck(prog).unwrap();
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let result = explicate_control(prog);
@@ -443,6 +499,7 @@ mod tests {
 "#,
     )
     .unwrap();
+    let prog = typecheck::typecheck(prog).unwrap();
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let result = explicate_control(prog);
@@ -452,6 +509,7 @@ mod tests {
   #[test]
   fn const_cond() {
     let prog = ast::parse(r#"(if (not #t) 1 2)"#).unwrap();
+    let prog = typecheck::typecheck(prog).unwrap();
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let result = explicate_control(prog);
@@ -464,6 +522,7 @@ mod tests {
       r#"(let ([x (if (>= (read) 3) 10 77)]) (if (not (eq? x 10)) 41 2))"#,
     )
     .unwrap();
+    let prog = typecheck::typecheck(prog).unwrap();
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let result = explicate_control(prog);
@@ -474,6 +533,7 @@ mod tests {
   fn var_cond() {
     let prog =
       ast::parse(r#"(let ([x (eq? (read) 20)]) (if x 42 89))"#).unwrap();
+    let prog = typecheck::typecheck(prog).unwrap();
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let result = explicate_control(prog);
@@ -484,6 +544,7 @@ mod tests {
   fn shrink_and() {
     let prog =
       ast::parse(r#"(if (and (eq? (read) 0) (eq? (read) 2)) 0 42)"#).unwrap();
+    let prog = typecheck::typecheck(prog).unwrap();
     let prog = shrink::shrink(prog);
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);

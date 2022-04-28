@@ -1,0 +1,12 @@
+---
+source: ch5/src/pass/explicate_control.rs
+expression: result.to_string_pretty()
+---
+locals: {y.1}
+
+start:
+    y.1 = 1
+    newline
+    y.1 = 10
+    return #<void>
+

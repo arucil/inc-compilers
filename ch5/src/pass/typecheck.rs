@@ -1,21 +1,21 @@
-use ast::{Program};
+use ast::{Program, Type};
+use ch4::pass::typecheck::typecheck_exp;
 use std::collections::HashMap;
 use support::CompileError;
-use ch4::pass::typecheck::{Type, typecheck_exp};
 
 pub type Result<T> = std::result::Result<T, CompileError>;
 
-pub fn typecheck(prog: Program) -> Result<Program> {
+pub fn typecheck(prog: Program) -> Result<Program<String, Type>> {
   let body = prog
     .body
     .into_iter()
     .map(|exp| {
-      let range = exp.0;
-      let (exp, ty) = typecheck_exp(&mut HashMap::new(), exp)?;
-      if ty != Type::Void {
+      let range = exp.range;
+      let exp = typecheck_exp(&mut HashMap::new(), exp)?;
+      if exp.ty != Type::Void {
         return Err(CompileError {
           range,
-          message: format!("expected Void, found {:?}", ty),
+          message: format!("expected Void, found {:?}", exp.ty),
         });
       }
       Ok(exp)

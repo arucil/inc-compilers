@@ -1,7 +1,8 @@
 start
 y!=z false
 ?=7
-?=neg!
--3
+neg!
+?=-3
+?=8
 ?=8
 12

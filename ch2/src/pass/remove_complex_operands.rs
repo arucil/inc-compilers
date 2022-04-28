@@ -1,149 +1,184 @@
-use ast::{Exp, IdxVar, Program};
+use ast::{Exp, ExpKind, IdxVar, Program};
 use support::Range;
 
-pub fn remove_complex_operands(prog: Program<IdxVar>) -> Program<IdxVar> {
+pub fn remove_complex_operands<TYPE: Copy>(
+  prog: Program<IdxVar, TYPE>,
+) -> Program<IdxVar, TYPE> {
   let mut counter = 0;
   Program {
     body: prog
       .body
       .into_iter()
-      .map(|(range, exp)| (range, mon_exp(range, exp, &mut counter)))
+      .map(|exp| mon_exp(exp, &mut counter))
       .collect(),
   }
 }
 
-struct TmpVar {
+struct TmpVar<TYPE> {
   range: Range,
   name: IdxVar,
   /// May be not atomic.
-  init: Exp<IdxVar>,
+  init: Exp<IdxVar, TYPE>,
 }
 
 /// process expressions that do not need to be atomic.
 ///
 /// `mon` stands for Monadic Normal Form.
-fn mon_exp(range: Range, exp: Exp<IdxVar>, counter: &mut usize) -> Exp<IdxVar> {
-  match exp {
-    Exp::Int(..) => exp,
-    Exp::Var(..) => exp,
-    Exp::Let { var, init, body } => Exp::Let {
-      var,
-      init: box (init.0, mon_exp(init.0, init.1, counter)),
-      body: box (body.0, mon_exp(body.0, body.1, counter)),
+fn mon_exp<TYPE: Copy>(
+  exp: Exp<IdxVar, TYPE>,
+  counter: &mut usize,
+) -> Exp<IdxVar, TYPE> {
+  let range = exp.range;
+  let ty = exp.ty;
+  match exp.kind {
+    ExpKind::Int(..) => exp,
+    ExpKind::Var(..) => exp,
+    ExpKind::Let { var, init, body } => Exp {
+      kind: ExpKind::Let {
+        var,
+        init: box mon_exp(*init, counter),
+        body: box mon_exp(*body, counter),
+      },
+      range,
+      ty,
     },
-    Exp::Prim { op, args } => {
-      mon_prim(range, args, |args| Exp::Prim { op, args }, counter)
-    }
+    ExpKind::Prim { op, args } => mon_prim(
+      args,
+      |args| Exp {
+        kind: ExpKind::Prim { op, args },
+        range,
+        ty,
+      },
+      counter,
+    ),
     // ch4
-    Exp::If { cond, conseq, alt } => Exp::If {
-      cond: box (cond.0, mon_exp(cond.0, cond.1, counter)),
-      conseq: box (conseq.0, mon_exp(conseq.0, conseq.1, counter)),
-      alt: box (alt.0, mon_exp(alt.0, alt.1, counter)),
+    ExpKind::If { cond, conseq, alt } => Exp {
+      kind: ExpKind::If {
+        cond: box mon_exp(*cond, counter),
+        conseq: box mon_exp(*conseq, counter),
+        alt: box mon_exp(*alt, counter),
+      },
+      range,
+      ty,
     },
-    Exp::Bool(..) => exp,
+    ExpKind::Bool(..) => exp,
     // ch5
-    Exp::Get(..) => exp,
-    Exp::Set { var, exp } => Exp::Set {
-      var,
-      exp: box (exp.0, mon_exp(exp.0, exp.1, counter)),
+    ExpKind::Get(..) => exp,
+    ExpKind::Set { var, exp } => Exp {
+      kind: ExpKind::Set {
+        var,
+        exp: box mon_exp(*exp, counter),
+      },
+      range,
+      ty,
     },
-    Exp::Begin { seq, last } => Exp::Begin {
-      seq: seq
-        .into_iter()
-        .map(|exp| (exp.0, mon_exp(exp.0, exp.1, counter)))
-        .collect(),
-      last: box (last.0, mon_exp(last.0, last.1, counter)),
+    ExpKind::Begin { seq, last } => Exp {
+      kind: ExpKind::Begin {
+        seq: seq.into_iter().map(|exp| mon_exp(exp, counter)).collect(),
+        last: box mon_exp(*last, counter),
+      },
+      range,
+      ty,
     },
-    Exp::While { cond, body } => Exp::While {
-      cond: box (cond.0, mon_exp(cond.0, cond.1, counter)),
-      body: box (body.0, mon_exp(body.0, body.1, counter)),
+    ExpKind::While { cond, body } => Exp {
+      kind: ExpKind::While {
+        cond: box mon_exp(*cond, counter),
+        body: box mon_exp(*body, counter),
+      },
+      range,
+      ty,
     },
-    Exp::Void => exp,
-    Exp::Print { args, types } => {
-      mon_prim(range, args, |args| Exp::Print { args, types }, counter)
-    }
-    Exp::Str(..) => exp,
-    Exp::NewLine => exp,
+    ExpKind::Void => exp,
+    ExpKind::Print(args) => mon_prim(
+      args,
+      |args| Exp {
+        kind: ExpKind::Print(args),
+        range,
+        ty,
+      },
+      counter,
+    ),
+    ExpKind::Str(..) => exp,
+    ExpKind::NewLine => exp,
   }
 }
 
-fn mon_prim(
-  range: Range,
-  args: Vec<(Range, Exp<IdxVar>)>,
-  build_exp: impl FnOnce(Vec<(Range, Exp<IdxVar>)>) -> Exp<IdxVar>,
+fn mon_prim<TYPE: Copy>(
+  args: Vec<Exp<IdxVar, TYPE>>,
+  build_exp: impl FnOnce(Vec<Exp<IdxVar, TYPE>>) -> Exp<IdxVar, TYPE>,
   counter: &mut usize,
-) -> Exp<IdxVar> {
+) -> Exp<IdxVar, TYPE> {
   let mut tmps = vec![];
   let args = args
     .into_iter()
-    .map(|(range, arg)| (range, atom_exp(range, arg, &mut tmps, counter)))
+    .map(|arg| atom_exp(arg, &mut tmps, counter))
     .collect();
-  tmps
-    .into_iter()
-    .rfold((range, build_exp(args)), |(body_range, body), tmp| {
-      (
-        body_range,
-        Exp::Let {
-          var: (tmp.range, tmp.name),
-          init: box (range, tmp.init),
-          body: box (body_range, body),
-        },
-      )
-    })
-    .1
+  tmps.into_iter().rfold(build_exp(args), |body, tmp| Exp {
+    range: body.range,
+    ty: tmp.init.ty,
+    kind: ExpKind::Let {
+      var: (tmp.range, tmp.name),
+      init: box tmp.init,
+      body: box body,
+    },
+  })
 }
 
 /// Process expressions that need to be atomic.
-fn atom_exp(
-  range: Range,
-  exp: Exp<IdxVar>,
-  tmps: &mut Vec<TmpVar>,
+fn atom_exp<TYPE: Copy>(
+  exp: Exp<IdxVar, TYPE>,
+  tmps: &mut Vec<TmpVar<TYPE>>,
   counter: &mut usize,
-) -> Exp<IdxVar> {
-  match exp {
-    Exp::Let { var, init, body } => {
+) -> Exp<IdxVar, TYPE> {
+  match exp.kind {
+    ExpKind::Let { var, init, body } => {
       tmps.push(TmpVar {
         range: var.0,
         name: var.1,
-        init: mon_exp(init.0, init.1, counter),
+        init: mon_exp(*init, counter),
       });
-      atom_exp(body.0, body.1, tmps, counter)
+      atom_exp(*body, tmps, counter)
     }
-    Exp::Prim { op, args } => {
+    ExpKind::Prim { op, args } => {
       let args = args
         .into_iter()
-        .map(|(range, arg)| (range, atom_exp(range, arg, tmps, counter)))
+        .map(|arg| atom_exp(arg, tmps, counter))
         .collect();
-      let exp = Exp::Prim { op, args };
-      assign_var(range, exp, tmps, counter)
+      let exp = Exp {
+        kind: ExpKind::Prim { op, args },
+        range: exp.range,
+        ty: exp.ty,
+      };
+      assign_var(exp, tmps, counter)
     }
-    Exp::Bool(..) | Exp::Int(..) | Exp::Var(..) => exp,
+    ExpKind::Bool(..) | ExpKind::Int(..) | ExpKind::Var(..) => exp,
     // ch4
-    Exp::If { .. } => {
-      let exp = mon_exp(range, exp, counter);
-      assign_var(range, exp, tmps, counter)
+    ExpKind::If { .. } => {
+      let exp = mon_exp(exp, counter);
+      assign_var(exp, tmps, counter)
     }
     // ch5
-    Exp::Get(..)
-    | Exp::Begin { .. }
-    | Exp::While { .. }
-    | Exp::Set { .. }
-    | Exp::Print { .. } => {
-      let exp = mon_exp(range, exp, counter);
-      assign_var(range, exp, tmps, counter)
+    ExpKind::Get(..)
+    | ExpKind::Begin { .. }
+    | ExpKind::While { .. }
+    | ExpKind::Set { .. }
+    | ExpKind::Print { .. } => {
+      let exp = mon_exp(exp, counter);
+      assign_var(exp, tmps, counter)
     }
-    Exp::Void => exp,
-    Exp::Str(..) => exp,
-    Exp::NewLine => exp,
+    ExpKind::Void => exp,
+    ExpKind::Str(..) => exp,
+    ExpKind::NewLine => exp,
   }
 }
 
-fn assign_var(
-  range: Range,
-  exp: Exp<IdxVar>,
-  tmps: &mut Vec<TmpVar>,
+fn assign_var<TYPE: Copy>(
+  exp: Exp<IdxVar, TYPE>,
+  tmps: &mut Vec<TmpVar<TYPE>>,
   counter: &mut usize,
-) -> Exp<IdxVar> {
+) -> Exp<IdxVar, TYPE> {
+  let range = exp.range;
+  let ty = exp.ty;
   let tmp = IdxVar {
     name: "tmp".to_owned(),
     index: *counter,
@@ -154,7 +189,11 @@ fn assign_var(
     name: tmp.clone(),
     init: exp,
   });
-  Exp::Var(tmp)
+  Exp {
+    kind: ExpKind::Var(tmp),
+    range,
+    ty,
+  }
 }
 
 #[cfg(test)]

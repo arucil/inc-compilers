@@ -12,4 +12,4 @@
             (set! z (+ z 1))
             (- step))
           z))))
-  x)
+  (print x))

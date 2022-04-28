@@ -30,16 +30,16 @@ section .rodata
     xor rcx, rcx
     xor r8, r8
     cmp rax, 0
-    jge int_len_loop
+    jge %%loop
     inc rcx
     neg rax
     inc r8
-int_len_loop:
+%%loop:
     inc rcx
     xor rdx, rdx
     div r9
     cmp rax, 0
-    jne int_len_loop
+    jne %%loop
 %endmacro
 
 %macro is_space 1
@@ -79,20 +79,20 @@ int_to_str:
     int_len
     mov rax, rsi
     cmp r8, 0
-    je int_to_str_positive
+    je .positive
     neg rax
     mov [rdi], byte '-'
-int_to_str_positive:
+.positive:
     add rdi, rcx
     mov r9, 10
-int_to_str_loop:
+.loop:
     xor rdx, rdx
     div r9
     add rdx, 48
     dec rdi
     mov [rdi], dl
     cmp rax, 0
-    jne int_to_str_loop
+    jne .loop
     ret
 
 ;; args:
@@ -103,13 +103,13 @@ int_to_str_loop:
     global str_len
 str_len:
     xor rcx, rcx
-str_len_loop:
+.loop:
     cmp [rdi], byte 0
-    je str_len_end
+    je .end
     inc rdi
     inc rcx
-    jmp str_len_loop
-str_len_end:
+    jmp .loop
+.end:
     ret
 
 ;; rdi: address
@@ -126,32 +126,32 @@ str_to_int:
     xor r8, r8
     mov r9, 10
     cmp [rdi], byte '-'
-    jne str_to_int_loop
+    jne .loop
     dec rcx
     inc rdi
     inc r8
-str_to_int_loop:
+.loop:
     cmp rcx, 0
-    je str_to_int_after
+    je .after
     mul r9
     xor rdx, rdx
     mov dl, [rdi]
     cmp dl, 57
-    jg str_to_int_error
+    jg .error
     cmp dl, 48
-    jl str_to_int_error
+    jl .error
     sub rdx, 48
     add rax, rdx
     dec rcx
     inc rdi
-    jmp str_to_int_loop
-str_to_int_after:
+    jmp .loop
+.after:
     cmp r8, 0
-    je str_to_int_end
+    je .end
     neg rax
-str_to_int_end:
+.end:
     ret
-str_to_int_error:
+.error:
     mov rax, 1
     mov rdi, 1
     mov rsi, invalid_integer
@@ -195,14 +195,14 @@ print_str:
     global print_bool
 print_bool:
     cmp rax, 0
-    je print_bool_f
+    je .false
     mov rsi, true_lit
     mov rdx, true_lit_len
     mov rax, 1
     mov rdi, 1
     syscall
     ret
-print_bool_f:
+.false:
     mov rsi, false_lit
     mov rdx, false_lit_len
     mov rax, 1
@@ -238,24 +238,24 @@ read_int:
     call read_line
     mov rsi, input_buf
     ; skip spaces
-read_int_skip_spaces:
+.skip_spaces:
     mov al, [rsi]
     is_space al
-    jne read_int_skip_trailing_spaces
+    jne .skip_starting_spaces
     inc rsi
     dec rcx
-    jmp read_int_skip_spaces
-read_int_skip_trailing_spaces:
+    jmp .skip_spaces
+.skip_starting_spaces:
     mov rdi, rsi
     add rsi, rcx
     dec rsi
-read_int_skip_trailing_spaces_loop:
+.skip_starting_spaces_loop:
     mov al, [rsi]
     is_space al
     jne str_to_int
     dec rsi
     dec rcx
-    jmp read_int_skip_trailing_spaces_loop
+    jmp .skip_starting_spaces_loop
 
 ;; args:
 ;;   rdi: buffer address
@@ -272,23 +272,23 @@ read_line:
     mov r10, rcx
     xor r9, r9
     cmp qword [has_char], 0
-    jne read_line_skip_read
-    jmp read_line_start
-read_line_loop:
+    jne .skip_read
+    jmp .start
+.loop:
     mov byte [r8], al
     inc r8
     inc r9
     cmp r9, r10
-    jge read_line_end
-read_line_start:
+    jge .end
+.start:
     read_char char_buf
     cmp rax, 0
-    je read_line_end
-read_line_skip_read:
+    je .end
+.skip_read:
     mov al, [char_buf]
     cmp al, `\n`
-    jne read_line_loop
-read_line_end:
+    jne .loop
+.end:
     mov rcx, r9
     mov qword [has_char], 0
     ret

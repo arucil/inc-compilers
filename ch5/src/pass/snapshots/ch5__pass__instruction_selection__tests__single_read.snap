@@ -6,6 +6,5 @@ locals: {}
 
 start:
     call read_int
-    mov rax, rax
     jmp conclusion
 

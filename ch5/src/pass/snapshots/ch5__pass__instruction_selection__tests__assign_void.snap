@@ -2,7 +2,7 @@
 source: ch5/src/pass/instruction_selection.rs
 expression: result.to_string_pretty()
 ---
-locals: {x.0, y.1}
+locals: {}
 
 start:
     mov rax, 3

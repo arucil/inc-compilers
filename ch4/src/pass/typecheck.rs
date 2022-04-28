@@ -1,18 +1,10 @@
-use ast::{Exp, PrintType, Program};
+use ast::{Exp, ExpKind, Program, Type};
 use maplit::hashmap;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use support::{CompileError, Range};
 
 pub type Result<T> = std::result::Result<T, CompileError>;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Type {
-  Int,
-  Bool,
-  Str,
-  Void,
-}
 
 type PrimType = Vec<(Vec<Type>, Type)>;
 
@@ -36,17 +28,17 @@ static PRIM_TYPES: Lazy<HashMap<&'static str, PrimType>> = Lazy::new(|| {
   }
 });
 
-pub fn typecheck(prog: Program) -> Result<Program> {
+pub fn typecheck(prog: Program) -> Result<Program<String, Type>> {
   let body = prog
     .body
     .into_iter()
     .map(|exp| {
-      let range = exp.0;
-      let (exp, ty) = typecheck_exp(&mut HashMap::new(), exp)?;
-      if ty != Type::Int {
+      let range = exp.range;
+      let exp = typecheck_exp(&mut HashMap::new(), exp)?;
+      if exp.ty != Type::Int {
         return Err(CompileError {
           range,
-          message: format!("expected Int, found {:?}", ty),
+          message: format!("expected Int, found {:?}", exp.ty),
         });
       }
       Ok(exp)
@@ -57,16 +49,37 @@ pub fn typecheck(prog: Program) -> Result<Program> {
 
 pub fn typecheck_exp(
   env: &mut HashMap<String, Type>,
-  (range, exp): (Range, Exp),
-) -> Result<((Range, Exp), Type)> {
-  match exp {
-    Exp::Int(_) => Ok(((range, exp), Type::Int)),
-    Exp::Bool(_) => Ok(((range, exp), Type::Bool)),
-    Exp::Str(_) => Ok(((range, exp), Type::Str)),
-    Exp::Void => Ok(((range, exp), Type::Void)),
-    Exp::Var(ref var) | Exp::Get(ref var) => {
-      if let Some(&ty) = env.get(var) {
-        Ok(((range, exp), ty))
+  exp: Exp,
+) -> Result<Exp<String, Type>> {
+  let range = exp.range;
+  match exp.kind {
+    ExpKind::Int(n) => Ok(Exp {
+      kind: ExpKind::Int(n),
+      range,
+      ty: Type::Int,
+    }),
+    ExpKind::Bool(b) => Ok(Exp {
+      kind: ExpKind::Bool(b),
+      range,
+      ty: Type::Bool,
+    }),
+    ExpKind::Str(s) => Ok(Exp {
+      kind: ExpKind::Str(s),
+      range,
+      ty: Type::Str,
+    }),
+    ExpKind::Void => Ok(Exp {
+      kind: ExpKind::Void,
+      range,
+      ty: Type::Void,
+    }),
+    ExpKind::Var(var) => {
+      if let Some(&ty) = env.get(&var) {
+        Ok(Exp {
+          kind: ExpKind::Var(var),
+          range,
+          ty,
+        })
       } else {
         Err(CompileError {
           range,
@@ -74,84 +87,95 @@ pub fn typecheck_exp(
         })
       }
     }
-    Exp::Prim { op, args } => {
+    ExpKind::Get(var) => {
+      if let Some(&ty) = env.get(&var) {
+        Ok(Exp {
+          kind: ExpKind::Get(var),
+          range,
+          ty,
+        })
+      } else {
+        Err(CompileError {
+          range,
+          message: format!("variable {} not found", var),
+        })
+      }
+    }
+    ExpKind::Prim { op, args } => {
       let args = args
         .into_iter()
         .map(|arg| typecheck_exp(env, arg))
         .collect::<Result<Vec<_>>>()?;
-      let arg_types = args.iter().map(|(_, ty)| *ty).collect::<Vec<_>>();
-      let args = args.into_iter().map(|(arg, _)| arg).collect();
+      let arg_types = args.iter().map(|arg| arg.ty).collect::<Vec<_>>();
       let ty = typecheck_op(range, op.1, &arg_types)?;
-      Ok(((range, Exp::Prim { op, args }), ty))
+      Ok(Exp {
+        kind: ExpKind::Prim { op, args },
+        range,
+        ty,
+      })
     }
-    Exp::Let { var, init, body } => {
-      let (init, init_ty) = typecheck_exp(env, *init)?;
-      let old_var_ty = env.insert(var.1.clone(), init_ty);
-      let (body, ty) = typecheck_exp(env, *body)?;
+    ExpKind::Let { var, init, body } => {
+      let init = typecheck_exp(env, *init)?;
+      let old_var_ty = env.insert(var.1.clone(), init.ty);
+      let body = typecheck_exp(env, *body)?;
       if let Some(old_var_ty) = old_var_ty {
         env.insert(var.1.clone(), old_var_ty);
       } else {
         env.remove(&var.1);
       }
-      Ok((
-        (
-          range,
-          Exp::Let {
-            var,
-            init: box init,
-            body: box body,
-          },
-        ),
-        ty,
-      ))
+      Ok(Exp {
+        ty: body.ty,
+        kind: ExpKind::Let {
+          var,
+          init: box init,
+          body: box body,
+        },
+        range,
+      })
     }
-    Exp::If { cond, conseq, alt } => {
-      let (cond, ty) = typecheck_exp(env, *cond)?;
-      if ty != Type::Bool {
+    ExpKind::If { cond, conseq, alt } => {
+      let cond = typecheck_exp(env, *cond)?;
+      if cond.ty != Type::Bool {
         return Err(CompileError {
-          range: cond.0,
-          message: format!("expected Bool, found {:?}", ty),
+          range: cond.range,
+          message: format!("expected Bool, found {:?}", cond.ty),
         });
       }
-      let (conseq, ty1) = typecheck_exp(env, *conseq)?;
-      let (alt, ty2) = typecheck_exp(env, *alt)?;
-      if ty1 != ty2 {
+      let conseq = typecheck_exp(env, *conseq)?;
+      let alt = typecheck_exp(env, *alt)?;
+      if conseq.ty != alt.ty {
         return Err(CompileError {
           range,
-          message: format!("type mismatch, {:?} != {:?}", ty1, ty2),
+          message: format!("type mismatch, {:?} != {:?}", conseq.ty, alt.ty),
         });
       }
-      Ok((
-        (
-          range,
-          Exp::If {
-            cond: box cond,
-            conseq: box conseq,
-            alt: box alt,
-          },
-        ),
-        ty1,
-      ))
+      Ok(Exp {
+        ty: conseq.ty,
+        kind: ExpKind::If {
+          cond: box cond,
+          conseq: box conseq,
+          alt: box alt,
+        },
+        range,
+      })
     }
-    Exp::Set { ref var, exp } => {
+    ExpKind::Set { ref var, exp } => {
       if let Some(&ty) = env.get(&var.1) {
-        let (exp, exp_ty) = typecheck_exp(env, *exp)?;
-        if ty != exp_ty {
+        let exp = typecheck_exp(env, *exp)?;
+        if ty != exp.ty {
           return Err(CompileError {
             range,
-            message: format!("type mismatch, {:?} != {:?}", ty, exp_ty),
+            message: format!("type mismatch, {:?} != {:?}", ty, exp.ty),
           });
         }
-        Ok((
-          (
-            range,
-            Exp::Set {
-              var: var.clone(),
-              exp: box exp,
-            },
-          ),
-          Type::Void,
-        ))
+        Ok(Exp {
+          kind: ExpKind::Set {
+            var: var.clone(),
+            exp: box exp,
+          },
+          range,
+          ty: Type::Void,
+        })
       } else {
         Err(CompileError {
           range,
@@ -159,66 +183,67 @@ pub fn typecheck_exp(
         })
       }
     }
-    Exp::Begin { seq, last } => {
-      let (last, last_ty) = typecheck_exp(env, *last)?;
+    ExpKind::Begin { seq, last } => {
+      let last = typecheck_exp(env, *last)?;
       let seq: Vec<_> = seq
         .into_iter()
-        .map(|exp| typecheck_exp(env, exp).map(|r| r.0))
+        .map(|exp| typecheck_exp(env, exp))
         .collect::<Result<_>>()?;
-      Ok((
-        (
-          range,
-          Exp::Begin {
-            seq,
-            last: box last,
-          },
-        ),
-        last_ty,
-      ))
+      Ok(Exp {
+        ty: last.ty,
+        kind: ExpKind::Begin {
+          seq,
+          last: box last,
+        },
+        range,
+      })
     }
-    Exp::While { cond, body } => {
-      let (cond, ty) = typecheck_exp(env, *cond)?;
-      if ty != Type::Bool {
+    ExpKind::While { cond, body } => {
+      let cond = typecheck_exp(env, *cond)?;
+      if cond.ty != Type::Bool {
         return Err(CompileError {
-          range: cond.0,
-          message: format!("expected Bool, found {:?}", ty),
+          range: cond.range,
+          message: format!("expected Bool, found {:?}", cond.ty),
         });
       }
-      let (body, _) = typecheck_exp(env, *body)?;
-      Ok((
-        (
-          range,
-          Exp::While {
-            cond: box cond,
-            body: box body,
-          },
-        ),
-        Type::Void,
-      ))
+      let body = typecheck_exp(env, *body)?;
+      Ok(Exp {
+        kind: ExpKind::While {
+          cond: box cond,
+          body: box body,
+        },
+        range,
+        ty: Type::Void,
+      })
     }
-    Exp::Print { args, types: _ } => {
-      let tys = args
+    ExpKind::Print(args) => {
+      let args = args
         .into_iter()
         .map(|exp| {
-          let (val, ty) = typecheck_exp(env, exp)?;
-          let ty = match ty {
-            Type::Int => PrintType::Int,
-            Type::Bool => PrintType::Bool,
-            Type::Str => PrintType::Str,
-            _ => {
-              return Err(CompileError {
-                range,
-                message: format!("expected Int, Bool, or Str, found {:?}", ty),
-              });
-            }
-          };
-          Ok((val, ty))
+          let val = typecheck_exp(env, exp)?;
+          if !matches!(val.ty, Type::Int | Type::Bool | Type::Str) {
+            return Err(CompileError {
+              range,
+              message: format!(
+                "expected Int, Bool, or Str, found {:?}",
+                val.ty
+              ),
+            });
+          }
+          Ok(val)
         })
         .collect::<Result<Vec<_>>>()?;
-      let (args, types) = tys.into_iter().unzip();
-      Ok(((range, Exp::Print { args, types }), Type::Void))
+      Ok(Exp {
+        kind: ExpKind::Print(args),
+        range,
+        ty: Type::Void,
+      })
     }
-    Exp::NewLine => Ok(((range, Exp::NewLine), Type::Void)),
+    ExpKind::NewLine => Ok(Exp {
+      kind: ExpKind::NewLine,
+      range,
+      ty: Type::Void,
+    }),
   }
 }
 
