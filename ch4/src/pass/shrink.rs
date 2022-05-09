@@ -2,7 +2,7 @@ use ast::{Exp, ExpKind, Program, Type};
 
 pub fn shrink(prog: Program<String, Type>) -> Program<String, Type> {
   let body = prog.body.into_iter().map(shrink_exp).collect();
-  Program { body }
+  Program { body, types: prog.types }
 }
 
 fn shrink_exp(exp: Exp<String, Type>) -> Exp<String, Type> {

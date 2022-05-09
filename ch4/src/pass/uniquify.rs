@@ -11,6 +11,7 @@ pub fn uniquify<TYPE>(prog: Program<String, TYPE>) -> Program<IdxVar, TYPE> {
       .into_iter()
       .map(|exp| uniquify_exp(exp, &mut env, &mut counter).unwrap())
       .collect(),
+    types: prog.types,
   }
 }
 

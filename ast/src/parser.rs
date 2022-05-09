@@ -205,6 +205,7 @@ fn build_prog(input: &str, cst: Vec<Cst>) -> Result<Program> {
       .into_iter()
       .map(|c| build_exp(input, c))
       .collect::<Result<_>>()?,
+    types: Default::default(),
   })
 }
 
@@ -223,7 +224,21 @@ fn build_exp(input: &str, cst: Cst) -> Result<Exp> {
           "void" => build_void(input, xs, range),
           _ => {
             const OPERATORS: &[&str] = &[
-              "read", "+", "-", "and", "or", "not", "eq?", ">", "<", ">=", "<=",
+              "read",
+              "+",
+              "-",
+              "and",
+              "or",
+              "not",
+              "eq?",
+              ">",
+              "<",
+              ">=",
+              "<=",
+              "vector",
+              "vector-length",
+              "vector-ref",
+              "vector-set!",
             ];
             if let Some(&op) = OPERATORS.iter().find(|&&s| s == op) {
               let op = (sym_range, op);

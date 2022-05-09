@@ -117,7 +117,7 @@ impl<INFO: Debug, VAR: Debug> Program<INFO, VAR> {
     let mut buf = format!("{:?}", self.info);
     for (label, block) in &self.blocks {
       writeln!(&mut buf, "{:?}:", label).unwrap();
-      buf += &format!("{:?}", block);
+      write!(&mut buf, "{:?}", block).unwrap();
     }
     buf
   }
@@ -132,8 +132,8 @@ impl<INFO: Debug, VAR: Debug> Program<INFO, VAR> {
         buf += "    ";
         buf += name;
         buf += " dq ";
-        buf += &format!("{}", str.len());
-        buf += "\n    ";
+        writeln!(&mut buf, "{}", str.len()).unwrap();
+        buf += "    ";
         for _ in 0..name.len() {
           buf += " ";
         }
@@ -149,11 +149,10 @@ impl<INFO: Debug, VAR: Debug> Program<INFO, VAR> {
       buf += "\n";
       if block.global {
         buf += "    global ";
-        buf += &format!("{:?}", label);
-        buf += "\n";
+        writeln!(&mut buf, "{:?}", label).unwrap();
       }
       writeln!(&mut buf, "{:?}:", label).unwrap();
-      buf += &format!("{:?}", block);
+      write!(&mut buf, "{:?}", block).unwrap();
     }
     buf
   }

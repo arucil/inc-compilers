@@ -10,13 +10,13 @@ ast = { path = "../ast" }
 asm = { path = "../asm" }
 support = { path = "../support" }
 ch2 = { path = "../ch2" }
-indexmap = "1.7.0"
-smallvec = "1.7.0"
-num-traits = "0.2.14"
+indexmap = "1.8.1"
+smallvec = "1.8.0"
+num-traits = "0.2.15"
 maplit = "1.0.2"
 petgraph = "0.6.0"
-priority-queue = "1.2.0"
+priority-queue = "1.2.1"
 
 [dev-dependencies]
-insta = "1.8.0"
-pretty_assertions = "1.0.0"
+insta = "1.14.0"
+pretty_assertions = "1.2.1"

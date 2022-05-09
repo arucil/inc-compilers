@@ -85,7 +85,7 @@ impl<INFO: Debug> CProgram<INFO> {
     let mut buf = format!("{:?}", self.info);
     for (label, block) in &self.body {
       writeln!(&mut buf, "{:?}:", label).unwrap();
-      buf += &format!("{:?}\n", block);
+      writeln!(&mut buf, "{:?}", block).unwrap();
     }
     buf
   }

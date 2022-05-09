@@ -166,6 +166,7 @@ mod tests {
   use indexmap::indexset;
   use insta::assert_snapshot;
   use maplit::hashmap;
+  use std::fmt::Write;
 
   trait ShowLiveness {
     fn show(&self) -> String;
@@ -183,8 +184,7 @@ mod tests {
           buf += "                ";
           l.write(&mut buf, &self.info.var_store).unwrap();
           buf += "\n";
-          buf += &format!("{:?}", block.code[i]);
-          buf += "\n";
+          writeln!(&mut buf, "{:?}", block.code[i]).unwrap();
         }
         buf += "                ";
         live

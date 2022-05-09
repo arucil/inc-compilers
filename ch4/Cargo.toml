@@ -12,13 +12,13 @@ support = { path = "../support" }
 ch2 = { path = "../ch2" }
 ch3 = { path = "../ch3" }
 control = { path = "../control" }
-indexmap = "1.7.0"
-num-traits = "0.2.14"
+indexmap = "1.8.1"
+num-traits = "0.2.15"
 petgraph = "0.6.0"
-priority-queue = "1.2.0"
-once_cell = "1.8.0"
+priority-queue = "1.2.1"
+once_cell = "1.10.0"
 maplit = "1.0.2"
 
 [dev-dependencies]
-insta = "1.8.0"
-pretty_assertions = "1.0.0"
+insta = "1.14.0"
+pretty_assertions = "1.2.1"

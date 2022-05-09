@@ -11,6 +11,7 @@ pub fn remove_complex_operands<TYPE: Copy>(
       .into_iter()
       .map(|exp| mon_exp(exp, &mut counter))
       .collect(),
+    types: prog.types,
   }
 }
 

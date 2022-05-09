@@ -4,6 +4,7 @@ use pretty::*;
 use std::fmt::{self, Debug, Formatter};
 use std::iter;
 use support::Range;
+use id_arena::{Id, Arena};
 
 pub mod parser;
 
@@ -12,6 +13,7 @@ pub use parser::{parse, Result};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Program<VAR = String, TYPE = ()> {
   pub body: Vec<Exp<VAR, TYPE>>,
+  pub types: Arena<CompType>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,7 +69,16 @@ pub enum Type {
   Int,
   Bool,
   Str,
+  Comp(TypeId),
   Void,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TypeId(Id<CompType>);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CompType {
+  Vector(Vec<Type>),
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]

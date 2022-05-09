@@ -14,9 +14,9 @@ ch3 = { path = "../ch3" }
 ch4 = { path = "../ch4" }
 control = { path = "../control" }
 petgraph = "0.6.0"
-indexmap = "1.7.0"
+indexmap = "1.8.1"
 maplit = "1.0.2"
 
 [dev-dependencies]
-insta = "1.8.0"
-pretty_assertions = "1.0.0"
+insta = "1.14.0"
+pretty_assertions = "1.2.1"

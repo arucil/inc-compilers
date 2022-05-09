@@ -4,6 +4,7 @@ use std::collections::HashSet;
 pub fn uncover_get<TYPE>(prog: Program<IdxVar, TYPE>) -> Program<IdxVar, TYPE> {
   Program {
     body: prog.body.into_iter().map(uncover_exp).collect(),
+    types: prog.types,
   }
 }
 

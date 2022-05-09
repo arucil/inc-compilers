@@ -44,7 +44,7 @@ pub fn typecheck(prog: Program) -> Result<Program<String, Type>> {
       Ok(exp)
     })
     .collect::<Result<_>>()?;
-  Ok(Program { body })
+  Ok(Program { body, types: prog.types })
 }
 
 pub fn typecheck_exp(

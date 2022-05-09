@@ -9,9 +9,9 @@ edition = "2018"
 ast = { path = "../ast" }
 asm = { path = "../asm" }
 support = { path = "../support" }
-indexmap = "1.7.0"
+indexmap = "1.8.1"
 control = { path = "../control" }
 
 [dev-dependencies]
-insta = "1.8.0"
-pretty_assertions = "1.0.0"
+insta = "1.14.0"
+pretty_assertions = "1.2.1"

@@ -4,6 +4,7 @@ use support::Range;
 pub fn partial_evaluate(prog: Program) -> Program {
   Program {
     body: prog.body.into_iter().map(pe_exp).collect(),
+    types: prog.types,
   }
 }
 
