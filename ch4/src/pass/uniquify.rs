@@ -2,7 +2,7 @@ use ast::{IdxVar, Program};
 use ch2::pass::uniquify::uniquify_exp;
 use std::collections::HashMap;
 
-pub fn uniquify<TYPE>(prog: Program<String, TYPE>) -> Program<IdxVar, TYPE> {
+pub fn uniquify(prog: Program<String>) -> Program<IdxVar> {
   let mut counter = 0;
   let mut env = HashMap::new();
   Program {

@@ -1,4 +1,4 @@
-use ast::{Exp, ExpKind, Program};
+use ast::{Exp, Program};
 use support::Range;
 
 pub fn partial_evaluate(prog: Program) -> Program {
@@ -9,22 +9,20 @@ pub fn partial_evaluate(prog: Program) -> Program {
 }
 
 fn pe_exp(exp: Exp) -> Exp {
-  match exp.kind {
-    ExpKind::Int(_) | ExpKind::Str(_) | ExpKind::Var(_) => exp,
-    ExpKind::Let {
+  match exp {
+    Exp::Int { .. } | Exp::Str { .. } | Exp::Var { .. } => exp,
+    Exp::Let {
       var,
-      box init,
-      box body,
-    } => Exp {
-      kind: ExpKind::Let {
-        var,
-        init: box pe_exp(init),
-        body: box pe_exp(body),
-      },
-      range: exp.range,
-      ty: exp.ty,
+      init,
+      body,
+      range,
+    } => Exp::Let {
+      var,
+      init: box pe_exp(*init),
+      body: box pe_exp(*body),
+      range,
     },
-    ExpKind::Prim { op, args } => pe_prim(op, args, exp.range),
+    Exp::Prim { op, args, range } => pe_prim(op, args, range),
     e => unimplemented!("{:?}", e),
   }
 }
@@ -32,180 +30,122 @@ fn pe_exp(exp: Exp) -> Exp {
 fn pe_prim(op: (Range, &'static str), args: Vec<Exp>, range: Range) -> Exp {
   let mut args = args.into_iter().map(pe_exp).collect::<Vec<_>>();
   match (op.1, &mut args[..]) {
-    (
-      "+",
-      [Exp {
-        kind: ExpKind::Int(a),
-        ..
-      }, Exp {
-        kind: ExpKind::Int(b),
-        ..
-      }],
-    ) => Exp {
-      kind: ExpKind::Int(*a + *b),
+    ("+", [Exp::Int { value: a, .. }, Exp::Int { value: b, .. }]) => Exp::Int {
+      value: *a + *b,
       range,
-      ty: (),
     },
-    (
-      "-",
-      [Exp {
-        kind: ExpKind::Int(a),
-        ..
-      }, Exp {
-        kind: ExpKind::Int(b),
-        ..
-      }],
-    ) => Exp {
-      kind: ExpKind::Int(*a - *b),
+    ("-", [Exp::Int { value: a, .. }, Exp::Int { value: b, .. }]) => Exp::Int {
+      value: *a - *b,
       range,
-      ty: (),
     },
     (
       "+",
-      [Exp {
-        kind: ExpKind::Int(a),
+      [Exp::Int {
+        value: a,
         range: range1,
-        ..
       }, rhs]
-      | [rhs, Exp {
-        kind: ExpKind::Int(a),
+      | [rhs, Exp::Int {
+        value: a,
         range: range1,
-        ..
       }],
     ) => pe_add(op.0, (*range1, *a), rhs.clone()),
     (
       "-",
-      [Exp {
-        kind: ExpKind::Int(a),
+      [Exp::Int {
+        value: a,
         range: range1,
         ..
       }, rhs],
     ) => pe_sub(op.0, (*range1, *a), rhs.clone()),
-    (
-      "-",
-      [Exp {
-        kind: ExpKind::Int(a),
-        ..
-      }],
-    ) => Exp {
-      kind: ExpKind::Int(-*a),
-      range,
-      ty: (),
-    },
-    _ => Exp {
-      kind: ExpKind::Prim { op, args },
-      range,
-      ty: (),
-    },
+    ("-", [Exp::Int { value: a, .. }]) => Exp::Int { value: -*a, range },
+    _ => Exp::Prim { op, args, range },
   }
 }
 
 fn pe_add(range: Range, lhs: (Range, i64), mut rhs: Exp) -> Exp {
-  match &mut rhs.kind {
-    ExpKind::Prim {
+  match &mut rhs {
+    Exp::Prim {
       op: (_, op @ ("+" | "-")),
       args: subargs,
-    } => match subargs[0].kind {
-      ExpKind::Int(b) => Exp {
-        kind: ExpKind::Prim {
-          op: (range, op),
-          args: vec![
-            Exp {
-              kind: ExpKind::Int(lhs.1 + b),
-              range: lhs.0,
-              ty: (),
-            },
-            subargs.pop().unwrap(),
-          ],
-        },
+      ..
+    } => match subargs[0] {
+      Exp::Int { value: b, .. } => Exp::Prim {
+        op: (range, op),
+        args: vec![
+          Exp::Int {
+            value: lhs.1 + b,
+            range: lhs.0,
+          },
+          subargs.pop().unwrap(),
+        ],
         range,
-        ty: (),
       },
-      _ => Exp {
-        kind: ExpKind::Prim {
-          op: (range, "+"),
-          args: vec![
-            Exp {
-              kind: ExpKind::Int(lhs.1),
-              range: lhs.0,
-              ty: (),
-            },
-            rhs,
-          ],
-        },
-        range,
-        ty: (),
-      },
-    },
-    _ => Exp {
-      kind: ExpKind::Prim {
+      _ => Exp::Prim {
         op: (range, "+"),
         args: vec![
-          Exp {
-            kind: ExpKind::Int(lhs.1),
+          Exp::Int {
+            value: lhs.1,
             range: lhs.0,
-            ty: (),
           },
           rhs,
         ],
+        range,
       },
+    },
+    _ => Exp::Prim {
+      op: (range, "+"),
+      args: vec![
+        Exp::Int {
+          value: lhs.1,
+          range: lhs.0,
+        },
+        rhs,
+      ],
       range,
-      ty: (),
     },
   }
 }
 
 fn pe_sub(range: Range, lhs: (Range, i64), mut rhs: Exp) -> Exp {
-  match &mut rhs.kind {
-    ExpKind::Prim {
+  match &mut rhs {
+    Exp::Prim {
       op: (_, op @ ("+" | "-")),
       args: subargs,
-    } => match subargs[0].kind {
-      ExpKind::Int(b) => Exp {
-        kind: ExpKind::Prim {
-          op: (range, op),
-          args: vec![
-            Exp {
-              kind: ExpKind::Int(lhs.1 - b),
-              range,
-              ty: (),
-            },
-            subargs.pop().unwrap(),
-          ],
-        },
+      ..
+    } => match subargs[0] {
+      Exp::Int { value: b, .. } => Exp::Prim {
+        op: (range, op),
+        args: vec![
+          Exp::Int {
+            value: lhs.1 - b,
+            range,
+          },
+          subargs.pop().unwrap(),
+        ],
         range,
-        ty: (),
       },
-      _ => Exp {
-        kind: ExpKind::Prim {
-          op: (range, "-"),
-          args: vec![
-            Exp {
-              kind: ExpKind::Int(lhs.1),
-              range,
-              ty: (),
-            },
-            rhs,
-          ],
-        },
-        range,
-        ty: (),
-      },
-    },
-    _ => Exp {
-      kind: ExpKind::Prim {
+      _ => Exp::Prim {
         op: (range, "-"),
         args: vec![
-          Exp {
-            kind: ExpKind::Int(lhs.1),
-            range: lhs.0,
-            ty: (),
+          Exp::Int {
+            value: lhs.1,
+            range,
           },
           rhs,
         ],
+        range,
       },
+    },
+    _ => Exp::Prim {
+      op: (range, "-"),
+      args: vec![
+        Exp::Int {
+          value: lhs.1,
+          range: lhs.0,
+        },
+        rhs,
+      ],
       range,
-      ty: (),
     },
   }
 }

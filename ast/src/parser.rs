@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use crate::{Exp, ExpKind, Program};
+use crate::{Exp, Program};
 use support::{CompileError, Range};
 
 pub type Result<T> = std::result::Result<T, CompileError>;
@@ -247,11 +247,7 @@ fn build_exp(input: &str, cst: Cst) -> Result<Exp> {
                 .skip(1)
                 .map(|c| build_exp(input, c))
                 .collect::<Result<_>>()?;
-              Ok(Exp {
-                kind: ExpKind::Prim { op, args },
-                range,
-                ty: (),
-              })
+              Ok(Exp::Prim { op, args, range })
             } else {
               Err(CompileError {
                 range,
@@ -267,10 +263,9 @@ fn build_exp(input: &str, cst: Cst) -> Result<Exp> {
         })
       }
     }
-    Cst::Symbol(range) => Ok(Exp {
-      kind: ExpKind::Var(input[range.start..range.end].to_owned()),
+    Cst::Symbol(range) => Ok(Exp::Var {
+      var: input[range.start..range.end].to_owned(),
       range,
-      ty: (),
     }),
     Cst::String(range) => {
       let mut buf = String::new();
@@ -295,22 +290,13 @@ fn build_exp(input: &str, cst: Cst) -> Result<Exp> {
           buf.push(c);
         }
       }
-      Ok(Exp {
-        kind: ExpKind::Str(buf),
-        range,
-        ty: (),
-      })
+      Ok(Exp::Str { value: buf, range })
     }
-    Cst::Number(range) => Ok(Exp {
-      kind: ExpKind::Int(input[range.start..range.end].parse().unwrap()),
+    Cst::Number(range) => Ok(Exp::Int {
+      value: input[range.start..range.end].parse().unwrap(),
       range,
-      ty: (),
     }),
-    Cst::Boolean(b, range) => Ok(Exp {
-      kind: ExpKind::Bool(b),
-      range,
-      ty: (),
-    }),
+    Cst::Boolean(value, range) => Ok(Exp::Bool { value, range }),
   }
 }
 
@@ -325,16 +311,13 @@ fn build_let(input: &str, mut xs: Vec<Cst>, range: Range) -> Result<Exp> {
         .map(|exp| build_exp(input, exp))
         .collect::<Result<_>>()?;
       let seq_range = Range {
-        start: seq[0].range.start,
-        end: seq.last().unwrap().range.end,
+        start: seq[0].range().start,
+        end: seq.last().unwrap().range().end,
       };
-      Exp {
-        kind: ExpKind::Begin {
-          seq,
-          last: box last,
-        },
+      Exp::Begin {
+        seq,
+        last: box last,
         range: seq_range,
-        ty: (),
       }
     };
     let inits = if let Cst::List(vars, _) = xs.pop().unwrap() {
@@ -373,15 +356,17 @@ fn build_let(input: &str, mut xs: Vec<Cst>, range: Range) -> Result<Exp> {
         message: "invalid let form".to_owned(),
       });
     };
-    Ok(inits.into_iter().rev().fold(body, |body, (var, init)| Exp {
-      kind: ExpKind::Let {
-        var,
-        init: box init,
-        body: box body,
-      },
-      range,
-      ty: (),
-    }))
+    Ok(
+      inits
+        .into_iter()
+        .rev()
+        .fold(body, |body, (var, init)| Exp::Let {
+          var,
+          init: box init,
+          body: box body,
+          range,
+        }),
+    )
   } else {
     Err(CompileError {
       range,
@@ -395,14 +380,11 @@ fn build_if(input: &str, mut xs: Vec<Cst>, range: Range) -> Result<Exp> {
     let alt = build_exp(input, xs.pop().unwrap())?;
     let conseq = build_exp(input, xs.pop().unwrap())?;
     let cond = build_exp(input, xs.pop().unwrap())?;
-    Ok(Exp {
-      kind: ExpKind::If {
-        cond: box cond,
-        conseq: box conseq,
-        alt: box alt,
-      },
+    Ok(Exp::If {
+      cond: box cond,
+      conseq: box conseq,
+      alt: box alt,
       range,
-      ty: (),
     })
   } else {
     Err(CompileError {
@@ -420,13 +402,10 @@ fn build_begin(input: &str, mut xs: Vec<Cst>, range: Range) -> Result<Exp> {
       .skip(1)
       .map(|exp| build_exp(input, exp))
       .collect::<Result<_>>()?;
-    Ok(Exp {
-      kind: ExpKind::Begin {
-        seq,
-        last: box last,
-      },
+    Ok(Exp::Begin {
+      seq,
+      last: box last,
       range,
-      ty: (),
     })
   } else {
     Err(CompileError {
@@ -441,13 +420,10 @@ fn build_set(input: &str, mut xs: Vec<Cst>, range: Range) -> Result<Exp> {
     let exp = build_exp(input, xs.pop().unwrap())?;
     if let Cst::Symbol(sym_range) = xs.pop().unwrap() {
       let var = input[sym_range.start..sym_range.end].to_owned();
-      Ok(Exp {
-        kind: ExpKind::Set {
-          var: (sym_range, var),
-          exp: box exp,
-        },
+      Ok(Exp::Set {
+        var: (sym_range, var),
+        exp: box exp,
         range,
-        ty: (),
       })
     } else {
       Err(CompileError {
@@ -468,13 +444,10 @@ fn build_while(input: &str, mut xs: Vec<Cst>, range: Range) -> Result<Exp> {
     Ordering::Equal => {
       let body = build_exp(input, xs.pop().unwrap())?;
       let cond = build_exp(input, xs.pop().unwrap())?;
-      Ok(Exp {
-        kind: ExpKind::While {
-          cond: box cond,
-          body: box body,
-        },
+      Ok(Exp::While {
+        cond: box cond,
+        body: box body,
         range,
-        ty: (),
       })
     }
     Ordering::Greater => {
@@ -484,24 +457,18 @@ fn build_while(input: &str, mut xs: Vec<Cst>, range: Range) -> Result<Exp> {
         .map(|exp| build_exp(input, exp))
         .collect::<Result<_>>()?;
       let seq_range = Range {
-        start: seq[0].range.start,
-        end: seq.last().unwrap().range.end,
+        start: seq[0].range().start,
+        end: seq.last().unwrap().range().end,
       };
       let cond = build_exp(input, xs.pop().unwrap())?;
-      Ok(Exp {
-        kind: ExpKind::While {
-          cond: box cond,
-          body: box Exp {
-            kind: ExpKind::Begin {
-              seq,
-              last: box last,
-            },
-            range: seq_range,
-            ty: (),
-          },
+      Ok(Exp::While {
+        cond: box cond,
+        body: box Exp::Begin {
+          seq,
+          last: box last,
+          range: seq_range,
         },
         range,
-        ty: (),
       })
     }
     Ordering::Less => Err(CompileError {
@@ -513,32 +480,20 @@ fn build_while(input: &str, mut xs: Vec<Cst>, range: Range) -> Result<Exp> {
 
 fn build_print(input: &str, xs: Vec<Cst>, range: Range) -> Result<Exp> {
   if xs.len() == 1 {
-    Ok(Exp {
-      kind: ExpKind::NewLine,
-      range,
-      ty: (),
-    })
+    Ok(Exp::NewLine(range))
   } else {
     let args = xs
       .into_iter()
       .skip(1)
       .map(|exp| build_exp(input, exp))
       .collect::<Result<_>>()?;
-    Ok(Exp {
-      kind: ExpKind::Print(args),
-      range,
-      ty: (),
-    })
+    Ok(Exp::Print { args, range })
   }
 }
 
 fn build_void(_: &str, xs: Vec<Cst>, range: Range) -> Result<Exp> {
   if xs.len() == 1 {
-    Ok(Exp {
-      kind: ExpKind::Void,
-      range,
-      ty: (),
-    })
+    Ok(Exp::Void(range))
   } else {
     Err(CompileError {
       range,
