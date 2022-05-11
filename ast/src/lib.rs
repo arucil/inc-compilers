@@ -1,88 +1,67 @@
 #![feature(never_type, box_syntax)]
 
-use id_arena::{Arena, Id};
 use pretty::*;
 use std::fmt::{self, Debug, Formatter};
 use std::iter;
 use support::Range;
+use id_arena::{Id, Arena};
 
 pub mod parser;
 
 pub use parser::{parse, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Program<VAR = String> {
-  pub body: Vec<Exp<VAR>>,
+pub struct Program<VAR = String, TYPE = ()> {
+  pub body: Vec<Exp<VAR, TYPE>>,
   pub types: Arena<CompType>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Exp<VAR = String> {
-  Int {
-    value: i64,
-    range: Range,
-  },
+pub struct Exp<VAR = String, TYPE = ()> {
+  pub kind: ExpKind<VAR, TYPE>,
+  pub range: Range,
+  pub ty: TYPE,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExpKind<VAR, TYPE> {
+  Int(i64),
   Prim {
     op: (Range, &'static str),
-    args: Vec<Exp<VAR>>,
-    range: Range,
+    args: Vec<Exp<VAR, TYPE>>,
   },
-  Var {
-    var: VAR,
-    range: Range,
-  },
-  Str {
-    value: String,
-    range: Range,
-  },
+  Var(VAR),
+  Str(String),
   Let {
     var: (Range, VAR),
-    /// is HasType after typecheck
-    init: Box<Exp<VAR>>,
-    /// is HasType after typecheck
-    body: Box<Exp<VAR>>,
-    range: Range,
+    init: Box<Exp<VAR, TYPE>>,
+    body: Box<Exp<VAR, TYPE>>,
   },
-  Bool {
-    value: bool,
-    range: Range,
-  },
+  Bool(bool),
   If {
-    cond: Box<Exp<VAR>>,
-    conseq: Box<Exp<VAR>>,
-    alt: Box<Exp<VAR>>,
-    range: Range,
+    cond: Box<Exp<VAR, TYPE>>,
+    conseq: Box<Exp<VAR, TYPE>>,
+    alt: Box<Exp<VAR, TYPE>>,
   },
   Set {
     var: (Range, VAR),
-    exp: Box<Exp<VAR>>,
-    range: Range,
+    exp: Box<Exp<VAR, TYPE>>,
   },
-  Get {
-    var: VAR,
-    range: Range,
-  },
+  Get(VAR),
   Begin {
-    seq: Vec<Exp<VAR>>,
-    last: Box<Exp<VAR>>,
-    range: Range,
+    seq: Vec<Exp<VAR, TYPE>>,
+    last: Box<Exp<VAR, TYPE>>,
   },
   While {
-    cond: Box<Exp<VAR>>,
-    body: Box<Exp<VAR>>,
-    range: Range,
+    cond: Box<Exp<VAR, TYPE>>,
+    body: Box<Exp<VAR, TYPE>>,
   },
-  Void(Range),
-  Print {
-    /// nonempty. is HasTypes after typecheck
-    args: Vec<Exp<VAR>>,
-    range: Range,
-  },
-  NewLine(Range),
-  HasType {
-    exp: Box<Exp<VAR>>,
-    ty: Type,
-  },
+  Void,
+  Print(
+    /// nonempty
+    Vec<Exp<VAR, TYPE>>,
+  ),
+  NewLine,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -123,35 +102,13 @@ impl IdxVar {
   }
 }
 
-impl<VAR> Exp<VAR> {
-  pub fn range(&self) -> Range {
-    match self {
-      Self::Int { range, .. }
-      | Self::Prim { range, .. }
-      | Self::Var { range, .. }
-      | Self::Str { range, .. }
-      | Self::Let { range, .. }
-      | Self::Bool { range, .. }
-      | Self::If { range, .. }
-      | Self::Set { range, .. }
-      | Self::Get { range, .. }
-      | Self::Begin { range, .. }
-      | Self::While { range, .. }
-      | Self::Void(range)
-      | Self::Print { range, .. }
-      | Self::NewLine(range) => *range,
-      Self::HasType { exp, .. } => exp.range(),
-    }
-  }
-}
-
 impl Debug for IdxVar {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     write!(f, "{}.{}", self.name, self.index)
   }
 }
 
-impl<VAR: Debug> Program<VAR> {
+impl<VAR: Debug, TYPE: Debug> Program<VAR, TYPE> {
   pub fn to_string_pretty(&self) -> String {
     let doc = self.to_doc();
     let mut buf = String::new();
@@ -164,15 +121,15 @@ impl<VAR: Debug> Program<VAR> {
   }
 }
 
-impl<VAR: Debug> Exp<VAR> {
+impl<VAR: Debug, TYPE: Debug> Exp<VAR, TYPE> {
   fn to_doc(&self) -> RcDoc {
-    match self {
-      Exp::Int { value, .. } => RcDoc::text(format!("{}", value)),
-      Exp::Str { value, .. } => RcDoc::text(format!("{:?}", value)),
-      Exp::Var { var, .. } | Exp::Get { var, .. } => {
+    match &self.kind {
+      ExpKind::Int(n) => RcDoc::text(format!("{}", n)),
+      ExpKind::Str(s) => RcDoc::text(format!("{:?}", s)),
+      ExpKind::Var(var) | ExpKind::Get(var) => {
         RcDoc::text(format!("{:?}", var))
       }
-      Exp::Prim { op, args, .. } => RcDoc::text("(")
+      ExpKind::Prim { op, args } => RcDoc::text("(")
         .append(
           RcDoc::intersperse(
             iter::once(RcDoc::text(op.1))
@@ -183,9 +140,7 @@ impl<VAR: Debug> Exp<VAR> {
           .group(),
         )
         .append(RcDoc::text(")")),
-      Exp::Let {
-        var, init, body, ..
-      } => RcDoc::text("(")
+      ExpKind::Let { var, init, body } => RcDoc::text("(")
         .append(
           RcDoc::text("let")
             .append(Doc::line())
@@ -206,11 +161,9 @@ impl<VAR: Debug> Exp<VAR> {
             .group(),
         )
         .append(RcDoc::text(")")),
-      Exp::Bool { value: true, .. } => RcDoc::text("#t"),
-      Exp::Bool { value: false, .. } => RcDoc::text("#t"),
-      Exp::If {
-        cond, conseq, alt, ..
-      } => RcDoc::text("(")
+      ExpKind::Bool(true) => RcDoc::text("#t"),
+      ExpKind::Bool(false) => RcDoc::text("#f"),
+      ExpKind::If { cond, conseq, alt } => RcDoc::text("(")
         .append(
           RcDoc::text("if")
             .append(Doc::line())
@@ -222,7 +175,7 @@ impl<VAR: Debug> Exp<VAR> {
             .group(),
         )
         .append(RcDoc::text(")")),
-      Exp::Set { var, exp, .. } => RcDoc::text("(")
+      ExpKind::Set { var, exp } => RcDoc::text("(")
         .append(
           RcDoc::text("set!")
             .append(Doc::line())
@@ -233,7 +186,7 @@ impl<VAR: Debug> Exp<VAR> {
             .group(),
         )
         .append(RcDoc::text(")")),
-      Exp::Begin { seq, last, .. } => RcDoc::text("(")
+      ExpKind::Begin { seq, last } => RcDoc::text("(")
         .append(
           RcDoc::text("begin").append(Doc::line()).append(
             RcDoc::intersperse(
@@ -248,7 +201,7 @@ impl<VAR: Debug> Exp<VAR> {
           ),
         )
         .append(RcDoc::text(")")),
-      Exp::While { cond, body, .. } => RcDoc::text("(")
+      ExpKind::While { cond, body } => RcDoc::text("(")
         .append(
           RcDoc::text("while")
             .append(Doc::line())
@@ -260,8 +213,8 @@ impl<VAR: Debug> Exp<VAR> {
             .group(),
         )
         .append(RcDoc::text(")")),
-      Exp::Void { .. } => RcDoc::text("(void)"),
-      Exp::Print { args, .. } => RcDoc::text("(")
+      ExpKind::Void => RcDoc::text("(void)"),
+      ExpKind::Print(args) => RcDoc::text("(")
         .append(
           RcDoc::intersperse(
             iter::once(RcDoc::text("print"))
@@ -272,8 +225,7 @@ impl<VAR: Debug> Exp<VAR> {
           .group(),
         )
         .append(RcDoc::text(")")),
-      Exp::NewLine { .. } => RcDoc::text("(newline)"),
-      Exp::HasType { exp, .. } => exp.to_doc(),
+      ExpKind::NewLine => RcDoc::text("(newline)"),
     }
   }
 }

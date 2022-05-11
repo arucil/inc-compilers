@@ -52,7 +52,7 @@ impl State {
   }
 }
 
-pub fn explicate_control(mut prog: Program<IdxVar>) -> CProgram<CInfo> {
+pub fn explicate_control(mut prog: Program<IdxVar, Type>) -> CProgram<CInfo> {
   let locals = collect_locals(&prog);
   let mut state = State {
     blocks: vec![],
@@ -69,7 +69,7 @@ pub fn explicate_control(mut prog: Program<IdxVar>) -> CProgram<CInfo> {
   }
 }
 
-pub fn collect_locals(prog: &Program<IdxVar>) -> IndexSet<IdxVar> {
+pub fn collect_locals(prog: &Program<IdxVar, Type>) -> IndexSet<IdxVar> {
   let mut locals = IndexSet::new();
   for exp in &prog.body {
     collect_exp_locals(exp, &mut locals);
@@ -77,7 +77,7 @@ pub fn collect_locals(prog: &Program<IdxVar>) -> IndexSet<IdxVar> {
   locals
 }
 
-fn collect_exp_locals(exp: &Exp<IdxVar>, locals: &mut IndexSet<IdxVar>) {
+fn collect_exp_locals(exp: &Exp<IdxVar, Type>, locals: &mut IndexSet<IdxVar>) {
   match &exp.kind {
     ExpKind::Int(_)
     | ExpKind::Var(_)
@@ -167,7 +167,7 @@ fn remove_unreachable_blocks(
   reachable_blocks.into_iter().collect()
 }
 
-fn explicate_tail(state: &mut State, exp: Exp<IdxVar>) -> CTail {
+fn explicate_tail(state: &mut State, exp: Exp<IdxVar, Type>) -> CTail {
   match exp.kind {
     ExpKind::Int(_)
     | ExpKind::Var(_)
@@ -203,7 +203,7 @@ fn explicate_tail(state: &mut State, exp: Exp<IdxVar>) -> CTail {
 fn explicate_assign(
   state: &mut State,
   var: IdxVar,
-  init: Exp<IdxVar>,
+  init: Exp<IdxVar, Type>,
   cont: CTail,
 ) -> CTail {
   match init.kind {
@@ -261,7 +261,7 @@ fn explicate_assign(
 
 fn explicate_pred(
   state: &mut State,
-  cond: Exp<IdxVar>,
+  cond: Exp<IdxVar, Type>,
   conseq: CTail,
   alt: CTail,
 ) -> CTail {
@@ -336,7 +336,7 @@ fn explicate_pred(
 
 fn explicate_effect(
   state: &mut State,
-  seq: impl DoubleEndedIterator<Item = Exp<IdxVar>>,
+  seq: impl DoubleEndedIterator<Item = Exp<IdxVar, Type>>,
   cont: CTail,
 ) -> CTail {
   seq.rfold(cont, |cont, exp| explicate_exp_effect(state, exp, cont))
@@ -344,7 +344,7 @@ fn explicate_effect(
 
 fn explicate_exp_effect(
   state: &mut State,
-  exp: Exp<IdxVar>,
+  exp: Exp<IdxVar, Type>,
   cont: CTail,
 ) -> CTail {
   match exp.kind {
@@ -399,7 +399,7 @@ fn explicate_exp_effect(
   }
 }
 
-fn atom(exp: Exp<IdxVar>) -> CAtom {
+fn atom(exp: Exp<IdxVar, Type>) -> CAtom {
   match exp.kind {
     ExpKind::Int(n) => CAtom::Int(n),
     ExpKind::Var(var) | ExpKind::Get(var) => CAtom::Var(var),
@@ -410,7 +410,7 @@ fn atom(exp: Exp<IdxVar>) -> CAtom {
   }
 }
 
-fn prim(op: &str, mut args: Vec<Exp<IdxVar>>) -> CPrim {
+fn prim(op: &str, mut args: Vec<Exp<IdxVar, Type>>) -> CPrim {
   match op {
     "read" => CPrim::Read,
     "-" => {

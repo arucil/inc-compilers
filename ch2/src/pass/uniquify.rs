@@ -1,4 +1,4 @@
-use ast::{Exp, IdxVar, Program};
+use ast::{Exp, ExpKind, IdxVar, Program};
 use std::collections::HashMap;
 use support::CompileError;
 
@@ -16,111 +16,143 @@ pub fn uniquify(prog: Program) -> Result<Program<IdxVar>, CompileError> {
   })
 }
 
-pub fn uniquify_exp(
-  exp: Exp<String>,
+pub fn uniquify_exp<TYPE>(
+  exp: Exp<String, TYPE>,
   env: &mut HashMap<String, usize>,
   counter: &mut usize,
-) -> Result<Exp<IdxVar>, CompileError> {
-  match exp {
-    Exp::Int { value, range } => Ok(Exp::Int { value, range }),
-    Exp::Var { var, range } | Exp::Get { var, range } => {
-      env.get(&var).map_or_else(
-        || {
-          Err(CompileError {
-            range,
-            message: format!("variable {} not found", var),
-          })
-        },
-        |&index| {
-          Ok(Exp::Var {
-            var: IdxVar {
-              name: var.clone(),
-              index,
-            },
-            range,
-          })
-        },
-      )
-    }
-    Exp::Prim { op, args, range } => Ok(Exp::Prim {
-      op,
-      args: args
-        .into_iter()
-        .map(|exp| uniquify_exp(exp, env, counter))
-        .collect::<Result<_, _>>()?,
+) -> Result<Exp<IdxVar, TYPE>, CompileError> {
+  let range = exp.range;
+  let ty = exp.ty;
+  match exp.kind {
+    ExpKind::Int(n) => Ok(Exp {
+      kind: ExpKind::Int(n),
       range,
+      ty,
     }),
-    Exp::Let {
-      var: var @ (var_range, _),
-      init,
-      body,
+    ExpKind::Var(var) | ExpKind::Get(var) => env.get(&var).map_or_else(
+      || {
+        Err(CompileError {
+          range,
+          message: format!("variable {} not found", var),
+        })
+      },
+      |&index| {
+        Ok(Exp {
+          kind: ExpKind::Var(IdxVar {
+            name: var.clone(),
+            index,
+          }),
+          range,
+          ty,
+        })
+      },
+    ),
+    ExpKind::Prim { op, args } => Ok(Exp {
+      kind: ExpKind::Prim {
+        op,
+        args: args
+          .into_iter()
+          .map(|exp| uniquify_exp(exp, env, counter))
+          .collect::<Result<_, _>>()?,
+      },
       range,
+      ty,
+    }),
+    ExpKind::Let {
+      var: var @ (var_range, _),
+      init: box init,
+      body: box body,
     } => {
-      let init = uniquify_exp(*init, env, counter)?;
+      let init = uniquify_exp(init, env, counter)?;
       let index = *counter;
       *counter += 1;
       let old_value = env.insert(var.1.clone(), index);
-      let body = uniquify_exp(*body, env, counter)?;
+      let body = uniquify_exp(body, env, counter)?;
       if let Some(v) = old_value {
         env.insert(var.1.clone(), v);
       }
-      Ok(Exp::Let {
-        var: (var_range, IdxVar { name: var.1, index }),
-        init: box init,
-        body: box body,
+      Ok(Exp {
+        kind: ExpKind::Let {
+          var: (var_range, IdxVar { name: var.1, index }),
+          init: box init,
+          body: box body,
+        },
         range,
+        ty,
       })
     }
     // ch4
-    Exp::Bool { value, range } => Ok(Exp::Bool { value, range }),
-    Exp::If {
-      cond,
-      conseq,
-      alt,
+    ExpKind::Bool(b) => Ok(Exp {
+      kind: ExpKind::Bool(b),
       range,
-    } => Ok(Exp::If {
-      cond: box uniquify_exp(*cond, env, counter)?,
-      conseq: box uniquify_exp(*conseq, env, counter)?,
-      alt: box uniquify_exp(*alt, env, counter)?,
-      range,
+      ty,
     }),
-    Exp::Str { value, range } => Ok(Exp::Str { value, range }),
+    ExpKind::If { cond, conseq, alt } => Ok(Exp {
+      kind: ExpKind::If {
+        cond: box uniquify_exp(*cond, env, counter)?,
+        conseq: box uniquify_exp(*conseq, env, counter)?,
+        alt: box uniquify_exp(*alt, env, counter)?,
+      },
+      range,
+      ty,
+    }),
+    ExpKind::Str(s) => Ok(Exp {
+      kind: ExpKind::Str(s),
+      range,
+      ty,
+    }),
     // ch5
-    Exp::Set { var, exp, range } => Ok(Exp::Set {
-      var: (
-        var.0,
-        IdxVar {
-          name: var.1.clone(),
-          index: env[&var.1],
-        },
+    ExpKind::Set { var, exp } => Ok(Exp {
+      kind: ExpKind::Set {
+        var: (
+          var.0,
+          IdxVar {
+            name: var.1.clone(),
+            index: env[&var.1],
+          },
+        ),
+        exp: box uniquify_exp(*exp, env, counter)?,
+      },
+      range,
+      ty,
+    }),
+    ExpKind::Begin { seq, last } => Ok(Exp {
+      kind: ExpKind::Begin {
+        seq: seq
+          .into_iter()
+          .map(|exp| uniquify_exp(exp, env, counter))
+          .collect::<Result<_, _>>()?,
+        last: box uniquify_exp(*last, env, counter)?,
+      },
+      range,
+      ty,
+    }),
+    ExpKind::While { cond, body } => Ok(Exp {
+      kind: ExpKind::While {
+        cond: box uniquify_exp(*cond, env, counter)?,
+        body: box uniquify_exp(*body, env, counter)?,
+      },
+      range,
+      ty,
+    }),
+    ExpKind::Void => Ok(Exp {
+      kind: ExpKind::Void,
+      range,
+      ty,
+    }),
+    ExpKind::Print(args) => Ok(Exp {
+      kind: ExpKind::Print(
+        args
+          .into_iter()
+          .map(|exp| uniquify_exp(exp, env, counter))
+          .collect::<Result<_, _>>()?,
       ),
-      exp: box uniquify_exp(*exp, env, counter)?,
       range,
+      ty,
     }),
-    Exp::Begin { seq, last, range } => Ok(Exp::Begin {
-      seq: seq
-        .into_iter()
-        .map(|exp| uniquify_exp(exp, env, counter))
-        .collect::<Result<_, _>>()?,
-      last: box uniquify_exp(*last, env, counter)?,
+    ExpKind::NewLine => Ok(Exp {
+      kind: ExpKind::NewLine,
       range,
-    }),
-    Exp::While { cond, body, range } => Ok(Exp::While {
-      cond: box uniquify_exp(*cond, env, counter)?,
-      body: box uniquify_exp(*body, env, counter)?,
-      range,
-    }),
-    Exp::Void(range) => Ok(Exp::Void(range)),
-    Exp::Print { args, range } => Ok(Exp::Print {
-      args: args
-        .into_iter()
-        .map(|exp| uniquify_exp(exp, env, counter))
-        .collect::<Result<_, _>>()?,
-      range,
-    }),
-    Exp::NewLine(range) => Ok(Exp::NewLine(range)),
-    Exp::HasType { exp, ty } => Ok(Exp::HasType {
-      exp: box uniquify_exp(*exp, env, counter)?,
       ty,
     }),
   }

@@ -1,12 +1,13 @@
 use ast::{Exp, ExpKind, Program, Type};
 
-pub fn shrink(prog: Program<String>) -> Program<String> {
+pub fn shrink(prog: Program<String, Type>) -> Program<String, Type> {
   let body = prog.body.into_iter().map(shrink_exp).collect();
   Program { body, types: prog.types }
 }
 
-fn shrink_exp(exp: Exp<String>) -> Exp<String> {
+fn shrink_exp(exp: Exp<String, Type>) -> Exp<String, Type> {
   let range = exp.range;
+  let ty = exp.ty;
   match exp.kind {
     ExpKind::If { cond, conseq, alt } => Exp {
       kind: ExpKind::If {
@@ -15,6 +16,7 @@ fn shrink_exp(exp: Exp<String>) -> Exp<String> {
         alt: box shrink_exp(*alt),
       },
       range,
+      ty,
     },
     ExpKind::Let { var, init, body } => Exp {
       kind: ExpKind::Let {
@@ -23,6 +25,7 @@ fn shrink_exp(exp: Exp<String>) -> Exp<String> {
         body: box shrink_exp(*body),
       },
       range,
+      ty,
     },
     ExpKind::Set { var, exp } => Exp {
       kind: ExpKind::Set {
@@ -30,6 +33,7 @@ fn shrink_exp(exp: Exp<String>) -> Exp<String> {
         exp: box shrink_exp(*exp),
       },
       range,
+      ty,
     },
     ExpKind::Begin { seq, last } => Exp {
       kind: ExpKind::Begin {
@@ -37,6 +41,7 @@ fn shrink_exp(exp: Exp<String>) -> Exp<String> {
         last: box shrink_exp(*last),
       },
       range,
+      ty,
     },
     ExpKind::While { cond, body } => Exp {
       kind: ExpKind::While {
@@ -44,10 +49,12 @@ fn shrink_exp(exp: Exp<String>) -> Exp<String> {
         body: box shrink_exp(*body),
       },
       range,
+      ty,
     },
     ExpKind::Print(args) => Exp {
       kind: ExpKind::Print(args.into_iter().map(shrink_exp).collect()),
       range,
+      ty,
     },
     ExpKind::Prim { op, args } => {
       let args: Vec<_> = args.into_iter().map(shrink_exp).collect();
