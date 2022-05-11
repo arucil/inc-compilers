@@ -104,7 +104,7 @@ impl CodeGen {
       CStmt::Assign { var, exp } => self.exp_instructions(Arg::Var(var), exp),
       // ch4
       CStmt::Print { val, ty: Type::Int } => {
-        self.atom_instructions(Arg::Reg(Reg::Rax), val);
+        self.atom_instructions(Arg::Reg(Reg::Rdi), val);
         self.code.push(Instr::Call {
           label: "print_int".to_owned(),
           arity: 0,
@@ -114,7 +114,7 @@ impl CodeGen {
         val,
         ty: Type::Bool,
       } => {
-        self.atom_instructions(Arg::Reg(Reg::Rax), val);
+        self.atom_instructions(Arg::Reg(Reg::Rdi), val);
         self.code.push(Instr::Call {
           label: "print_bool".to_owned(),
           arity: 0,

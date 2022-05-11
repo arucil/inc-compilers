@@ -40,7 +40,7 @@ block0:
     call print_str
     mov rdi, const_3
     call print_str
-    mov rax, rbx
+    mov rdi, rbx
     call print_bool
     mov rdi, const_4
     call print_str

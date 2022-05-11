@@ -1,7 +1,6 @@
 ---
 source: ch2/src/lib.rs
 expression: prog
-
 ---
 extern read_int, print_int, print_str, print_bool, print_newline
 section .text
@@ -32,6 +31,7 @@ _start:
 conclusion:
     mov rsp, rbp
     pop rbp
+    mov rdi, rax
     call print_int
     call print_newline
     mov rax, 60

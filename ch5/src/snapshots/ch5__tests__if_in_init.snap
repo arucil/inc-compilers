@@ -26,7 +26,7 @@ block3:
     mov rbx, 2
 
 block0:
-    mov rax, rbx
+    mov rdi, rbx
     call print_int
     call print_newline
     pop rbx

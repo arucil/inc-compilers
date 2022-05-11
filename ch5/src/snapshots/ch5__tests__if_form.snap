@@ -18,7 +18,7 @@ _start:
     xor rbx, rbx
 
 block0:
-    mov rax, rbx
+    mov rdi, rbx
     call print_int
     call print_newline
     pop rbx

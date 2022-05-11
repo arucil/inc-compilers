@@ -53,6 +53,10 @@ fn add_epilogue(prog: &mut Program<self::pass::assign_home::Info>) {
         dest: Arg::Reg(Rsp),
       },
       Pop(Arg::Reg(Rbp)),
+      Mov {
+        src: Arg::Reg(Rax),
+        dest: Arg::Reg(Rdi),
+      },
       Call {
         label: "print_int".to_owned(),
         arity: 0,

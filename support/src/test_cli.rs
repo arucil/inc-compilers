@@ -1,7 +1,7 @@
 use assert_cmd::Command;
 use scopeguard::defer;
-use std::ffi;
 use std::fs;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::Once;
 
@@ -9,7 +9,8 @@ static INIT: Once = Once::new();
 
 fn compile_runtime() {
   INIT.call_once(|| {
-    run_nasm("../runtime/runtime.asm");
+    run_gcc("../runtime/runtime.c");
+    //run_nasm("../runtime/runtime.asm");
   });
 }
 
@@ -86,19 +87,35 @@ impl TestCli {
   }
 }
 
-fn run_nasm<P: AsRef<ffi::OsStr>>(file: P) {
+fn run_nasm<P: AsRef<Path>>(file: P) {
   Command::new("nasm")
     .arg("-f")
     .arg("elf64")
-    .arg(file)
+    .arg(file.as_ref())
+    .assert()
+    .success();
+}
+
+fn run_gcc<P: AsRef<Path>>(file: P) {
+  let input = file.as_ref();
+  let mut output = input.to_owned();
+  output.set_extension("o");
+  Command::new("gcc")
+    .arg("-c")
+    .arg(input)
+    .arg("-o")
+    .arg(output)
+    .arg("-Wall")
+    .arg("-Werror")
+    .arg("-fno-builtin-exit")
     .assert()
     .success();
 }
 
 fn run_ld<P, Q>(output: P, inputs: &[Q])
 where
-  P: AsRef<ffi::OsStr>,
-  Q: AsRef<ffi::OsStr>,
+  P: AsRef<OsStr>,
+  Q: AsRef<OsStr>,
 {
   Command::new("ld")
     .arg("-o")
