@@ -1,10 +1,10 @@
 #![feature(never_type, box_syntax)]
 
+use id_arena::{Arena, Id};
 use pretty::*;
 use std::fmt::{self, Debug, Formatter};
 use std::iter;
 use support::Range;
-use id_arena::{Id, Arena};
 
 pub mod parser;
 
