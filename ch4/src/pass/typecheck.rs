@@ -6,12 +6,25 @@ use support::{CompileError, Range};
 
 pub type Result<T> = std::result::Result<T, CompileError>;
 
-type PrimType = Vec<(Vec<Type>, Type)>;
+enum PrimType {
+  Fixed { args: Vec<Type>, ret: Type },
+  Overloaded(Vec<PrimType>),
+  Vector,
+}
+
+impl PrimType {
+  fn new_binary(arg1: Type, arg2: Type, ret: Type) -> Self {
+    Self::Fixed {
+      args: vec![arg1, arg2],
+      ret,
+    }
+  }
+}
 
 static PRIM_TYPES: Lazy<HashMap<&'static str, PrimType>> = Lazy::new(|| {
   use Type::*;
   hashmap! {
-    "+" => vec![(vec![Int, Int], Int)],
+    "+" => PrimType::new_fixed(Int, Int, Int),
     "-" => vec![
       (vec![Int], Int),
       (vec![Int, Int], Int)

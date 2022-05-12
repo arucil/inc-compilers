@@ -1,4 +1,6 @@
 #include <inttypes.h>
+#define __USE_MISC
+#include <sys/mman.h>
 
 static __attribute__((naked)) void *syscall5(
     uintptr_t number,
@@ -15,6 +17,7 @@ static __attribute__((naked)) void *syscall5(
       "movq %rcx,%rdx\n\t"
       "movq %r8,%r10\n\t"
       "movq %r9,%r8\n\t"
+      "xorq %r9,%r9\n\t"
       "syscall\n\t"
       "ret");
 }
@@ -46,6 +49,11 @@ static void *read(int fd, const void *data, uintptr_t nbytes)
       0, /* ignored */
       0  /* ignored */
   );
+}
+
+static void *mmap(uintptr_t size)
+{
+  return syscall5(9, 0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1);
 }
 
 void print_int(intptr_t value)
@@ -153,4 +161,15 @@ intptr_t read_int()
     exit(1);
   }
   return neg ? -n : n;
+}
+
+void *rootstack_begin;
+
+void initialize(uint64_t rootstack_size, uint64_t heap_size)
+{
+}
+
+void *allocate(uint64_t size, void *rootstack_ptr)
+{
+  return 0;
 }
