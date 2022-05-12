@@ -108,6 +108,7 @@ fn run_gcc<P: AsRef<Path>>(file: P) {
     .arg("-Wall")
     .arg("-Werror")
     .arg("-fno-builtin-exit")
+    .arg("-O2")
     .assert()
     .success();
 }

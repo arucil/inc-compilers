@@ -9,13 +9,14 @@ static __attribute__((naked)) void *syscall5(
     void *param5)
 {
   asm(
-      "movq %rdi,%rax\n"
-      "movq %rsi,%rdi\n"
-      "movq %rdx,%rsi\n"
-      "movq %rcx,%rdx\n"
-      "movq %r8,%r10\n"
-      "movq %r9,%r8\n"
-      "syscall\n");
+      "movq %rdi,%rax\n\t"
+      "movq %rsi,%rdi\n\t"
+      "movq %rdx,%rsi\n\t"
+      "movq %rcx,%rdx\n\t"
+      "movq %r8,%r10\n\t"
+      "movq %r9,%r8\n\t"
+      "syscall\n\t"
+      "ret");
 }
 
 static void exit(uintptr_t code)
@@ -47,7 +48,7 @@ static void *read(int fd, const void *data, uintptr_t nbytes)
   );
 }
 
-void print_int(uintptr_t value)
+void print_int(intptr_t value)
 {
   static char buf[22];
   char *p = buf + sizeof(buf);
@@ -79,7 +80,7 @@ void print_str(void *p)
 }
 
 #define STR_TRUE "true"
-#define STR_FALSE "true"
+#define STR_FALSE "false"
 
 void print_bool(uintptr_t b)
 {

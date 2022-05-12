@@ -65,6 +65,7 @@ _start:
     jmp start
 
 conclusion:
+    mov rdi, rax
     call print_int
     call print_newline
     pop r15

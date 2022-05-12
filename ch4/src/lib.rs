@@ -76,6 +76,10 @@ fn add_epilogue(prog: &mut Program<ch3::pass::register_allocation::Info>) {
     .map(|&reg| Pop(Arg::Reg(reg)))
     .collect();
   code.extend_from_slice(&[
+    Mov {
+      src: Arg::Reg(Rax),
+      dest: Arg::Reg(Rdi),
+    },
     Call {
       label: "print_int".to_owned(),
       arity: 0,
