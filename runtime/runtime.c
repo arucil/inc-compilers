@@ -16,7 +16,7 @@ static __attribute__((naked)) uint64_t syscall5(
     uint64_t param5)
 {
   asm(
-      "movq %rdi,%rax\n\t"
+      "\tmovq %rdi,%rax\n\t"
       "movq %rsi,%rdi\n\t"
       "movq %rdx,%rsi\n\t"
       "movq %rcx,%rdx\n\t"
@@ -174,7 +174,43 @@ void initialize(uint64_t rootstack_size, uint64_t heap_size)
 {
 }
 
+// tag:
+// bit0         0=visited, 1=unvisited
+// bit1~bit2    0=vector   1=string
+//
+// vector:
+// bit3~bit8    number of fields
+// bit9~bit58   pointer mask
+//
+// string:
+// bit3~bit63   string length
+
 void *allocate(uint64_t size, void *rootstack_ptr)
 {
   return 0;
+}
+
+struct vector_params
+{
+  uint64_t params[3];
+};
+
+void *new_vector(
+    uint64_t num_fields,
+    uint64_t ptr_mask,
+    void *rootstack_ptr,
+    struct vector_params params)
+{
+  uint64_t *p = allocate((num_fields + 1) * sizeof(uint64_t), rootstack_ptr);
+  if (p)
+  {
+    *p = 1 | num_fields << 3 | ptr_mask << 9;
+    int n = num_fields > 3 ? 3 : num_fields;
+    for (int i = 0; i < n; i++)
+    {
+      p[i + 1] = params.params[i];
+    }
+    if (num_fields)
+  }
+  return p;
 }

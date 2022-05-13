@@ -10,7 +10,7 @@ pub fn shrink(prog: Program<String, Type>) -> Program<String, Type> {
 
 fn shrink_exp(exp: Exp<String, Type>) -> Exp<String, Type> {
   let range = exp.range;
-  let ty = exp.ty;
+  let ty = exp.ty.clone();
   match exp.kind {
     ExpKind::If { cond, conseq, alt } => Exp {
       kind: ExpKind::If {

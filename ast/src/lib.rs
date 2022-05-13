@@ -13,7 +13,7 @@ pub use parser::{parse, Result};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Program<VAR = String, TYPE = ()> {
   pub body: Vec<Exp<VAR, TYPE>>,
-  pub types: Arena<CompType>,
+  pub types: Arena<Type>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -64,21 +64,17 @@ pub enum ExpKind<VAR, TYPE> {
   NewLine,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
   Int,
   Bool,
   Str,
-  Comp(TypeId),
+  Vector(Vec<Type>),
+  Alias(TypeId),
   Void,
 }
 
-pub type TypeId = Id<CompType>;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CompType {
-  Vector(Vec<Type>),
-}
+pub type TypeId = Id<Type>;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct IdxVar {
@@ -231,14 +227,13 @@ impl<VAR: Debug, TYPE: Debug> Exp<VAR, TYPE> {
 
 impl Type {
   pub fn to_vector<'a>(
-    &self,
-    types: &'a Arena<CompType>,
-  ) -> Option<&'a [Type]> {
-    if let Self::Comp(id) = self {
-      let CompType::Vector(types) = types.get(*id).unwrap();
-      Some(types)
-    } else {
-      None
+    &'a self,
+    types: &'a Arena<Type>,
+  ) -> Option<&[Type]> {
+    match self {
+      Self::Vector(types) => Some(types),
+      Self::Alias(id) => types.get(*id).unwrap().to_vector(types),
+      _ => None,
     }
   }
 }

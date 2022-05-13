@@ -1,4 +1,4 @@
-use ast::{CompType, Exp, ExpKind, Program, Type};
+use ast::{Exp, ExpKind, Program, Type};
 use id_arena::Arena;
 use maplit::hashmap;
 use once_cell::sync::Lazy;
@@ -95,7 +95,7 @@ pub fn typecheck(prog: Program) -> Result<Program<String, Type>> {
 #[derive(Debug, Clone, Default)]
 pub struct TypeChecker {
   env: HashMap<String, Type>,
-  pub types: Arena<CompType>,
+  pub types: Arena<Type>,
 }
 
 impl TypeChecker {
@@ -132,11 +132,11 @@ impl TypeChecker {
         ty: Type::Void,
       }),
       ExpKind::Var(var) => {
-        if let Some(&ty) = self.env.get(&var) {
+        if let Some(ty) = self.env.get(&var) {
           Ok(Exp {
             kind: ExpKind::Var(var),
             range,
-            ty,
+            ty: ty.clone(),
           })
         } else {
           Err(CompileError {
@@ -146,11 +146,11 @@ impl TypeChecker {
         }
       }
       ExpKind::Get(var) => {
-        if let Some(&ty) = self.env.get(&var) {
+        if let Some(ty) = self.env.get(&var) {
           Ok(Exp {
             kind: ExpKind::Get(var),
             range,
-            ty,
+            ty: ty.clone(),
           })
         } else {
           Err(CompileError {
@@ -177,7 +177,7 @@ impl TypeChecker {
       }
       ExpKind::Let { var, init, body } => {
         let init = self.typecheck_exp(*init)?;
-        let old_var_ty = self.env.insert(var.1.clone(), init.ty);
+        let old_var_ty = self.env.insert(var.1.clone(), init.ty.clone());
         let body = self.typecheck_exp(*body)?;
         if let Some(old_var_ty) = old_var_ty {
           self.env.insert(var.1.clone(), old_var_ty);
@@ -185,7 +185,7 @@ impl TypeChecker {
           self.env.remove(&var.1);
         }
         Ok(Exp {
-          ty: body.ty,
+          ty: body.ty.clone(),
           kind: ExpKind::Let {
             var,
             init: box init,
@@ -211,7 +211,7 @@ impl TypeChecker {
           });
         }
         Ok(Exp {
-          ty: conseq.ty,
+          ty: conseq.ty.clone(),
           kind: ExpKind::If {
             cond: box cond,
             conseq: box conseq,
@@ -221,9 +221,9 @@ impl TypeChecker {
         })
       }
       ExpKind::Set { ref var, exp } => {
-        if let Some(&ty) = self.env.get(&var.1) {
-          let exp = self.typecheck_exp(*exp)?;
-          if ty != exp.ty {
+        let exp = self.typecheck_exp(*exp)?;
+        if let Some(ty) = self.env.get(&var.1) {
+          if ty != &exp.ty {
             return Err(CompileError {
               range,
               message: format!("type mismatch, {:?} != {:?}", ty, exp.ty),
@@ -251,7 +251,7 @@ impl TypeChecker {
           .map(|exp| self.typecheck_exp(exp))
           .collect::<Result<_>>()?;
         Ok(Exp {
-          ty: last.ty,
+          ty: last.ty.clone(),
           kind: ExpKind::Begin {
             seq,
             last: box last,
@@ -324,7 +324,7 @@ impl TypeChecker {
           });
         }
         if args.iter().zip(arg_tys).all(|(x, y)| x.ty == *y) {
-          Ok(*ret)
+          Ok(ret.clone())
         } else {
           Err(CompileError {
             range,
@@ -364,10 +364,7 @@ impl TypeChecker {
         }
       }
       PrimType::Vector => {
-        let id = self
-          .types
-          .alloc(CompType::Vector(args.iter().map(|e| e.ty).collect()));
-        Ok(Type::Comp(id))
+        Ok(Type::Vector(args.iter().map(|e| e.ty.clone()).collect()))
       }
       PrimType::VecLen => {
         if args.len() == 1 {
@@ -391,7 +388,7 @@ impl TypeChecker {
           if let Some(types) = args[0].ty.to_vector(&self.types) {
             if let ExpKind::Int(k) = &args[1].kind {
               if *k >= 0 && (*k as usize) < types.len() {
-                Ok(types[*k as usize])
+                Ok(types[*k as usize].clone())
               } else {
                 Err(CompileError {
                   range,

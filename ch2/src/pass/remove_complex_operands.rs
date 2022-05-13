@@ -1,7 +1,7 @@
 use ast::{Exp, ExpKind, IdxVar, Program};
 use support::Range;
 
-pub fn remove_complex_operands<TYPE: Copy>(
+pub fn remove_complex_operands<TYPE: Clone>(
   prog: Program<IdxVar, TYPE>,
 ) -> Program<IdxVar, TYPE> {
   let mut counter = 0;
@@ -25,12 +25,12 @@ struct TmpVar<TYPE> {
 /// process expressions that do not need to be atomic.
 ///
 /// `mon` stands for Monadic Normal Form.
-fn mon_exp<TYPE: Copy>(
+fn mon_exp<TYPE: Clone>(
   exp: Exp<IdxVar, TYPE>,
   counter: &mut usize,
 ) -> Exp<IdxVar, TYPE> {
   let range = exp.range;
-  let ty = exp.ty;
+  let ty = exp.ty.clone();
   match exp.kind {
     ExpKind::Int(..) => exp,
     ExpKind::Var(..) => exp,
@@ -104,7 +104,7 @@ fn mon_exp<TYPE: Copy>(
   }
 }
 
-fn mon_prim<TYPE: Copy>(
+fn mon_prim<TYPE: Clone>(
   args: Vec<Exp<IdxVar, TYPE>>,
   build_exp: impl FnOnce(Vec<Exp<IdxVar, TYPE>>) -> Exp<IdxVar, TYPE>,
   counter: &mut usize,
@@ -116,7 +116,7 @@ fn mon_prim<TYPE: Copy>(
     .collect();
   tmps.into_iter().rfold(build_exp(args), |body, tmp| Exp {
     range: body.range,
-    ty: tmp.init.ty,
+    ty: body.ty.clone(),
     kind: ExpKind::Let {
       var: (tmp.range, tmp.name),
       init: box tmp.init,
@@ -126,7 +126,7 @@ fn mon_prim<TYPE: Copy>(
 }
 
 /// Process expressions that need to be atomic.
-fn atom_exp<TYPE: Copy>(
+fn atom_exp<TYPE: Clone>(
   exp: Exp<IdxVar, TYPE>,
   tmps: &mut Vec<TmpVar<TYPE>>,
   counter: &mut usize,
@@ -173,13 +173,13 @@ fn atom_exp<TYPE: Copy>(
   }
 }
 
-fn assign_var<TYPE: Copy>(
+fn assign_var<TYPE: Clone>(
   exp: Exp<IdxVar, TYPE>,
   tmps: &mut Vec<TmpVar<TYPE>>,
   counter: &mut usize,
 ) -> Exp<IdxVar, TYPE> {
   let range = exp.range;
-  let ty = exp.ty;
+  let ty = exp.ty.clone();
   let tmp = IdxVar {
     name: "tmp".to_owned(),
     index: *counter,

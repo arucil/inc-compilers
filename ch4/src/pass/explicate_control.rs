@@ -389,7 +389,7 @@ fn explicate_exp_effect(
       |cont, exp| {
         CTail::Seq(
           CStmt::Print {
-            ty: exp.ty,
+            ty: exp.ty.clone(),
             val: atom(exp),
           },
           box cont,
