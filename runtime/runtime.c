@@ -1,14 +1,19 @@
-#include <inttypes.h>
-#define __USE_MISC
-#include <sys/mman.h>
+#define PROT_READ 0x1      /* Page can be read.  */
+#define PROT_WRITE 0x2     /* Page can be written.  */
+#define PROT_EXEC 0x4      /* Page can be executed.  */
+#define MAP_PRIVATE 0x02   /* Changes are private.  */
+#define MAP_ANONYMOUS 0x20 /* Don't use a file.  */
 
-static __attribute__((naked)) void *syscall5(
-    uintptr_t number,
-    void *param1,
-    void *param2,
-    void *param3,
-    void *param4,
-    void *param5)
+typedef unsigned long uint64_t;
+typedef long int64_t;
+
+static __attribute__((naked)) uint64_t syscall5(
+    uint64_t number,
+    uint64_t param1,
+    uint64_t param2,
+    uint64_t param3,
+    uint64_t param4,
+    uint64_t param5)
 {
   asm(
       "movq %rdi,%rax\n\t"
@@ -22,41 +27,41 @@ static __attribute__((naked)) void *syscall5(
       "ret");
 }
 
-static void exit(uintptr_t code)
+static void exit(uint64_t code)
 {
-  syscall5(60, (void *)code, 0, 0, 0, 0);
+  syscall5(60, code, 0, 0, 0, 0);
 }
 
-static void *write(int fd, const void *data, uintptr_t nbytes)
+static void *write(int fd, const void *data, uint64_t nbytes)
 {
-  return syscall5(
+  return (void *)syscall5(
       1, /* SYS_write */
-      (void *)(intptr_t)fd,
-      (void *)data,
-      (void *)nbytes,
+      fd,
+      (uint64_t)data,
+      nbytes,
       0, /* ignored */
       0  /* ignored */
   );
 }
 
-static void *read(int fd, const void *data, uintptr_t nbytes)
+static void *read(int fd, const void *data, uint64_t nbytes)
 {
-  return syscall5(
+  return (void *)syscall5(
       0, /* SYS_read */
-      (void *)(intptr_t)fd,
-      (void *)data,
-      (void *)nbytes,
+      fd,
+      (uint64_t)data,
+      nbytes,
       0, /* ignored */
       0  /* ignored */
   );
 }
 
-static void *mmap(uintptr_t size)
+void *mmap(uint64_t size)
 {
-  return syscall5(9, 0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1);
+  return (void *)syscall5(9, 0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1);
 }
 
-void print_int(intptr_t value)
+void print_int(int64_t value)
 {
   static char buf[22];
   char *p = buf + sizeof(buf);
@@ -82,15 +87,15 @@ void print_int(intptr_t value)
   write(1, p, buf + sizeof(buf) - p);
 }
 
-void print_str(void *p)
+void print_str(uint64_t p)
 {
-  write(1, ((void **)p) + 1, *(uintptr_t *)p);
+  write(1, ((uint64_t *)p) + 1, *(uint64_t *)p);
 }
 
 #define STR_TRUE "true"
 #define STR_FALSE "false"
 
-void print_bool(uintptr_t b)
+void print_bool(uint64_t b)
 {
   if (b)
   {
@@ -107,7 +112,7 @@ void print_newline()
   write(1, "\n", 1);
 }
 
-uintptr_t read_line(char *buf, uintptr_t size)
+uint64_t read_line(char *buf, uint64_t size)
 {
   char *p = buf;
   for (;;)
@@ -126,7 +131,7 @@ uintptr_t read_line(char *buf, uintptr_t size)
 
 #define ERR_INVALID_INT "invalid integer\n"
 
-intptr_t read_int()
+int64_t read_int()
 {
   static char buf[80];
   char *p = buf;
@@ -146,7 +151,7 @@ intptr_t read_int()
     neg = 1;
     p++;
   }
-  intptr_t n = 0;
+  int64_t n = 0;
   if (p < end && *p >= '0' && *p <= '9')
   {
     while (p < end && *p >= '0' && *p <= '9')

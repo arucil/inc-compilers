@@ -73,8 +73,7 @@ pub enum Type {
   Void,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TypeId(Id<CompType>);
+pub type TypeId = Id<CompType>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CompType {
@@ -226,6 +225,20 @@ impl<VAR: Debug, TYPE: Debug> Exp<VAR, TYPE> {
         )
         .append(RcDoc::text(")")),
       ExpKind::NewLine => RcDoc::text("(newline)"),
+    }
+  }
+}
+
+impl Type {
+  pub fn to_vector<'a>(
+    &self,
+    types: &'a Arena<CompType>,
+  ) -> Option<&'a [Type]> {
+    if let Self::Comp(id) = self {
+      let CompType::Vector(types) = types.get(*id).unwrap();
+      Some(types)
+    } else {
+      None
     }
   }
 }

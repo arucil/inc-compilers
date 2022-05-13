@@ -1,4 +1,5 @@
-use ast::{Exp, ExpKind, Program, Type};
+use ast::{CompType, Exp, ExpKind, Program, Type};
+use id_arena::Arena;
 use maplit::hashmap;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -10,6 +11,10 @@ enum PrimType {
   Fixed { args: Vec<Type>, ret: Type },
   Overloaded(Vec<PrimType>),
   Vector,
+  Eq,
+  VecRef,
+  VecSet,
+  VecLen,
 }
 
 impl PrimType {
@@ -19,35 +24,59 @@ impl PrimType {
       ret,
     }
   }
+
+  fn new_unary(arg1: Type, ret: Type) -> Self {
+    Self::Fixed {
+      args: vec![arg1],
+      ret,
+    }
+  }
+
+  fn new_nullary(ret: Type) -> Self {
+    Self::Fixed { args: vec![], ret }
+  }
 }
 
 static PRIM_TYPES: Lazy<HashMap<&'static str, PrimType>> = Lazy::new(|| {
   use Type::*;
   hashmap! {
-    "+" => PrimType::new_fixed(Int, Int, Int),
-    "-" => vec![
-      (vec![Int], Int),
-      (vec![Int, Int], Int)
-    ],
-    "read" => vec![(vec![], Int)],
-    "and" => vec![(vec![Bool, Bool], Bool)],
-    "or" => vec![(vec![Bool, Bool], Bool)],
-    "not" => vec![(vec![Bool], Bool)],
-    // TODO compare strings
-    ">" => vec![(vec![Int, Int], Bool)],
-    ">=" => vec![(vec![Int, Int], Bool)],
-    "<" => vec![(vec![Int, Int], Bool)],
-    "<=" => vec![(vec![Int, Int], Bool)],
+    "+" => PrimType::new_binary(Int, Int, Int),
+    "-" => PrimType::Overloaded(vec![
+      PrimType::new_unary(Int, Int),
+      PrimType::new_binary(Int, Int, Int),
+    ]),
+    "read" => PrimType::new_nullary(Int),
+    "and" => PrimType::new_binary(Bool, Bool, Bool),
+    "or" => PrimType::new_binary(Bool, Bool, Bool),
+    "not" => PrimType::new_unary(Bool, Bool),
+    ">" => PrimType::Overloaded(vec![
+      PrimType::new_binary(Int, Int, Bool),
+      PrimType::new_binary(Str, Str, Bool)]),
+    ">=" => PrimType::Overloaded(vec![
+      PrimType::new_binary(Int, Int, Bool),
+      PrimType::new_binary(Str, Str, Bool)]),
+    "<" => PrimType::Overloaded(vec![
+      PrimType::new_binary(Int, Int, Bool),
+      PrimType::new_binary(Str, Str, Bool)]),
+    "<=" => PrimType::Overloaded(vec![
+      PrimType::new_binary(Int, Int, Bool),
+      PrimType::new_binary(Str, Str, Bool)]),
+    "eq?" => PrimType::Eq,
+    "vector" => PrimType::Vector,
+    "vector-ref" => PrimType::VecRef,
+    "vector-set!" => PrimType::VecSet,
+    "vector-length" => PrimType::VecLen,
   }
 });
 
 pub fn typecheck(prog: Program) -> Result<Program<String, Type>> {
+  let mut checker = TypeChecker::new();
   let body = prog
     .body
     .into_iter()
     .map(|exp| {
       let range = exp.range;
-      let exp = typecheck_exp(&mut HashMap::new(), exp)?;
+      let exp = checker.typecheck(exp)?;
       if exp.ty != Type::Int {
         return Err(CompileError {
           range,
@@ -59,256 +88,374 @@ pub fn typecheck(prog: Program) -> Result<Program<String, Type>> {
     .collect::<Result<_>>()?;
   Ok(Program {
     body,
-    types: prog.types,
+    types: checker.types,
   })
 }
 
-pub fn typecheck_exp(
-  env: &mut HashMap<String, Type>,
-  exp: Exp,
-) -> Result<Exp<String, Type>> {
-  let range = exp.range;
-  match exp.kind {
-    ExpKind::Int(n) => Ok(Exp {
-      kind: ExpKind::Int(n),
-      range,
-      ty: Type::Int,
-    }),
-    ExpKind::Bool(b) => Ok(Exp {
-      kind: ExpKind::Bool(b),
-      range,
-      ty: Type::Bool,
-    }),
-    ExpKind::Str(s) => Ok(Exp {
-      kind: ExpKind::Str(s),
-      range,
-      ty: Type::Str,
-    }),
-    ExpKind::Void => Ok(Exp {
-      kind: ExpKind::Void,
-      range,
-      ty: Type::Void,
-    }),
-    ExpKind::Var(var) => {
-      if let Some(&ty) = env.get(&var) {
+#[derive(Debug, Clone, Default)]
+pub struct TypeChecker {
+  env: HashMap<String, Type>,
+  pub types: Arena<CompType>,
+}
+
+impl TypeChecker {
+  pub fn new() -> Self {
+    Self::default()
+  }
+
+  pub fn typecheck(&mut self, exp: Exp) -> Result<Exp<String, Type>> {
+    self.env.clear();
+    self.typecheck_exp(exp)
+  }
+
+  fn typecheck_exp(&mut self, exp: Exp) -> Result<Exp<String, Type>> {
+    let range = exp.range;
+    match exp.kind {
+      ExpKind::Int(n) => Ok(Exp {
+        kind: ExpKind::Int(n),
+        range,
+        ty: Type::Int,
+      }),
+      ExpKind::Bool(b) => Ok(Exp {
+        kind: ExpKind::Bool(b),
+        range,
+        ty: Type::Bool,
+      }),
+      ExpKind::Str(s) => Ok(Exp {
+        kind: ExpKind::Str(s),
+        range,
+        ty: Type::Str,
+      }),
+      ExpKind::Void => Ok(Exp {
+        kind: ExpKind::Void,
+        range,
+        ty: Type::Void,
+      }),
+      ExpKind::Var(var) => {
+        if let Some(&ty) = self.env.get(&var) {
+          Ok(Exp {
+            kind: ExpKind::Var(var),
+            range,
+            ty,
+          })
+        } else {
+          Err(CompileError {
+            range,
+            message: format!("variable {} not found", var),
+          })
+        }
+      }
+      ExpKind::Get(var) => {
+        if let Some(&ty) = self.env.get(&var) {
+          Ok(Exp {
+            kind: ExpKind::Get(var),
+            range,
+            ty,
+          })
+        } else {
+          Err(CompileError {
+            range,
+            message: format!("variable {} not found", var),
+          })
+        }
+      }
+      ExpKind::Prim { op, args } => {
+        let args = args
+          .into_iter()
+          .map(|arg| self.typecheck_exp(arg))
+          .collect::<Result<Vec<_>>>()?;
+        let ty = if let Some(ty) = PRIM_TYPES.get(op.1) {
+          self.typecheck_op(range, op.1, ty, &args)?
+        } else {
+          panic!("unimplemented op {}", op.1)
+        };
         Ok(Exp {
-          kind: ExpKind::Var(var),
+          kind: ExpKind::Prim { op, args },
           range,
           ty,
         })
-      } else {
-        Err(CompileError {
-          range,
-          message: format!("variable {} not found", var),
-        })
       }
-    }
-    ExpKind::Get(var) => {
-      if let Some(&ty) = env.get(&var) {
+      ExpKind::Let { var, init, body } => {
+        let init = self.typecheck_exp(*init)?;
+        let old_var_ty = self.env.insert(var.1.clone(), init.ty);
+        let body = self.typecheck_exp(*body)?;
+        if let Some(old_var_ty) = old_var_ty {
+          self.env.insert(var.1.clone(), old_var_ty);
+        } else {
+          self.env.remove(&var.1);
+        }
         Ok(Exp {
-          kind: ExpKind::Get(var),
+          ty: body.ty,
+          kind: ExpKind::Let {
+            var,
+            init: box init,
+            body: box body,
+          },
           range,
-          ty,
         })
-      } else {
-        Err(CompileError {
-          range,
-          message: format!("variable {} not found", var),
-        })
       }
-    }
-    ExpKind::Prim { op, args } => {
-      let args = args
-        .into_iter()
-        .map(|arg| typecheck_exp(env, arg))
-        .collect::<Result<Vec<_>>>()?;
-      let arg_types = args.iter().map(|arg| arg.ty).collect::<Vec<_>>();
-      let ty = typecheck_op(range, op.1, &arg_types)?;
-      Ok(Exp {
-        kind: ExpKind::Prim { op, args },
-        range,
-        ty,
-      })
-    }
-    ExpKind::Let { var, init, body } => {
-      let init = typecheck_exp(env, *init)?;
-      let old_var_ty = env.insert(var.1.clone(), init.ty);
-      let body = typecheck_exp(env, *body)?;
-      if let Some(old_var_ty) = old_var_ty {
-        env.insert(var.1.clone(), old_var_ty);
-      } else {
-        env.remove(&var.1);
-      }
-      Ok(Exp {
-        ty: body.ty,
-        kind: ExpKind::Let {
-          var,
-          init: box init,
-          body: box body,
-        },
-        range,
-      })
-    }
-    ExpKind::If { cond, conseq, alt } => {
-      let cond = typecheck_exp(env, *cond)?;
-      if cond.ty != Type::Bool {
-        return Err(CompileError {
-          range: cond.range,
-          message: format!("expected Bool, found {:?}", cond.ty),
-        });
-      }
-      let conseq = typecheck_exp(env, *conseq)?;
-      let alt = typecheck_exp(env, *alt)?;
-      if conseq.ty != alt.ty {
-        return Err(CompileError {
-          range,
-          message: format!("type mismatch, {:?} != {:?}", conseq.ty, alt.ty),
-        });
-      }
-      Ok(Exp {
-        ty: conseq.ty,
-        kind: ExpKind::If {
-          cond: box cond,
-          conseq: box conseq,
-          alt: box alt,
-        },
-        range,
-      })
-    }
-    ExpKind::Set { ref var, exp } => {
-      if let Some(&ty) = env.get(&var.1) {
-        let exp = typecheck_exp(env, *exp)?;
-        if ty != exp.ty {
+      ExpKind::If { cond, conseq, alt } => {
+        let cond = self.typecheck_exp(*cond)?;
+        if cond.ty != Type::Bool {
+          return Err(CompileError {
+            range: cond.range,
+            message: format!("expected Bool, found {:?}", cond.ty),
+          });
+        }
+        let conseq = self.typecheck_exp(*conseq)?;
+        let alt = self.typecheck_exp(*alt)?;
+        if conseq.ty != alt.ty {
           return Err(CompileError {
             range,
-            message: format!("type mismatch, {:?} != {:?}", ty, exp.ty),
+            message: format!("type mismatch, {:?} != {:?}", conseq.ty, alt.ty),
           });
         }
         Ok(Exp {
-          kind: ExpKind::Set {
-            var: var.clone(),
-            exp: box exp,
+          ty: conseq.ty,
+          kind: ExpKind::If {
+            cond: box cond,
+            conseq: box conseq,
+            alt: box alt,
+          },
+          range,
+        })
+      }
+      ExpKind::Set { ref var, exp } => {
+        if let Some(&ty) = self.env.get(&var.1) {
+          let exp = self.typecheck_exp(*exp)?;
+          if ty != exp.ty {
+            return Err(CompileError {
+              range,
+              message: format!("type mismatch, {:?} != {:?}", ty, exp.ty),
+            });
+          }
+          Ok(Exp {
+            kind: ExpKind::Set {
+              var: var.clone(),
+              exp: box exp,
+            },
+            range,
+            ty: Type::Void,
+          })
+        } else {
+          Err(CompileError {
+            range,
+            message: format!("variable {} not found", var.1),
+          })
+        }
+      }
+      ExpKind::Begin { seq, last } => {
+        let last = self.typecheck_exp(*last)?;
+        let seq: Vec<_> = seq
+          .into_iter()
+          .map(|exp| self.typecheck_exp(exp))
+          .collect::<Result<_>>()?;
+        Ok(Exp {
+          ty: last.ty,
+          kind: ExpKind::Begin {
+            seq,
+            last: box last,
+          },
+          range,
+        })
+      }
+      ExpKind::While { cond, body } => {
+        let cond = self.typecheck_exp(*cond)?;
+        if cond.ty != Type::Bool {
+          return Err(CompileError {
+            range: cond.range,
+            message: format!("expected Bool, found {:?}", cond.ty),
+          });
+        }
+        let body = self.typecheck_exp(*body)?;
+        Ok(Exp {
+          kind: ExpKind::While {
+            cond: box cond,
+            body: box body,
           },
           range,
           ty: Type::Void,
         })
-      } else {
-        Err(CompileError {
+      }
+      ExpKind::Print(args) => {
+        let args = args
+          .into_iter()
+          .map(|exp| {
+            let val = self.typecheck_exp(exp)?;
+            if !matches!(val.ty, Type::Int | Type::Bool | Type::Str) {
+              return Err(CompileError {
+                range,
+                message: format!(
+                  "expected Int, Bool, or Str, found {:?}",
+                  val.ty
+                ),
+              });
+            }
+            Ok(val)
+          })
+          .collect::<Result<Vec<_>>>()?;
+        Ok(Exp {
+          kind: ExpKind::Print(args),
           range,
-          message: format!("variable {} not found", var.1),
+          ty: Type::Void,
         })
       }
-    }
-    ExpKind::Begin { seq, last } => {
-      let last = typecheck_exp(env, *last)?;
-      let seq: Vec<_> = seq
-        .into_iter()
-        .map(|exp| typecheck_exp(env, exp))
-        .collect::<Result<_>>()?;
-      Ok(Exp {
-        ty: last.ty,
-        kind: ExpKind::Begin {
-          seq,
-          last: box last,
-        },
-        range,
-      })
-    }
-    ExpKind::While { cond, body } => {
-      let cond = typecheck_exp(env, *cond)?;
-      if cond.ty != Type::Bool {
-        return Err(CompileError {
-          range: cond.range,
-          message: format!("expected Bool, found {:?}", cond.ty),
-        });
-      }
-      let body = typecheck_exp(env, *body)?;
-      Ok(Exp {
-        kind: ExpKind::While {
-          cond: box cond,
-          body: box body,
-        },
+      ExpKind::NewLine => Ok(Exp {
+        kind: ExpKind::NewLine,
         range,
         ty: Type::Void,
-      })
+      }),
     }
-    ExpKind::Print(args) => {
-      let args = args
-        .into_iter()
-        .map(|exp| {
-          let val = typecheck_exp(env, exp)?;
-          if !matches!(val.ty, Type::Int | Type::Bool | Type::Str) {
-            return Err(CompileError {
+  }
+
+  fn typecheck_op(
+    &mut self,
+    range: Range,
+    op: &str,
+    ty: &PrimType,
+    args: &[Exp<String, Type>],
+  ) -> Result<Type> {
+    match ty {
+      PrimType::Fixed { args: arg_tys, ret } => {
+        if arg_tys.len() != args.len() {
+          return Err(CompileError {
+            range,
+            message: "arity mismatch".to_owned(),
+          });
+        }
+        if args.iter().zip(arg_tys).all(|(x, y)| x.ty == *y) {
+          Ok(*ret)
+        } else {
+          Err(CompileError {
+            range,
+            message: "type mismatch".to_owned(),
+          })
+        }
+      }
+      PrimType::Overloaded(alts) => {
+        for alt in alts {
+          if let Ok(ty) = self.typecheck_op(range, op, alt, args) {
+            return Ok(ty);
+          }
+        }
+        Err(CompileError {
+          range,
+          message: format!("invalid {} operation", op),
+        })
+      }
+      PrimType::Eq => {
+        if args.len() == 2 {
+          if args[0].ty == args[1].ty {
+            Ok(Type::Bool)
+          } else {
+            Err(CompileError {
               range,
               message: format!(
-                "expected Int, Bool, or Str, found {:?}",
-                val.ty
+                "type mismatch, {:?} != {:?}",
+                args[0].ty, args[1].ty
               ),
-            });
+            })
           }
-          Ok(val)
-        })
-        .collect::<Result<Vec<_>>>()?;
-      Ok(Exp {
-        kind: ExpKind::Print(args),
-        range,
-        ty: Type::Void,
-      })
-    }
-    ExpKind::NewLine => Ok(Exp {
-      kind: ExpKind::NewLine,
-      range,
-      ty: Type::Void,
-    }),
-  }
-}
-
-fn typecheck_op(range: Range, op: &str, arg_types: &[Type]) -> Result<Type> {
-  if op == "eq?" {
-    if arg_types.len() == 2 {
-      if arg_types[0] == arg_types[1] {
-        Ok(Type::Bool)
-      } else {
-        Err(CompileError {
-          range,
-          message: format!(
-            "type mismatch, {:?} != {:?}",
-            arg_types[0], arg_types[1]
-          ),
-        })
-      }
-    } else {
-      Err(CompileError {
-        range,
-        message: "arity mismatch".to_owned(),
-      })
-    }
-  } else if let Some(tys) = PRIM_TYPES.get(&op) {
-    let mut arity_matched = false;
-    let mut matched_arg_tys = Vec::<&[Type]>::new();
-    for (arg_tys, ret_ty) in tys {
-      if arg_types.len() == arg_tys.len() {
-        arity_matched = true;
-        if arg_tys.iter().zip(arg_types.iter()).all(|(x, y)| x == y) {
-          return Ok(*ret_ty);
+        } else {
+          Err(CompileError {
+            range,
+            message: "arity mismatch".to_owned(),
+          })
         }
-      } else {
-        matched_arg_tys.push(arg_tys);
+      }
+      PrimType::Vector => {
+        let id = self
+          .types
+          .alloc(CompType::Vector(args.iter().map(|e| e.ty).collect()));
+        Ok(Type::Comp(id))
+      }
+      PrimType::VecLen => {
+        if args.len() == 1 {
+          if args[0].ty.to_vector(&self.types).is_some() {
+            Ok(Type::Int)
+          } else {
+            Err(CompileError {
+              range,
+              message: "type mismatch".to_owned(),
+            })
+          }
+        } else {
+          Err(CompileError {
+            range,
+            message: "arity mismatch".to_owned(),
+          })
+        }
+      }
+      PrimType::VecRef => {
+        if args.len() == 2 {
+          if let Some(types) = args[0].ty.to_vector(&self.types) {
+            if let ExpKind::Int(k) = &args[1].kind {
+              if *k >= 0 && (*k as usize) < types.len() {
+                Ok(types[*k as usize])
+              } else {
+                Err(CompileError {
+                  range,
+                  message: "tuple index out of range".to_owned(),
+                })
+              }
+            } else {
+              Err(CompileError {
+                range,
+                message: "expected int literal".to_owned(),
+              })
+            }
+          } else {
+            Err(CompileError {
+              range,
+              message: "type mismatch".to_owned(),
+            })
+          }
+        } else {
+          Err(CompileError {
+            range,
+            message: "arity mismatch".to_owned(),
+          })
+        }
+      }
+      PrimType::VecSet => {
+        if args.len() == 3 {
+          if let Some(types) = args[0].ty.to_vector(&self.types) {
+            if let ExpKind::Int(k) = &args[1].kind {
+              if *k >= 0 && (*k as usize) < types.len() {
+                if types[*k as usize] == args[2].ty {
+                  Ok(Type::Void)
+                } else {
+                  Err(CompileError {
+                    range,
+                    message: "type mismatch".to_owned(),
+                  })
+                }
+              } else {
+                Err(CompileError {
+                  range,
+                  message: "tuple index out of range".to_owned(),
+                })
+              }
+            } else {
+              Err(CompileError {
+                range,
+                message: "expected int literal".to_owned(),
+              })
+            }
+          } else {
+            Err(CompileError {
+              range,
+              message: "type mismatch".to_owned(),
+            })
+          }
+        } else {
+          Err(CompileError {
+            range,
+            message: "arity mismatch".to_owned(),
+          })
+        }
       }
     }
-    if arity_matched {
-      Err(CompileError {
-        range,
-        message: format!("invalid {:?} operation", op),
-      })
-    } else {
-      Err(CompileError {
-        range,
-        message: "arity mismatch".to_owned(),
-      })
-    }
-  } else {
-    panic!("unimplemented op {:?}", op)
   }
 }
 
@@ -430,7 +577,7 @@ mod tests {
       result,
       Err(CompileError {
         range: Range { start: 0, end: 14 },
-        message: "invalid \"+\" operation".to_owned(),
+        message: "type mismatch".to_owned(),
       })
     );
   }
