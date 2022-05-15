@@ -19,6 +19,7 @@ pub fn explicate_control(mut prog: Program<IdxVar>) -> CProgram<CInfo> {
   CProgram {
     info: CInfo { locals },
     body: vec![(Label::Start, explicate_tail(prog.body.pop().unwrap()))],
+    types: prog.types,
   }
 }
 

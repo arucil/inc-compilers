@@ -1,11 +1,13 @@
 use asm::{CmpResult, Label};
 use ast::{IdxVar, Type};
+use id_arena::Arena;
 use std::fmt::{self, Debug, Formatter, Write};
 use std::str::FromStr;
 
 pub struct CProgram<INFO> {
   pub info: INFO,
   pub body: Vec<(Label, CTail)>,
+  pub types: Arena<Type>,
 }
 
 pub struct CDef {
@@ -38,16 +40,29 @@ pub enum CTail {
 #[non_exhaustive]
 #[derive(Clone)]
 pub enum CStmt {
-  Assign { var: IdxVar, exp: CExp },
-  Print { val: CAtom, ty: Type },
+  Assign {
+    var: IdxVar,
+    exp: CExp,
+  },
+  Print {
+    val: CAtom,
+    ty: Type,
+  },
   NewLine,
   Read,
+  VecSet {
+    vec: CAtom,
+    index: usize,
+    val: CAtom,
+  },
 }
 
 #[derive(Clone)]
 pub enum CExp {
   Atom(CAtom),
   Prim(CPrim),
+  /// exclude unit fields
+  Vector(Vec<(CAtom, Type)>),
 }
 
 #[non_exhaustive]
@@ -59,6 +74,9 @@ pub enum CPrim {
   Sub(CAtom, CAtom),
   Not(CAtom),
   Cmp(CCmpOp, CAtom, CAtom),
+  VecRef(CAtom, u32),
+  VecSet(CAtom, u32, CAtom),
+  VecLen(CAtom),
 }
 
 #[derive(Clone, Copy)]
@@ -135,6 +153,9 @@ impl Debug for CStmt {
       Self::NewLine => {
         write!(f, "newline")
       }
+      Self::VecSet { vec, index, val } => {
+        write!(f, "vector-set! {:?} {} {:?}", vec, index, val)
+      }
     }
   }
 }
@@ -144,6 +165,13 @@ impl Debug for CExp {
     match self {
       Self::Atom(atom) => atom.fmt(f),
       Self::Prim(prim) => prim.fmt(f),
+      Self::Vector(args) => {
+        write!(f, "(vector")?;
+        for (arg, ty) in args {
+          write!(f, " ({:?} : {:?})", arg, ty)?;
+        }
+        write!(f, ")")
+      }
     }
   }
 }
@@ -168,6 +196,15 @@ impl Debug for CPrim {
       }
       Self::Cmp(op, arg1, arg2) => {
         write!(f, "({:?} {:?} {:?})", op, arg1, arg2)
+      }
+      Self::VecRef(arg, index) => {
+        write!(f, "(vector-ref {:?} {})", arg, index)
+      }
+      Self::VecSet(vec, index, val) => {
+        write!(f, "(vector-set! {:?} {} {:?})", vec, index, val)
+      }
+      Self::VecLen(arg) => {
+        write!(f, "(vector-length {:?})", arg)
       }
     }
   }

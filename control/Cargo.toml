@@ -9,3 +9,4 @@ edition = "2018"
 ast = { path = "../ast" }
 support = { path = "../support" }
 asm = { path = "../asm" }
+id-arena = "2.2.1"

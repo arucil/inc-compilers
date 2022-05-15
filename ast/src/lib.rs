@@ -226,10 +226,7 @@ impl<VAR: Debug, TYPE: Debug> Exp<VAR, TYPE> {
 }
 
 impl Type {
-  pub fn to_vector<'a>(
-    &'a self,
-    types: &'a Arena<Type>,
-  ) -> Option<&[Type]> {
+  pub fn to_vector<'a>(&'a self, types: &'a Arena<Type>) -> Option<&[Type]> {
     match self {
       Self::Vector(types) => Some(types),
       Self::Alias(id) => types.get(*id).unwrap().to_vector(types),

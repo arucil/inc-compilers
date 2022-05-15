@@ -66,6 +66,7 @@ pub fn explicate_control(mut prog: Program<IdxVar, Type>) -> CProgram<CInfo> {
   CProgram {
     info: CInfo { locals },
     body: blocks,
+    types: prog.types,
   }
 }
 
@@ -175,6 +176,12 @@ fn explicate_tail(state: &mut State, exp: Exp<IdxVar, Type>) -> CTail {
     | ExpKind::Str(_)
     | ExpKind::Void
     | ExpKind::Get(_) => CTail::Return(CExp::Atom(atom(exp))),
+    ExpKind::Prim {
+      op: (_, "vector-set!"),
+      ..
+    } => {
+      explicate_exp_effect(state, exp, CTail::Return(CExp::Atom(CAtom::Void)))
+    }
     ExpKind::Prim { op: (_, op), args } => {
       CTail::Return(CExp::Prim(prim(op, args)))
     }
@@ -226,6 +233,10 @@ fn explicate_assign(
       }
     }
     ExpKind::Void => cont,
+    ExpKind::Prim {
+      op: (_, "vector-set!"),
+      args,
+    } => explicate_exp_effect(state, init, cont),
     ExpKind::Prim { op: (_, op), args } => {
       let prim = prim(op, args);
       let assign = CStmt::Assign {
@@ -358,6 +369,12 @@ fn explicate_exp_effect(
       op: (_, "read"),
       args: _,
     } => CTail::Seq(CStmt::Read, box cont),
+    ExpKind::Prim {
+      op: (_, "vector-set!"),
+      args,
+    } => {
+      // TODO
+    }
     ExpKind::Prim { op: _, args } => {
       explicate_effect(state, args.into_iter(), cont)
     }
@@ -436,6 +453,27 @@ fn prim(op: &str, mut args: Vec<Exp<IdxVar, Type>>) -> CPrim {
       let arg2 = args.pop().unwrap();
       let arg1 = args.pop().unwrap();
       CPrim::Cmp(op.parse().unwrap(), atom(arg1), atom(arg2))
+    }
+    "vector-ref" => {
+      let index = args.pop().unwrap();
+      let vec = args.pop().unwrap();
+      match index.kind {
+        ExpKind::Int(index) => CPrim::VecRef(atom(vec), index as _),
+        _ => unreachable!(),
+      }
+    }
+    "vector-set" => {
+      let val = args.pop().unwrap();
+      let index = args.pop().unwrap();
+      let vec = args.pop().unwrap();
+      match index.kind {
+        ExpKind::Int(index) => CPrim::VecSet(atom(vec), index as _, atom(val)),
+        _ => unreachable!(),
+      }
+    }
+    "vector-length" => {
+      let arg = args.pop().unwrap();
+      CPrim::VecLen(atom(arg))
     }
     _ => unreachable!("{}", op),
   }
