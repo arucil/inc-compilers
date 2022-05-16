@@ -146,6 +146,7 @@ impl CodeGen {
         val,
       } => {
         let vec = atom_to_arg(vec);
+        // TODO remove R11 requirement
         self.code.push(Instr::Mov {
           src: vec,
           dest: Arg::Reg(Reg::R11),

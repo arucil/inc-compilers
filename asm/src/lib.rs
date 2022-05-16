@@ -261,12 +261,20 @@ impl Reg {
 
   pub fn caller_saved_regs() -> impl IntoIterator<Item = Self> {
     use Reg::*;
-    [Rax, Rcx, Rdx, Rdx, Rsi, Rdi, R8, R9, R10, R11]
+    [Rax, Rcx, Rdx, Rsi, Rdi, R8, R9, R10, R11]
   }
 
   pub fn argument_regs() -> impl IntoIterator<Item = Self> {
     use Reg::*;
     [Rdi, Rsi, Rdx, Rcx, R8, R9]
+  }
+
+  pub fn all_regs() -> impl IntoIterator<Item = Self> {
+    use Reg::*;
+    [
+      Rsp, Rbp, Rax, Rbx, Rcx, Rdx, Rsi, Rdi, R8, R9, R10, R11, R12, R13, R14,
+      R15,
+    ]
   }
 }
 

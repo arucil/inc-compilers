@@ -85,9 +85,15 @@ fn add_instr_edges(
         add(dest_loc);
       }
     }
-    Instr::Call { .. } => {
-      for reg in Reg::caller_saved_regs() {
-        add(reg.into());
+    Instr::Call { label, .. } => {
+      if label == "allocate" {
+        for reg in Reg::all_regs() {
+          add(reg.into());
+        }
+      } else {
+        for reg in Reg::caller_saved_regs() {
+          add(reg.into());
+        }
       }
     }
     Instr::Mov { src, dest } | Instr::Movzx { src, dest } => {
