@@ -1,0 +1,36 @@
+---
+source: ch6/src/pass/instruction_selection.rs
+expression: result.to_string_pretty()
+---
+locals: {y.1, tmp.1, tmp.2, tmp.3, tmp.4, tmp.5}
+
+constants: {"const_1": "abc"}
+
+start:
+    mov rdi, 8
+    mov rsi, r15
+    call allocate
+    mov qword [rax], 1
+    mov rdi, const_1
+    mov rsi, r15
+    call new_string
+    mov tmp.2, rax
+    mov rdi, 40
+    mov rsi, r15
+    call allocate
+    mov qword [rax], 6177
+    mov qword [rax + 8], 1
+    mov qword [rax + 16], 0
+    mov qword [rax + 24], tmp.1
+    mov qword [rax + 32], tmp.2
+    mov r11, y.1
+    mov tmp.3, qword [r11 + 16]
+    mov tmp.4, tmp.3
+    xor tmp.4, 1
+    mov r11, y.1
+    mov qword [r11 + 16], tmp.4
+    mov tmp.5, 5
+    mov r11, y.1
+    mov qword [r11 + 8], tmp.5
+    jmp conclusion
+

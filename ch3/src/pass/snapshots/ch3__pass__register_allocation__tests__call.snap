@@ -5,6 +5,8 @@ expression: result.to_string_pretty()
 locals: {x.0, w.0}
 used_callee_saved_regs: {r12}
 stack_space: 0 bytes
+constants: {}
+
 start:
     pop rdi
     pop rsi

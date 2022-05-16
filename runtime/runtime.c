@@ -170,7 +170,7 @@ int64_t read_int()
 
 void *rootstack_begin;
 
-void initialize(uint64_t rootstack_size, uint64_t heap_size)
+void initialize_runtime(uint64_t rootstack_size, uint64_t heap_size)
 {
 }
 
@@ -179,7 +179,7 @@ void initialize(uint64_t rootstack_size, uint64_t heap_size)
 // bit1~bit2    0=vector   1=string
 //
 // vector:
-// bit3~bit8    number of fields
+// bit3~bit8    number of fields (exluding unit fields)
 // bit9~bit58   pointer mask
 //
 // string:
@@ -187,30 +187,18 @@ void initialize(uint64_t rootstack_size, uint64_t heap_size)
 
 void *allocate(uint64_t size, void *rootstack_ptr)
 {
+  // TODO error if no enough space
   return 0;
 }
 
-struct vector_params
+void *new_string(uint64_t *ptr, void *rootstack_ptr)
 {
-  uint64_t params[3];
-};
-
-void *new_vector(
-    uint64_t num_fields,
-    uint64_t ptr_mask,
-    void *rootstack_ptr,
-    struct vector_params params)
-{
-  uint64_t *p = allocate((num_fields + 1) * sizeof(uint64_t), rootstack_ptr);
-  if (p)
-  {
-    *p = 1 | num_fields << 3 | ptr_mask << 9;
-    int n = num_fields > 3 ? 3 : num_fields;
-    for (int i = 0; i < n; i++)
-    {
-      p[i + 1] = params.params[i];
-    }
-    if (num_fields)
+  uint64_t len = *ptr;
+  uint64_t len_dqw = (len + 15) & ~15;
+  uint64_t *str = allocate(8 + len_dqw, rootstack_ptr);
+  *str = len << 3 | 0b01 << 1 | 1;
+  for (uint64_t i = 0; i < len_dqw; i++) {
+    str[i + 1] = ptr[i];
   }
-  return p;
+  return str;
 }

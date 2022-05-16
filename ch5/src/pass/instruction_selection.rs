@@ -15,7 +15,7 @@ mod tests {
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let prog = explicate_control::explicate_control(prog);
-    let result = instruction_selection::select_instruction(prog);
+    let result = instruction_selection::select_instruction(prog, false);
     assert_snapshot!(result.to_string_pretty());
   }
 
@@ -28,7 +28,7 @@ mod tests {
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let prog = explicate_control::explicate_control(prog);
-    let result = instruction_selection::select_instruction(prog);
+    let result = instruction_selection::select_instruction(prog, false);
     assert_snapshot!(result.to_string_pretty());
   }
 }

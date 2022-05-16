@@ -5,6 +5,8 @@ expression: result.to_string_pretty()
 locals: {x.0, y.0, z.0, t.0, w.0}
 used_callee_saved_regs: {}
 stack_space: 0 bytes
+constants: {}
+
 start:
     mov r8, rdx
     add r8, rsi

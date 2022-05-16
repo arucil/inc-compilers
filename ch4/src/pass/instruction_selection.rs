@@ -4,18 +4,23 @@ use ast::IdxVar;
 use ch2::pass::instruction_selection::{CodeGen, Info};
 use control::*;
 
-pub fn select_instruction(prog: CProgram<CInfo>) -> Program<Info, IdxVar> {
-  let mut code_gen = CodeGen::new();
+pub fn select_instruction(
+  prog: CProgram<CInfo>,
+  use_heap: bool,
+) -> Program<Info, IdxVar> {
+  let mut codegen = CodeGen::new(use_heap);
+  let blocks = prog
+    .body
+    .into_iter()
+    .map(|(label, tail)| (label, codegen.tail_block(tail)))
+    .collect();
+  let constants = codegen.finish();
   Program {
     info: Info {
       locals: prog.info.locals,
     },
-    blocks: prog
-      .body
-      .into_iter()
-      .map(|(label, tail)| (label, code_gen.tail_block(tail)))
-      .collect(),
-    constants: code_gen.into_constants(),
+    blocks,
+    constants,
   }
 }
 
@@ -36,7 +41,7 @@ mod tests {
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let prog = explicate_control::explicate_control(prog);
-    let result = select_instruction(prog);
+    let result = select_instruction(prog, false);
     assert_snapshot!(result.to_string_pretty());
   }
 
@@ -58,7 +63,7 @@ mod tests {
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let prog = explicate_control::explicate_control(prog);
-    let result = select_instruction(prog);
+    let result = select_instruction(prog, false);
     assert_snapshot!(result.to_string_pretty());
   }
 
@@ -72,7 +77,7 @@ mod tests {
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let prog = explicate_control::explicate_control(prog);
-    let result = select_instruction(prog);
+    let result = select_instruction(prog, false);
     assert_snapshot!(result.to_string_pretty());
   }
 
@@ -98,7 +103,7 @@ mod tests {
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let prog = explicate_control::explicate_control(prog);
-    let result = select_instruction(prog);
+    let result = select_instruction(prog, false);
     assert_snapshot!(result.to_string_pretty());
   }
 }

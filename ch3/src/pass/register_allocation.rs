@@ -353,11 +353,6 @@ fn color_graph(
     var_colors.insert(var, color);
   }
 
-  // TODO remove this
-  for &var in locals {
-    var_colors.entry(var).or_insert(Color(0));
-  }
-
   var_colors
 }
 

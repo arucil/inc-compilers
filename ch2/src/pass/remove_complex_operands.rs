@@ -110,6 +110,8 @@ fn mon_prim<TYPE: Clone>(
   counter: &mut usize,
 ) -> Exp<IdxVar, TYPE> {
   let mut tmps = vec![];
+  // TODO rearrange args to make atom exps come after complex ones, but make
+  // sure their results in original order.
   let args = args
     .into_iter()
     .map(|arg| atom_exp(arg, &mut tmps, counter))
@@ -163,12 +165,13 @@ fn atom_exp<TYPE: Clone>(
     | ExpKind::Begin { .. }
     | ExpKind::While { .. }
     | ExpKind::Set { .. }
-    | ExpKind::Print { .. } => {
+    | ExpKind::Print { .. }
+    | ExpKind::Str(..) => {
       let exp = mon_exp(exp, counter);
       assign_var(exp, tmps, counter)
     }
     ExpKind::Void => exp,
-    ExpKind::Str(..) => exp,
+    // ExpKind::Str(..) => exp,
     ExpKind::NewLine => exp,
   }
 }

@@ -2,7 +2,7 @@
 source: ch5/src/lib.rs
 expression: prog
 ---
-extern read_int, print_int, print_str, print_bool, print_newline
+extern read_int, print_int, print_str, print_bool, print_newline, initialize_runtime, allocate, new_string
 section .rodata
     const_1 dq 1
             db `x`
@@ -20,6 +20,8 @@ _start:
     mov rbp, rsp
     sub rsp, 8
     push rbx
+    push r12
+    push r13
     mov rbx, 1
     mov rcx, 2
 
@@ -34,21 +36,25 @@ block3:
     mov rcx, const_2
 
 block0:
-    mov rbx, 1
-    xor rbx, 1
+    mov r13, const_3
+    mov r12, 1
+    xor r12, 1
+    mov rbx, const_4
     mov rdi, rcx
     call print_str
-    mov rdi, const_3
+    mov rdi, r13
     call print_str
-    mov rdi, rbx
+    mov rdi, r12
     call print_bool
-    mov rdi, const_4
+    mov rdi, rbx
     call print_str
     call print_newline
     call read_int
     mov rbx, rax
     add rbx, 1
     sub rbx, 4
+    pop r13
+    pop r12
     pop rbx
     mov rsp, rbp
     pop rbp

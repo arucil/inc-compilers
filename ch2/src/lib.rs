@@ -11,7 +11,7 @@ pub fn compile(input: &str) -> Result<String, CompileError> {
   let prog = self::pass::uniquify::uniquify(prog)?;
   let prog = self::pass::remove_complex_operands::remove_complex_operands(prog);
   let prog = self::pass::explicate_control::explicate_control(prog);
-  let prog = self::pass::instruction_selection::select_instruction(prog);
+  let prog = self::pass::instruction_selection::select_instruction(prog, false);
   let prog = self::pass::assign_home::assign_home(prog);
   let mut prog = self::pass::patch_instructions::patch_instructions(prog);
   add_prologue(&mut prog);

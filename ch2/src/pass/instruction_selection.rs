@@ -15,8 +15,11 @@ impl Debug for Info {
   }
 }
 
-pub fn select_instruction(prog: CProgram<CInfo>) -> Program<Info, IdxVar> {
-  let mut code_gen = CodeGen::new();
+pub fn select_instruction(
+  prog: CProgram<CInfo>,
+  use_heap: bool,
+) -> Program<Info, IdxVar> {
+  let mut code_gen = CodeGen::new(use_heap);
   Program {
     info: Info {
       locals: prog.info.locals,
@@ -26,7 +29,7 @@ pub fn select_instruction(prog: CProgram<CInfo>) -> Program<Info, IdxVar> {
       .into_iter()
       .map(|(label, tail)| (label, code_gen.tail_block(tail)))
       .collect(),
-    constants: code_gen.into_constants(),
+    constants: code_gen.finish(),
   }
 }
 
@@ -34,17 +37,19 @@ pub fn select_instruction(prog: CProgram<CInfo>) -> Program<Info, IdxVar> {
 pub struct CodeGen {
   code: Vec<Instr<IdxVar>>,
   constants: IndexMap<String, String>,
+  use_heap: bool,
 }
 
 impl CodeGen {
-  pub fn new() -> Self {
+  pub fn new(use_heap: bool) -> Self {
     Self {
       code: vec![],
       constants: IndexMap::new(),
+      use_heap,
     }
   }
 
-  pub fn into_constants(self) -> IndexMap<String, String> {
+  pub fn finish(self) -> IndexMap<String, String> {
     self.constants
   }
 
@@ -94,7 +99,6 @@ impl CodeGen {
           self.code.push(Instr::Jmp(alt));
           return;
         }
-        _ => unimplemented!(),
       }
     }
   }
@@ -127,6 +131,7 @@ impl CodeGen {
           arity: 0,
         });
       }
+      CStmt::Print { .. } => unreachable!(),
       CStmt::NewLine => self.code.push(Instr::Call {
         label: "print_newline".to_owned(),
         arity: 0,
@@ -135,7 +140,21 @@ impl CodeGen {
         label: "read_int".to_owned(),
         arity: 0,
       }),
-      _ => unimplemented!("{:?}", stmt),
+      CStmt::VecSet {
+        vec,
+        fields_before,
+        val,
+      } => {
+        let vec = atom_to_arg(vec);
+        self.code.push(Instr::Mov {
+          src: vec,
+          dest: Arg::Reg(Reg::R11),
+        });
+        self.atom_instructions(
+          Arg::Deref(Reg::R11, calc_field_offset(&fields_before)),
+          val,
+        );
+      }
     }
   }
 
@@ -202,34 +221,86 @@ impl CodeGen {
           dest: target,
         });
       }
-      _ => unimplemented!(),
+      // ch6
+      CPrim::Vector(fields) => {
+        let mut size = 8;
+        let mut non_unit_fields = fields.len() as i64;
+        let mut ptr_mask = 0i64;
+        let mut field_offsets = vec![];
+        for (i, (_, ty)) in fields.iter().enumerate() {
+          let offset = size as i32;
+          match ty {
+            Type::Void => {
+              non_unit_fields -= 1;
+            }
+            Type::Int => size += 8,
+            Type::Bool => size += 8,
+            Type::Str => {
+              size += 8;
+              ptr_mask |= 1 << i;
+            }
+            Type::Vector(_) => {
+              size += 8;
+              ptr_mask |= 1 << i;
+            }
+            Type::Alias(_) => todo!(),
+          }
+          field_offsets.push(offset);
+        }
+        ptr_mask >>= 1;
+        self.code.push(Instr::Mov {
+          src: Arg::Imm(size),
+          dest: Arg::Reg(Reg::Rdi),
+        });
+        self.code.push(Instr::Mov {
+          src: Arg::Reg(Reg::R15),
+          dest: Arg::Reg(Reg::Rsi),
+        });
+        self.code.push(Instr::Call {
+          label: "allocate".to_owned(),
+          arity: 2,
+        });
+        self.code.push(Instr::Mov {
+          src: Arg::Imm(ptr_mask << 9 | non_unit_fields << 3 | 1),
+          dest: Arg::Deref(Reg::Rax, 0),
+        });
+        for ((field, ty), offset) in fields.into_iter().zip(field_offsets) {
+          if ty == Type::Void {
+            continue;
+          }
+          self.atom_instructions(Arg::Deref(Reg::Rax, offset), field);
+        }
+      }
+      CPrim::VecRef { vec, fields_before } => {
+        self.atom_instructions(Arg::Reg(Reg::R11), vec);
+        self.code.push(Instr::Mov {
+          src: Arg::Deref(Reg::R11, calc_field_offset(&fields_before)),
+          dest: target,
+        });
+      }
+      CPrim::VecLen(arg) => {
+        self.atom_instructions(Arg::Reg(Reg::R11), arg);
+        self.code.push(Instr::Mov {
+          src: Arg::Deref(Reg::R11, 0),
+          dest: target.clone(),
+        });
+        self.code.push(Instr::Shr {
+          src: target.clone(),
+          count: Arg::Imm(3),
+        });
+        self.code.push(Instr::And {
+          src: Arg::Imm(0b111111),
+          dest: target,
+        });
+      }
     }
   }
 
   fn atom_instructions(&mut self, target: Arg<IdxVar>, atom: CAtom) {
     match atom {
-      CAtom::Int(n) => {
+      CAtom::Int(_) | CAtom::Var(_) | CAtom::Bool(_) => {
         self.code.push(Instr::Mov {
-          src: Arg::Imm(n),
-          dest: target,
-        });
-      }
-      CAtom::Var(var) => {
-        self.code.push(Instr::Mov {
-          src: Arg::Var(var),
-          dest: target,
-        });
-      }
-      // ch4
-      CAtom::Bool(true) => {
-        self.code.push(Instr::Mov {
-          src: Arg::Imm(1),
-          dest: target,
-        });
-      }
-      CAtom::Bool(false) => {
-        self.code.push(Instr::Mov {
-          src: Arg::Imm(0),
+          src: atom_to_arg(atom),
           dest: target,
         });
       }
@@ -238,13 +309,47 @@ impl CodeGen {
       CAtom::Str(s) => {
         let label = format!("const_{}", self.constants.len() + 1);
         self.constants.insert(label.clone(), s);
-        self.code.push(Instr::Mov {
-          src: Arg::Label(label),
-          dest: target,
-        });
+        if self.use_heap {
+          self.code.push(Instr::Mov {
+            src: Arg::Label(label),
+            dest: Arg::Reg(Reg::Rdi),
+          });
+          self.code.push(Instr::Mov {
+            src: Arg::Reg(Reg::R15),
+            dest: Arg::Reg(Reg::Rsi),
+          });
+          self.code.push(Instr::Call {
+            label: "new_string".to_owned(),
+            arity: 2,
+          });
+          self.code.push(Instr::Mov {
+            src: Arg::Reg(Reg::Rax),
+            dest: target,
+          });
+        } else {
+          self.code.push(Instr::Mov {
+            src: Arg::Label(label),
+            dest: target,
+          });
+        }
       }
     }
   }
+}
+
+fn calc_field_offset(fields_before: &[Type]) -> i32 {
+  let mut offset = 8;
+  for field in fields_before {
+    offset += match field {
+      Type::Void => 0,
+      Type::Int => 8,
+      Type::Bool => 8,
+      Type::Str => 8,
+      Type::Vector(_) => 8,
+      Type::Alias(_) => todo!(),
+    };
+  }
+  offset
 }
 
 fn atom_to_arg(atom: CAtom) -> Arg<IdxVar> {
@@ -253,8 +358,8 @@ fn atom_to_arg(atom: CAtom) -> Arg<IdxVar> {
     CAtom::Var(var) => Arg::Var(var),
     CAtom::Bool(true) => Arg::Imm(1),
     CAtom::Bool(false) => Arg::Imm(0),
-    CAtom::Void => unimplemented!(),
-    CAtom::Str(_) => todo!("compare strings"),
+    CAtom::Void => unreachable!(),
+    CAtom::Str(_) => unreachable!(),
   }
 }
 
@@ -273,7 +378,7 @@ mod tests {
     let prog = uniquify::uniquify(prog).unwrap();
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let prog = explicate_control::explicate_control(prog);
-    let result = select_instruction(prog);
+    let result = select_instruction(prog, false);
     assert_snapshot!(result.to_string_pretty());
   }
 }

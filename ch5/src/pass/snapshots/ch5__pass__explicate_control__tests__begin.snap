@@ -2,7 +2,7 @@
 source: ch5/src/pass/explicate_control.rs
 expression: result.to_string_pretty()
 ---
-locals: {x.0, y.1, tmp.0, tmp.1, tmp.2, k.2, tmp.3, tmp.5, tmp.4, tmp.6}
+locals: {x.0, y.1, tmp.0, tmp.1, tmp.2, tmp.3, k.2, tmp.4, tmp.6, tmp.5, tmp.7}
 
 start:
     x.0 = 1
@@ -11,31 +11,32 @@ start:
 block3:
     if (> x.0 10) goto block4 else goto block5
 block4:
-    print Str "x="
+    tmp.0 = "x="
+    print Str tmp.0
     print Int x.0
     newline
-    tmp.0 = (- y.1 1)
-    x.0 = (+ x.0 tmp.0)
     tmp.1 = (- y.1 1)
-    tmp.2 = (> x.0 tmp.1)
-    print Bool tmp.2
+    x.0 = (+ x.0 tmp.1)
+    tmp.2 = (- y.1 1)
+    tmp.3 = (> x.0 tmp.2)
+    print Bool tmp.3
     newline
     goto block3
 block5:
     k.2 = (+ x.0 1)
     print Int k.2
     newline
-    tmp.3 = (read)
+    tmp.4 = (read)
     y.1 = 37
-    tmp.4 = (eq? y.1 x.0)
-    if (eq? tmp.4 #f) goto block2 else goto block1
+    tmp.5 = (eq? y.1 x.0)
+    if (eq? tmp.5 #f) goto block2 else goto block1
 block2:
-    tmp.5 = 11
+    tmp.6 = 11
     goto block0
 block1:
-    tmp.5 = 23
+    tmp.6 = 23
     goto block0
 block0:
-    tmp.6 = (+ tmp.3 tmp.5)
+    tmp.7 = (+ tmp.4 tmp.6)
     return #<void>
 

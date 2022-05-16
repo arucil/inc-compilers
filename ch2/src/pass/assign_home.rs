@@ -111,7 +111,7 @@ mod tests {
     let prog = uniquify::uniquify(prog).unwrap();
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let prog = explicate_control::explicate_control(prog);
-    let prog = instruction_selection::select_instruction(prog);
+    let prog = instruction_selection::select_instruction(prog, false);
     let result = assign_home(prog);
     assert_snapshot!(result.to_string_pretty());
   }

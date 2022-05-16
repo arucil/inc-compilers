@@ -182,6 +182,17 @@ fn explicate_tail(state: &mut State, exp: Exp<IdxVar, Type>) -> CTail {
     } => {
       explicate_exp_effect(state, exp, CTail::Return(CExp::Atom(CAtom::Void)))
     }
+    // TODO this should be removed in chapter 9
+    ExpKind::Prim {
+      op: (_, "vector-length"),
+      mut args,
+    } => match args.pop().unwrap().ty {
+      Type::Vector(fields) => {
+        CTail::Return(CExp::Atom(CAtom::Int(fields.len() as i64)))
+      }
+      Type::Alias(_) => todo!(),
+      _ => unreachable!(),
+    },
     ExpKind::Prim { op: (_, op), args } => {
       CTail::Return(CExp::Prim(prim(op, args)))
     }
@@ -235,15 +246,33 @@ fn explicate_assign(
     ExpKind::Void => cont,
     ExpKind::Prim {
       op: (_, "vector-set!"),
-      args,
+      ..
     } => explicate_exp_effect(state, init, cont),
+    ExpKind::Prim {
+      op: (_, "vector-length"),
+      mut args,
+    } => match args.pop().unwrap().ty {
+      Type::Vector(fields) => {
+        let assign = CStmt::Assign {
+          var,
+          exp: CExp::Atom(CAtom::Int(fields.len() as i64)),
+        };
+        CTail::Seq(assign, box cont)
+      }
+      Type::Alias(_) => todo!(),
+      _ => unreachable!(),
+    },
     ExpKind::Prim { op: (_, op), args } => {
-      let prim = prim(op, args);
-      let assign = CStmt::Assign {
-        var,
-        exp: CExp::Prim(prim),
-      };
-      CTail::Seq(assign, box cont)
+      if init.ty == Type::Void {
+        cont
+      } else {
+        let prim = prim(op, args);
+        let assign = CStmt::Assign {
+          var,
+          exp: CExp::Prim(prim),
+        };
+        CTail::Seq(assign, box cont)
+      }
     }
     ExpKind::Let {
       var: (_, var1),
@@ -371,9 +400,29 @@ fn explicate_exp_effect(
     } => CTail::Seq(CStmt::Read, box cont),
     ExpKind::Prim {
       op: (_, "vector-set!"),
-      args,
+      mut args,
     } => {
-      // TODO
+      let val = args.pop().unwrap();
+      let index = args.pop().unwrap();
+      let vec = args.pop().unwrap();
+      match index.kind {
+        ExpKind::Int(index) => match &vec.ty {
+          Type::Vector(fields) => {
+            let fields_before = fields[..index as usize].to_vec();
+            CTail::Seq(
+              CStmt::VecSet {
+                vec: atom(vec),
+                fields_before,
+                val: atom(val),
+              },
+              box cont,
+            )
+          }
+          Type::Alias(_) => todo!(),
+          _ => unreachable!(),
+        },
+        _ => unreachable!(),
+      }
     }
     ExpKind::Prim { op: _, args } => {
       explicate_effect(state, args.into_iter(), cont)
@@ -454,20 +503,30 @@ fn prim(op: &str, mut args: Vec<Exp<IdxVar, Type>>) -> CPrim {
       let arg1 = args.pop().unwrap();
       CPrim::Cmp(op.parse().unwrap(), atom(arg1), atom(arg2))
     }
+    "vector" => CPrim::Vector(
+      args
+        .into_iter()
+        .map(|arg| {
+          let ty = arg.ty.clone();
+          (atom(arg), ty)
+        })
+        .collect(),
+    ),
     "vector-ref" => {
       let index = args.pop().unwrap();
       let vec = args.pop().unwrap();
       match index.kind {
-        ExpKind::Int(index) => CPrim::VecRef(atom(vec), index as _),
-        _ => unreachable!(),
-      }
-    }
-    "vector-set" => {
-      let val = args.pop().unwrap();
-      let index = args.pop().unwrap();
-      let vec = args.pop().unwrap();
-      match index.kind {
-        ExpKind::Int(index) => CPrim::VecSet(atom(vec), index as _, atom(val)),
+        ExpKind::Int(index) => {
+          let ty = vec.ty.clone();
+          match ty {
+            Type::Vector(fields) => CPrim::VecRef {
+              vec: atom(vec),
+              fields_before: fields[..index as usize].to_vec(),
+            },
+            Type::Alias(_) => todo!(),
+            _ => unreachable!(),
+          }
+        }
         _ => unreachable!(),
       }
     }

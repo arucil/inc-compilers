@@ -2,7 +2,7 @@
 source: ch4/src/lib.rs
 expression: prog
 ---
-extern read_int, print_int, print_str, print_bool, print_newline
+extern read_int, print_int, print_str, print_bool, print_newline, initialize_runtime, allocate, new_string
 section .text
 
     global _start

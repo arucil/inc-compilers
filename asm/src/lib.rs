@@ -21,23 +21,58 @@ pub struct Block<VAR = !> {
 }
 
 #[derive(Clone)]
-#[non_exhaustive]
 pub enum Instr<VAR = !> {
-  Add { src: Arg<VAR>, dest: Arg<VAR> },
-  Sub { src: Arg<VAR>, dest: Arg<VAR> },
-  Mov { src: Arg<VAR>, dest: Arg<VAR> },
+  Add {
+    src: Arg<VAR>,
+    dest: Arg<VAR>,
+  },
+  Sub {
+    src: Arg<VAR>,
+    dest: Arg<VAR>,
+  },
+  Mov {
+    src: Arg<VAR>,
+    dest: Arg<VAR>,
+  },
   Neg(Arg<VAR>),
-  Call { label: String, arity: usize },
+  Call {
+    label: String,
+    arity: usize,
+  },
   Ret,
   Push(Arg<VAR>),
   Pop(Arg<VAR>),
   Jmp(Label),
   Syscall,
-  Xor { src: Arg<VAR>, dest: Arg<VAR> },
-  Cmp { src: Arg<VAR>, dest: Arg<VAR> },
-  SetIf { cmp: CmpResult, dest: Arg<VAR> },
-  Movzx { src: Arg<VAR>, dest: Arg<VAR> },
-  JumpIf { cmp: CmpResult, label: Label },
+  Xor {
+    src: Arg<VAR>,
+    dest: Arg<VAR>,
+  },
+  Cmp {
+    src: Arg<VAR>,
+    dest: Arg<VAR>,
+  },
+  SetIf {
+    cmp: CmpResult,
+    dest: Arg<VAR>,
+  },
+  Movzx {
+    src: Arg<VAR>,
+    dest: Arg<VAR>,
+  },
+  JumpIf {
+    cmp: CmpResult,
+    label: Label,
+  },
+  /// `count` must be byte.
+  Shr {
+    src: Arg<VAR>,
+    count: Arg<VAR>,
+  },
+  And {
+    src: Arg<VAR>,
+    dest: Arg<VAR>,
+  },
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -114,7 +149,7 @@ impl<VAR: Clone> Arg<VAR> {
 
 impl<INFO: Debug, VAR: Debug> Program<INFO, VAR> {
   pub fn to_string_pretty(&self) -> String {
-    let mut buf = format!("{:?}", self.info);
+    let mut buf = format!("{:?}constants: {:?}\n\n", self.info, self.constants);
     for (label, block) in &self.blocks {
       writeln!(&mut buf, "{:?}:", label).unwrap();
       write!(&mut buf, "{:?}", block).unwrap();
@@ -124,7 +159,7 @@ impl<INFO: Debug, VAR: Debug> Program<INFO, VAR> {
 
   pub fn to_nasm(&self) -> String {
     let mut buf =
-      "extern read_int, print_int, print_str, print_bool, print_newline\n"
+      "extern read_int, print_int, print_str, print_bool, print_newline, initialize_runtime, allocate, new_string\n"
         .to_owned();
     if !self.constants.is_empty() {
       buf += "section .rodata\n";
@@ -187,6 +222,8 @@ impl<VAR: Debug> Debug for Instr<VAR> {
       Self::Movzx { src, dest } => write!(f, "movzx {:?}, {:?}", dest, src),
       Self::SetIf { cmp, dest } => write!(f, "set{:?} {:?}", cmp, dest),
       Self::JumpIf { cmp, label } => write!(f, "j{:?} {:?}", cmp, label),
+      Self::Shr { src, count } => write!(f, "shr {:?}, {:?}", src, count),
+      Self::And { src, dest } => write!(f, "and {:?}, {:?}", dest, src),
     }
   }
 }

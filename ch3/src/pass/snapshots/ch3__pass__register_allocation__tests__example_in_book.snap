@@ -5,6 +5,8 @@ expression: result.to_string_pretty()
 locals: {v.0, w.0, x.0, y.0, z.0, t.0}
 used_callee_saved_regs: {}
 stack_space: 16 bytes
+constants: {}
+
 start:
     mov rcx, 1
     mov qword [rbp - 16], 42
