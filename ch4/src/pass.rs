@@ -10,3 +10,4 @@ pub mod typecheck;
 pub mod uniquify;
 pub mod move_biasing;
 pub mod register_allocation;
+pub mod perilogue;

@@ -34,13 +34,14 @@ pub fn select_instruction(
     .into_iter()
     .map(|(label, tail)| (label, codegen.tail_block(tail)))
     .collect();
-  let constants = codegen.finish();
+  let result = codegen.finish();
   Program {
     info: Info {
       locals: prog.info.locals,
     },
     blocks,
-    constants,
+    constants: result.constants,
+    externs: result.externs,
   }
 }
 

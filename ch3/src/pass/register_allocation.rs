@@ -76,6 +76,7 @@ pub fn allocate_registers(
       used_callee_saved_regs,
     },
     constants: prog.constants,
+    externs: prog.externs,
     blocks,
   }
 }
@@ -407,6 +408,7 @@ mod tests {
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
@@ -440,6 +442,7 @@ mod tests {
         locals: indexset! {IdxVar::new("x"),IdxVar::new("w")},
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
@@ -473,6 +476,7 @@ mod tests {
         locals: indexset! {IdxVar::new("x"),IdxVar::new("w")},
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
@@ -511,6 +515,7 @@ mod tests {
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
@@ -556,6 +561,7 @@ mod tests {
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);

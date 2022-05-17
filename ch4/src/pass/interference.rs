@@ -42,8 +42,7 @@ pub fn build_interference(
       moves: LocationGraph::new(),
       var_store: prog.info.var_store,
     },
-    constants: prog.constants,
-    blocks: prog.blocks,
+    ..prog
   }
 }
 
@@ -105,6 +104,7 @@ mod tests {
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
@@ -140,6 +140,7 @@ mod tests {
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
@@ -172,6 +173,7 @@ mod tests {
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
@@ -225,6 +227,7 @@ block4:
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
@@ -277,6 +280,7 @@ block4:
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
@@ -355,6 +359,7 @@ block9:
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);

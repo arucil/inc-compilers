@@ -48,8 +48,7 @@ pub fn merge_blocks<INFO>(prog: Program<INFO>) -> Program<INFO> {
     new_blocks.push((label, block));
   }
   Program {
-    info: prog.info,
-    constants: prog.constants,
     blocks: new_blocks,
+    ..prog
   }
 }

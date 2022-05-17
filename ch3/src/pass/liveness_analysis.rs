@@ -49,6 +49,7 @@ pub fn analyze_liveness(
       var_store,
     },
     constants: prog.constants,
+    externs: prog.externs,
     blocks: prog.blocks,
   }
 }
@@ -241,6 +242,7 @@ mod tests {
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let result = analyze_liveness(prog, label_live);
@@ -273,6 +275,7 @@ mod tests {
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let result = analyze_liveness(prog, label_live);
@@ -307,6 +310,7 @@ mod tests {
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let result = analyze_liveness(prog, label_live);
@@ -335,6 +339,7 @@ mod tests {
         locals: IndexSet::new(),
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let result = analyze_liveness(prog, label_live);

@@ -75,8 +75,7 @@ pub fn analyze_liveness(
       live,
       var_store,
     },
-    constants: prog.constants,
-    blocks: prog.blocks,
+    ..prog
   }
 }
 
@@ -199,6 +198,7 @@ mod tests {
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let result = analyze_liveness(prog, label_live);
@@ -231,6 +231,7 @@ mod tests {
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let result = analyze_liveness(prog, label_live);
@@ -265,6 +266,7 @@ mod tests {
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let result = analyze_liveness(prog, label_live);
@@ -293,6 +295,7 @@ mod tests {
         locals: indexmap! {},
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let result = analyze_liveness(prog, label_live);
@@ -344,6 +347,7 @@ mod tests {
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let result = analyze_liveness(prog, label_live);
@@ -397,6 +401,7 @@ block4:
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let result = analyze_liveness(prog, label_live);
@@ -474,6 +479,7 @@ block9:
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let result = analyze_liveness(prog, label_live);
@@ -521,6 +527,7 @@ block8:
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let result = analyze_liveness(prog, label_live);

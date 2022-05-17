@@ -1,11 +1,8 @@
 ---
 source: ch6/src/lib.rs
-assertion_line: 68
 expression: prog
 ---
-extern rt_read_int, rt_print_int, rt_print_str, rt_print_bool
-extern rt_print_newline, rt_initialize, rt_allocate, rt_new_string
-extern rt_rootstack_begin
+extern rt_allocate, rt_initialize, rt_new_string, rt_rootstack_begin
 section .rodata
     const_1 db `abc`
 section .text
@@ -29,7 +26,11 @@ _start:
     mov r11, rax
     mov qword [r11], 1
     mov qword [r15], r11
-    mov qword [r15 + 8], const_1
+    mov rdi, 3
+    mov rsi, const_1
+    mov rdx, r15
+    call rt_new_string
+    mov qword [r15 + 8], rax
     mov rdi, 40
     mov rsi, r15
     call rt_allocate

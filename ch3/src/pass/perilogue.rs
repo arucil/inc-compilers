@@ -28,41 +28,7 @@ fn add_prologue(prog: &mut Program<Info>) {
   for &reg in &prog.info.used_callee_saved_regs {
     code.push(Push(Arg::Reg(reg)));
   }
-  let label_init = "rt_initialize".to_owned();
-  let label_rtstk = "rt_rootstack_begin".to_owned();
-  prog.externs.insert(label_init.clone());
-  prog.externs.insert(label_rtstk.clone());
-  code.extend_from_slice(&[
-    Mov {
-      src: Arg::Imm(65536),
-      dest: Arg::Reg(Rdi),
-    },
-    Mov {
-      src: Arg::Imm(64),
-      dest: Arg::Reg(Rsi),
-    },
-    Call {
-      label: label_init,
-      arity: 2,
-    },
-    Mov {
-      src: Arg::Label(label_rtstk),
-      dest: Arg::Reg(R15),
-    },
-  ]);
-  for i in (0..prog.info.rootstack_space as i32).step_by(8) {
-    code.push(Mov {
-      src: Arg::Imm(0),
-      dest: Arg::Deref(R15, i),
-    });
-  }
-  code.extend_from_slice(&[
-    Add {
-      src: Arg::Imm(prog.info.rootstack_space as i64),
-      dest: Arg::Reg(R15),
-    },
-    Jmp(Label::Start),
-  ]);
+  code.push(Jmp(Label::Start));
   let block = Block { global: true, code };
   prog.blocks.push((Label::EntryPoint, block));
 }
@@ -70,18 +36,27 @@ fn add_prologue(prog: &mut Program<Info>) {
 fn add_epilogue(prog: &mut Program<Info>) {
   use asm::Reg::*;
   use Instr::*;
-  let mut code: Vec<Instr> = vec![Sub {
-    src: Arg::Imm(prog.info.rootstack_space as i64),
-    dest: Arg::Reg(R15),
-  }];
-  code.extend(
-    prog
-      .info
-      .used_callee_saved_regs
-      .iter()
-      .rev()
-      .map(|&reg| Pop(Arg::Reg(reg))),
-  );
+  let label1 = "rt_print_int".to_owned();
+  let label2 = "rt_print_newline".to_owned();
+  prog.externs.insert(label1.clone());
+  prog.externs.insert(label2.clone());
+  let mut code = vec![
+    Mov {
+      src: Arg::Reg(Rax),
+      dest: Arg::Reg(Rdi),
+    },
+    Call {
+      label: label1,
+      arity: 0,
+    },
+    Call {
+      label: label2,
+      arity: 0,
+    },
+  ];
+  for &reg in prog.info.used_callee_saved_regs.iter().rev() {
+    code.push(Pop(Arg::Reg(reg)));
+  }
   code.extend_from_slice(&[
     Mov {
       src: Arg::Reg(Rbp),

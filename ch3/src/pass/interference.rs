@@ -49,6 +49,7 @@ pub fn build_interference(
       var_store: prog.info.var_store,
     },
     constants: prog.constants,
+    externs: prog.externs,
     blocks: prog.blocks,
   }
 }
@@ -204,6 +205,7 @@ mod tests {
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
@@ -239,6 +241,7 @@ mod tests {
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
@@ -271,6 +274,7 @@ mod tests {
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);

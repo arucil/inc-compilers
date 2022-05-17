@@ -1,5 +1,5 @@
 use self::location_set::LocationSet;
-use asm::{Arg, Block, Instr, Label, Program, Reg};
+use asm::{Label, Reg};
 use maplit::hashmap;
 use support::CompileError;
 
@@ -30,80 +30,10 @@ pub fn compile(
     Rbx, Rcx, Rdx, Rsi, Rdi, R8, R9, R10, R11, R12, R13, R14, R15,
   ]);
   let prog = self::pass::register_allocation::allocate_registers(prog, regs);
-  let mut prog = ch2::pass::patch_instructions::patch_instructions(prog);
-  add_prologue(&mut prog);
-  add_epilogue(&mut prog);
+  let prog = ch2::pass::patch_instructions::patch_instructions(prog);
+  let prog = self::pass::perilogue::add_perilogue(prog);
 
   Ok(prog.to_nasm(true))
-}
-
-fn add_prologue(prog: &mut Program<self::pass::register_allocation::Info>) {
-  use asm::Reg::*;
-  use Instr::*;
-  let stack_space =
-    prog.info.stack_space + prog.info.used_callee_saved_regs.len() * 8;
-  let stack_space =
-    ((stack_space + 15) & !15) - prog.info.used_callee_saved_regs.len() * 8;
-  let mut code = vec![
-    Push(Arg::Reg(Rbp)),
-    Mov {
-      src: Arg::Reg(Rsp),
-      dest: Arg::Reg(Rbp),
-    },
-    Sub {
-      src: Arg::Imm(stack_space as i64),
-      dest: Arg::Reg(Rsp),
-    },
-  ];
-  for &reg in &prog.info.used_callee_saved_regs {
-    code.push(Push(Arg::Reg(reg)));
-  }
-  code.push(Jmp(Label::Start));
-  let block = Block { global: true, code };
-  prog.blocks.push((Label::EntryPoint, block));
-}
-
-fn add_epilogue(prog: &mut Program<self::pass::register_allocation::Info>) {
-  use asm::Reg::*;
-  use Instr::*;
-  let mut code = vec![
-    Mov {
-      src: Arg::Reg(Rax),
-      dest: Arg::Reg(Rdi),
-    },
-    Call {
-      label: "rt_print_int".to_owned(),
-      arity: 0,
-    },
-    Call {
-      label: "rt_print_newline".to_owned(),
-      arity: 0,
-    },
-  ];
-  for &reg in prog.info.used_callee_saved_regs.iter().rev() {
-    code.push(Pop(Arg::Reg(reg)));
-  }
-  code.extend_from_slice(&[
-    Mov {
-      src: Arg::Reg(Rbp),
-      dest: Arg::Reg(Rsp),
-    },
-    Pop(Arg::Reg(Rbp)),
-    Mov {
-      src: Arg::Imm(60),
-      dest: Arg::Reg(Rax),
-    },
-    Mov {
-      src: Arg::Imm(0),
-      dest: Arg::Reg(Rdi),
-    },
-    Syscall,
-  ]);
-  let block = Block {
-    global: false,
-    code,
-  };
-  prog.blocks.push((Label::Conclusion, block));
 }
 
 #[cfg(test)]

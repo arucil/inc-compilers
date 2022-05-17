@@ -1,4 +1,4 @@
-#![feature(box_syntax)]
+#![feature(box_syntax, type_changing_struct_update)]
 
 use asm::{Label, Reg};
 use ch3::location_set::LocationSet;
@@ -19,7 +19,7 @@ pub fn compile(
   let prog = ch5::pass::uncover_get::uncover_get(prog);
   let prog = ch2::pass::remove_complex_operands::remove_complex_operands(prog);
   let prog = ch4::pass::explicate_control::explicate_control(prog);
-  let prog = ch4::pass::instruction_selection::select_instruction(prog, false);
+  let prog = ch4::pass::instruction_selection::select_instruction(prog, true);
   let prog = ch5::pass::liveness_analysis::analyze_liveness(
     prog,
     hashmap! {

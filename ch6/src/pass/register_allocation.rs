@@ -80,8 +80,8 @@ pub fn allocate_registers(
       rootstack_space: num_ref_locals * 8,
       used_callee_saved_regs,
     },
-    constants: prog.constants,
     blocks,
+    ..prog
   }
 }
 
@@ -240,11 +240,77 @@ start:
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let prog = interference::build_interference(prog);
     let result = allocate_registers(prog, &[Rcx]);
+
+    assert_snapshot!(result.to_string_pretty());
+  }
+
+  #[test]
+  fn vector_r11() {
+    use asm::Reg::*;
+    let blocks = asm::parse_blocks(
+      |s| IdxVar::new(s),
+      r#"
+start:
+    mov rdi, 8
+    mov rsi, r15
+    call rt_allocate
+    mov [r11], rax
+    mov [r11], 1
+    mov tmp.1, r11
+    mov rdi, 3
+    mov rsi, const_1
+    mov rdx, r15
+    call rt_new_string
+    mov tmp.2, rax
+    mov rdi, 40
+    mov rsi, r15
+    call rt_allocate
+    mov [r11], rax
+    mov [r11], 6177
+    mov [r11 + 8], 1
+    mov [r11 + 16], 0
+    mov [r11 + 24], tmp.1
+    mov [r11 + 32], tmp.2
+    mov y.1, r11
+    mov r11, y.1
+    mov tmp.3, [r11 + 16]
+    mov tmp.4, tmp.3
+    xor tmp.4, 1
+    mov r11, y.1
+    mov [r11 + 16], tmp.4
+    mov tmp.5, 5
+    mov r11, y.1
+    mov [r11 + 8], tmp.5
+    jmp conclusion
+    "#,
+    );
+    let label_live = hashmap! {
+      Label::Conclusion => LocationSet::regs([Rax, Rsp])
+    };
+    let prog = Program {
+      info: OldOldInfo {
+        locals: indexmap! {
+          IdxVar::new("tmp.1") => Type::Vector(vec![Type::Void]),
+          IdxVar::new("tmp.2") => Type::Str,
+          IdxVar::new("y.1") => Type::Vector(vec![Type::Int, Type::Bool, Type::Void, Type::Vector(vec![Type::Void]), Type::Str]),
+          IdxVar::new("tmp.3") => Type::Bool,
+          IdxVar::new("tmp.4") => Type::Bool,
+          IdxVar::new("tmp.5") => Type::Int,
+        },
+      },
+      constants: Default::default(),
+      externs: Default::default(),
+      blocks,
+    };
+    let prog = liveness_analysis::analyze_liveness(prog, label_live);
+    let prog = interference::build_interference(prog);
+    let result = allocate_registers(prog, &[R11]);
 
     assert_snapshot!(result.to_string_pretty());
   }
@@ -304,6 +370,7 @@ start:
         },
       },
       constants: Default::default(),
+      externs: Default::default(),
       blocks,
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);

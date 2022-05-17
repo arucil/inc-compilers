@@ -1,4 +1,4 @@
-#![feature(box_syntax)]
+#![feature(box_syntax, type_changing_struct_update)]
 
 use asm::{Arg, Block, Instr, Label, Program, Reg};
 use ch3::location_set::LocationSet;

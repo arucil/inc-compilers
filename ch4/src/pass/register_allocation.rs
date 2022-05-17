@@ -75,6 +75,7 @@ pub fn allocate_registers(
       used_callee_saved_regs,
     },
     constants: prog.constants,
+    externs: prog.externs,
     blocks,
   }
 }

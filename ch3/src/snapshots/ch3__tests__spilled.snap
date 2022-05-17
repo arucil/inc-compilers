@@ -2,9 +2,7 @@
 source: ch3/src/lib.rs
 expression: prog
 ---
-extern rt_read_int, rt_print_int, rt_print_str, rt_print_bool
-extern rt_print_newline, rt_initialize, rt_allocate, rt_new_string
-extern rt_rootstack_begin
+extern rt_print_int, rt_print_newline, rt_read_int
 section .text
 
 start:
