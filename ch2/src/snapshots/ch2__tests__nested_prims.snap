@@ -2,14 +2,16 @@
 source: ch2/src/lib.rs
 expression: prog
 ---
-extern read_int, print_int, print_str, print_bool, print_newline, initialize_runtime, allocate, new_string
+extern rt_read_int, rt_print_int, rt_print_str, rt_print_bool
+extern rt_print_newline, rt_initialize, rt_allocate, rt_new_string
+extern rt_rootstack_begin
 section .text
 
 start:
-    call read_int
+    call rt_read_int
     mov qword [rbp - 8], rax
     mov qword [rbp - 16], 5
-    call read_int
+    call rt_read_int
     mov qword [rbp - 24], rax
     mov rax, qword [rbp - 24]
     mov qword [rbp - 32], rax
@@ -32,8 +34,8 @@ conclusion:
     mov rsp, rbp
     pop rbp
     mov rdi, rax
-    call print_int
-    call print_newline
+    call rt_print_int
+    call rt_print_newline
     mov rax, 60
     mov rdi, 0
     syscall

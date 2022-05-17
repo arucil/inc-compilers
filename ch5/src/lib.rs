@@ -26,21 +26,21 @@ pub fn compile(
       Label::Conclusion => LocationSet::regs([Rax, Rbp])
     },
   );
-  let prog = ch3::pass::interference::build_interference(prog);
-  let prog = ch3::pass::move_biasing::build_move_graph(prog);
+  let prog = ch4::pass::interference::build_interference(prog);
+  let prog = ch4::pass::move_biasing::build_move_graph(prog);
   let regs = regs.unwrap_or(&[
     Rbx, Rcx, Rdx, Rsi, Rdi, R8, R9, R10, R11, R12, R13, R14, R15,
   ]);
-  let prog = ch3::pass::register_allocation::allocate_registers(prog, regs);
+  let prog = ch4::pass::register_allocation::allocate_registers(prog, regs);
   let mut prog = ch2::pass::patch_instructions::patch_instructions(prog);
   add_prologue(&mut prog);
   add_epilogue(&mut prog);
   let prog = ch4::pass::merge_blocks::merge_blocks(prog);
 
-  Ok(prog.to_nasm())
+  Ok(prog.to_nasm(true))
 }
 
-fn add_prologue(prog: &mut Program<ch3::pass::register_allocation::Info>) {
+fn add_prologue(prog: &mut Program<ch4::pass::register_allocation::Info>) {
   use asm::Reg::*;
   use Instr::*;
   let stack_space =
@@ -66,7 +66,7 @@ fn add_prologue(prog: &mut Program<ch3::pass::register_allocation::Info>) {
   prog.blocks.push((Label::EntryPoint, block));
 }
 
-fn add_epilogue(prog: &mut Program<ch3::pass::register_allocation::Info>) {
+fn add_epilogue(prog: &mut Program<ch4::pass::register_allocation::Info>) {
   use asm::Reg::*;
   use Instr::*;
   let mut code: Vec<Instr> = prog

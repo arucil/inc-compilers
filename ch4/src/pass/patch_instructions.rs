@@ -5,7 +5,6 @@ mod tests {
   use ast::*;
   use ch2::pass::remove_complex_operands;
   use ch3::location_set::LocationSet;
-  use ch3::pass::interference;
   use insta::assert_snapshot;
   use maplit::hashmap;
 
@@ -26,11 +25,11 @@ mod tests {
       },
     );
     let prog = interference::build_interference(prog);
-    let prog = ch3::pass::move_biasing::build_move_graph(prog);
+    let prog = move_biasing::build_move_graph(prog);
     let regs = &[
       Rbx, Rcx, Rdx, Rsi, Rdi, R8, R9, R10, R11, R12, R13, R14, R15,
     ];
-    let prog = ch3::pass::register_allocation::allocate_registers(prog, regs);
+    let prog = register_allocation::allocate_registers(prog, regs);
     let result = ch2::pass::patch_instructions::patch_instructions(prog);
     assert_snapshot!(result.to_string_pretty());
   }

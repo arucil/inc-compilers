@@ -1,10 +1,11 @@
-use super::interference::{Info, Moves};
-use crate::{
+use super::interference::Info;
+use asm::{Arg, Block, Instr, Program};
+use ast::IdxVar;
+use ch3::pass::interference::Moves;
+use ch3::{
   location_graph::LocationGraph,
   location_set::{Location, VarStore},
 };
-use asm::{Arg, Block, Instr, Program};
-use ast::IdxVar;
 
 pub fn build_move_graph(
   mut prog: Program<Info, IdxVar>,

@@ -3,6 +3,7 @@ use asm::{Arg, Block, ByteReg, Instr, Label, Program, Reg};
 use ast::{IdxVar, Type};
 use control::*;
 use indexmap::{IndexMap, IndexSet};
+use std::collections::BTreeSet;
 use std::fmt::{self, Debug, Formatter};
 
 pub struct Info {
@@ -15,21 +16,33 @@ impl Debug for Info {
   }
 }
 
-pub fn select_instruction(
-  prog: CProgram<CInfo>,
+impl From<CInfo> for Info {
+  fn from(info: CInfo) -> Self {
+    Self {
+      locals: info.locals,
+    }
+  }
+}
+
+pub fn select_instruction<OldInfo, NewInfo>(
+  prog: CProgram<OldInfo>,
   use_heap: bool,
-) -> Program<Info, IdxVar> {
-  let mut code_gen = CodeGen::new(use_heap);
+) -> Program<NewInfo, IdxVar>
+where
+  NewInfo: From<OldInfo>,
+{
+  let mut codegen = CodeGen::new(use_heap);
+  let blocks = prog
+    .body
+    .into_iter()
+    .map(|(label, tail)| (label, codegen.tail_block(tail)))
+    .collect();
+  let result = codegen.finish();
   Program {
-    info: Info {
-      locals: prog.info.locals,
-    },
-    blocks: prog
-      .body
-      .into_iter()
-      .map(|(label, tail)| (label, code_gen.tail_block(tail)))
-      .collect(),
-    constants: code_gen.finish(),
+    info: prog.info.into(),
+    blocks,
+    constants: result.constants,
+    externs: result.externs,
   }
 }
 
@@ -37,7 +50,13 @@ pub fn select_instruction(
 pub struct CodeGen {
   code: Vec<Instr<IdxVar>>,
   constants: IndexMap<String, String>,
+  externs: BTreeSet<String>,
   use_heap: bool,
+}
+
+pub struct CodeGenResult {
+  pub constants: IndexMap<String, String>,
+  pub externs: BTreeSet<String>,
 }
 
 impl CodeGen {
@@ -45,12 +64,16 @@ impl CodeGen {
     Self {
       code: vec![],
       constants: IndexMap::new(),
+      externs: BTreeSet::new(),
       use_heap,
     }
   }
 
-  pub fn finish(self) -> IndexMap<String, String> {
-    self.constants
+  pub fn finish(self) -> CodeGenResult {
+    CodeGenResult {
+      constants: self.constants,
+      externs: self.externs,
+    }
   }
 
   pub fn tail_block(&mut self, tail: CTail) -> Block<IdxVar> {
@@ -109,37 +132,36 @@ impl CodeGen {
       // ch4
       CStmt::Print { val, ty: Type::Int } => {
         self.atom_instructions(Arg::Reg(Reg::Rdi), val);
-        self.code.push(Instr::Call {
-          label: "print_int".to_owned(),
-          arity: 0,
-        });
+        let label = "rt_print_int".to_owned();
+        self.externs.insert(label.clone());
+        self.code.push(Instr::Call { label, arity: 0 });
       }
       CStmt::Print {
         val,
         ty: Type::Bool,
       } => {
         self.atom_instructions(Arg::Reg(Reg::Rdi), val);
-        self.code.push(Instr::Call {
-          label: "print_bool".to_owned(),
-          arity: 0,
-        });
+        let label = "rt_print_bool".to_owned();
+        self.externs.insert(label.clone());
+        self.code.push(Instr::Call { label, arity: 0 });
       }
       CStmt::Print { val, ty: Type::Str } => {
         self.atom_instructions(Arg::Reg(Reg::Rdi), val);
-        self.code.push(Instr::Call {
-          label: "print_str".to_owned(),
-          arity: 0,
-        });
+        let label = "rt_print_str".to_owned();
+        self.externs.insert(label.clone());
+        self.code.push(Instr::Call { label, arity: 0 });
       }
       CStmt::Print { .. } => unreachable!(),
-      CStmt::NewLine => self.code.push(Instr::Call {
-        label: "print_newline".to_owned(),
-        arity: 0,
-      }),
-      CStmt::Read => self.code.push(Instr::Call {
-        label: "read_int".to_owned(),
-        arity: 0,
-      }),
+      CStmt::NewLine => {
+        let label = "rt_print_newline".to_owned();
+        self.externs.insert(label.clone());
+        self.code.push(Instr::Call { label, arity: 0 })
+      }
+      CStmt::Read => {
+        let label = "rt_read_int".to_owned();
+        self.externs.insert(label.clone());
+        self.code.push(Instr::Call { label, arity: 0 })
+      }
       CStmt::VecSet {
         vec,
         fields_before,
@@ -169,10 +191,9 @@ impl CodeGen {
   fn prim_instructions(&mut self, target: Arg<IdxVar>, prim: CPrim) {
     match prim {
       CPrim::Read => {
-        self.code.push(Instr::Call {
-          label: "read_int".to_owned(),
-          arity: 0,
-        });
+        let label = "rt_read_int".to_owned();
+        self.externs.insert(label.clone());
+        self.code.push(Instr::Call { label, arity: 0 });
         self.code.push(Instr::Mov {
           src: Arg::Reg(Reg::Rax),
           dest: target,
@@ -257,20 +278,27 @@ impl CodeGen {
           src: Arg::Reg(Reg::R15),
           dest: Arg::Reg(Reg::Rsi),
         });
-        self.code.push(Instr::Call {
-          label: "allocate".to_owned(),
-          arity: 2,
+        let label = "rt_allocate".to_owned();
+        self.externs.insert(label.clone());
+        self.code.push(Instr::Call { label, arity: 2 });
+        self.code.push(Instr::Mov {
+          src: Arg::Reg(Reg::Rax),
+          dest: Arg::Reg(Reg::R11),
         });
         self.code.push(Instr::Mov {
           src: Arg::Imm(ptr_mask << 9 | non_unit_fields << 3 | 1),
-          dest: Arg::Deref(Reg::Rax, 0),
+          dest: Arg::Deref(Reg::R11, 0),
         });
         for ((field, ty), offset) in fields.into_iter().zip(field_offsets) {
           if ty == Type::Void {
             continue;
           }
-          self.atom_instructions(Arg::Deref(Reg::Rax, offset), field);
+          self.atom_instructions(Arg::Deref(Reg::R11, offset), field);
         }
+        self.code.push(Instr::Mov {
+          src: Arg::Reg(Reg::R11),
+          dest: target,
+        })
       }
       CPrim::VecRef { vec, fields_before } => {
         self.atom_instructions(Arg::Reg(Reg::R11), vec);
@@ -309,20 +337,24 @@ impl CodeGen {
       CAtom::Void => {}
       CAtom::Str(s) => {
         let label = format!("const_{}", self.constants.len() + 1);
+        let len = s.len();
         self.constants.insert(label.clone(), s);
         if self.use_heap {
           self.code.push(Instr::Mov {
-            src: Arg::Label(label),
+            src: Arg::Imm(len as i64),
             dest: Arg::Reg(Reg::Rdi),
           });
           self.code.push(Instr::Mov {
-            src: Arg::Reg(Reg::R15),
+            src: Arg::Label(label),
             dest: Arg::Reg(Reg::Rsi),
           });
-          self.code.push(Instr::Call {
-            label: "new_string".to_owned(),
-            arity: 2,
+          self.code.push(Instr::Mov {
+            src: Arg::Reg(Reg::R15),
+            dest: Arg::Reg(Reg::Rdx),
           });
+          let label = "rt_new_string".to_owned();
+          self.externs.insert(label.clone());
+          self.code.push(Instr::Call { label, arity: 3 });
           self.code.push(Instr::Mov {
             src: Arg::Reg(Reg::Rax),
             dest: target,
@@ -379,7 +411,7 @@ mod tests {
     let prog = uniquify::uniquify(prog).unwrap();
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let prog = explicate_control::explicate_control(prog);
-    let result = select_instruction(prog, false);
+    let result = select_instruction::<_, Info>(prog, false);
     assert_snapshot!(result.to_string_pretty());
   }
 }

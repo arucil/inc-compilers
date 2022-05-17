@@ -193,6 +193,14 @@ impl Location {
     }
   }
 
+  pub fn to_arg_var(&self, var_store: &VarStore) -> Option<IdxVar> {
+    if self.0 < 16 {
+      None
+    } else {
+      Some(var_store.0.get_index(self.0 - 16).unwrap().0.clone())
+    }
+  }
+
   pub fn from_arg(arg: Arg<IdxVar>, var_store: &VarStore) -> Option<Self> {
     match arg {
       Arg::Deref(reg, _) | Arg::Reg(reg) => Some(reg.into()),

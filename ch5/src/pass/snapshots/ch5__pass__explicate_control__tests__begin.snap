@@ -2,7 +2,7 @@
 source: ch5/src/pass/explicate_control.rs
 expression: result.to_string_pretty()
 ---
-locals: {x.0, y.1, tmp.0, tmp.1, tmp.2, tmp.3, k.2, tmp.4, tmp.6, tmp.5, tmp.7}
+locals: {x.0: Int, y.1: Int, tmp.0: Str, tmp.1: Int, tmp.2: Int, tmp.3: Bool, k.2: Int, tmp.4: Int, tmp.6: Int, tmp.5: Bool, tmp.7: Int}
 
 start:
     x.0 = 1

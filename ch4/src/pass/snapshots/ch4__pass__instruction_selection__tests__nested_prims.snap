@@ -2,16 +2,16 @@
 source: ch4/src/pass/instruction_selection.rs
 expression: result.to_string_pretty()
 ---
-locals: {x.0, y.1, tmp.0, tmp.1, tmp.2, tmp.3}
+locals: {x.0: Int, y.1: Int, tmp.0: Int, tmp.1: Int, tmp.2: Int, tmp.3: Int}
 
 constants: {}
 
 start:
-    call read_int
+    call rt_read_int
     mov x.0, rax
     mov y.1, 2
     add y.1, 3
-    call read_int
+    call rt_read_int
     mov tmp.0, rax
     mov tmp.1, tmp.0
     neg tmp.1

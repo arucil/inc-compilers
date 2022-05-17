@@ -1,8 +1,9 @@
 use asm::{Instr, Label, Program};
 use ast::IdxVar;
-use ch2::pass::instruction_selection::Info as OldInfo;
 use ch3::location_set::{LocationSet, VarStore};
-use ch3::pass::liveness_analysis::{AnalysisState, Info as NewInfo};
+use ch3::pass::liveness_analysis::AnalysisState;
+use ch4::pass::instruction_selection::Info as OldInfo;
+use ch4::pass::liveness_analysis::Info as NewInfo;
 use indexmap::IndexMap;
 use petgraph::graph::NodeIndex;
 use petgraph::{Direction, Graph};
@@ -16,7 +17,7 @@ pub fn analyze_liveness(
   label_live: HashMap<Label, LocationSet>,
 ) -> Program<NewInfo, IdxVar> {
   let mut var_store = VarStore::new();
-  for var in &prog.info.locals {
+  for var in prog.info.locals.keys() {
     var_store.insert(var.clone());
   }
 
@@ -128,7 +129,8 @@ where
 mod tests {
   use super::*;
   use asm::Label;
-  use indexmap::indexset;
+  use ast::Type;
+  use indexmap::indexmap;
   use insta::assert_snapshot;
   use maplit::hashmap;
   use std::fmt::Write;
@@ -187,13 +189,13 @@ mod tests {
     };
     let prog = Program {
       info: OldInfo {
-        locals: indexset! {
-          IdxVar::new("v"),
-          IdxVar::new("w"),
-          IdxVar::new("x"),
-          IdxVar::new("y"),
-          IdxVar::new("z"),
-          IdxVar::new("t"),
+        locals: indexmap! {
+          IdxVar::new("v") => Type::Int,
+          IdxVar::new("w") => Type::Int,
+          IdxVar::new("x") => Type::Int,
+          IdxVar::new("y") => Type::Int,
+          IdxVar::new("z") => Type::Int,
+          IdxVar::new("t") => Type::Int,
         },
       },
       constants: Default::default(),
@@ -223,9 +225,9 @@ mod tests {
     };
     let prog = Program {
       info: OldInfo {
-        locals: indexset! {
-          IdxVar::new("x"),
-          IdxVar::new("w"),
+        locals: indexmap! {
+          IdxVar::new("x") => Type::Int,
+          IdxVar::new("w") => Type::Int,
         },
       },
       constants: Default::default(),
@@ -257,9 +259,9 @@ mod tests {
     };
     let prog = Program {
       info: OldInfo {
-        locals: indexset! {
-          IdxVar::new("x"),
-          IdxVar::new("w"),
+        locals: indexmap! {
+          IdxVar::new("x") => Type::Int,
+          IdxVar::new("w") => Type::Int,
         },
       },
       constants: Default::default(),
@@ -288,7 +290,7 @@ mod tests {
     let label_live = HashMap::new();
     let prog = Program {
       info: OldInfo {
-        locals: indexset! {},
+        locals: indexmap! {},
       },
       constants: Default::default(),
       blocks,
@@ -335,10 +337,10 @@ mod tests {
     };
     let prog = Program {
       info: OldInfo {
-        locals: indexset! {
-          IdxVar::new("x"),
-          IdxVar::new("y"),
-          IdxVar::new("z"),
+        locals: indexmap! {
+          IdxVar::new("x") => Type::Int,
+          IdxVar::new("y") => Type::Int,
+          IdxVar::new("z") => Type::Int,
         },
       },
       constants: Default::default(),
@@ -388,10 +390,10 @@ block4:
     };
     let prog = Program {
       info: OldInfo {
-        locals: indexset! {
-          IdxVar::new("tmp.0"),
-          IdxVar::new("x.0"),
-          IdxVar::new("tmp.1"),
+        locals: indexmap! {
+          IdxVar::new("tmp.0") => Type::Int,
+          IdxVar::new("x.0"  ) => Type::Int,
+          IdxVar::new("tmp.1") => Type::Int,
         },
       },
       constants: Default::default(),
@@ -464,11 +466,11 @@ block9:
     };
     let prog = Program {
       info: OldInfo {
-        locals: indexset! {
-          IdxVar::new("x.0"),
-          IdxVar::new("y.1"),
-          IdxVar::new("tmp.1"),
-          IdxVar::new("tmp.0"),
+        locals: indexmap! {
+          IdxVar::new("x.0"  ) => Type::Int,
+          IdxVar::new("y.1"  ) => Type::Int,
+          IdxVar::new("tmp.1") => Type::Int,
+          IdxVar::new("tmp.0") => Type::Int,
         },
       },
       constants: Default::default(),
@@ -511,11 +513,11 @@ block8:
     };
     let prog = Program {
       info: OldInfo {
-        locals: indexset! {
-          IdxVar::new("sum.0"),
-          IdxVar::new("i.0"),
-          IdxVar::new("tmp.3"),
-          IdxVar::new("tmp.4"),
+        locals: indexmap! {
+          IdxVar::new("sum.0") => Type::Int,
+          IdxVar::new("i.0"  ) => Type::Int,
+          IdxVar::new("tmp.3") => Type::Int,
+          IdxVar::new("tmp.4") => Type::Int,
         },
       },
       constants: Default::default(),

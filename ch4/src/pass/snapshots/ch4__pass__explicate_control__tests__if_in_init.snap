@@ -1,9 +1,8 @@
 ---
 source: ch4/src/pass/explicate_control.rs
 expression: result.to_string_pretty()
-
 ---
-locals: {x.0, tmp.0, tmp.1}
+locals: {x.0: Int, tmp.0: Int, tmp.1: Bool}
 
 start:
     tmp.0 = (read)

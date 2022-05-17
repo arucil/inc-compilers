@@ -2,3 +2,6 @@
 mod typecheck;
 mod explicate_control;
 mod instruction_selection;
+mod interference;
+pub mod register_allocation;
+pub mod perilogue;

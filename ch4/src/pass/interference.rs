@@ -1,12 +1,70 @@
+use super::liveness_analysis::Info as OldInfo;
+use asm::Program;
+use ast::{IdxVar, Type};
+use ch3::location_graph::LocationGraph;
+use ch3::location_set::{Location, VarStore};
+use ch3::pass::interference::{Interference, Moves, State};
+use indexmap::IndexMap;
+use petgraph::dot::{Config, Dot};
+use std::fmt::{self, Debug, Formatter};
+
+pub struct Info {
+  /// Includes all locals.
+  pub locals: IndexMap<IdxVar, Type>,
+  /// Nodes include all locals.
+  pub conflicts: LocationGraph<Interference>,
+  pub moves: LocationGraph<Moves>,
+  pub var_store: VarStore,
+}
+
+pub fn build_interference(
+  prog: Program<OldInfo, IdxVar>,
+) -> Program<Info, IdxVar> {
+  let var_store = &prog.info.var_store;
+  let live = &prog.info.live;
+  let mut conflicts = LocationGraph::new();
+  for (_, var) in var_store.iter() {
+    conflicts.insert_node(Location::from(*var));
+  }
+  let mut state = State {
+    info: &prog.info,
+    conflicts,
+    var_store,
+  };
+  for (label, block) in &prog.blocks {
+    state.build_graph(block, &live[label]);
+  }
+
+  Program {
+    info: Info {
+      conflicts: state.conflicts,
+      locals: prog.info.locals,
+      moves: LocationGraph::new(),
+      var_store: prog.info.var_store,
+    },
+    constants: prog.constants,
+    blocks: prog.blocks,
+  }
+}
+
+impl Debug for Info {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    let graph = self
+      .conflicts
+      .graph()
+      .map(|_, var| var.to_arg(&self.var_store), |_, _| ());
+    Dot::with_config(&graph, &[Config::EdgeNoLabel]).fmt(f)
+  }
+}
+
 #[cfg(test)]
 mod tests {
+  use super::super::instruction_selection::Info as OldOldInfo;
   use super::super::*;
+  use super::*;
   use asm::{Label, Program};
-  use ast::IdxVar;
-  use ch2::pass::instruction_selection::Info as OldOldInfo;
   use ch3::location_set::LocationSet;
-  use ch3::pass::interference;
-  use indexmap::indexset;
+  use indexmap::indexmap;
   use insta::assert_snapshot;
   use maplit::hashmap;
 
@@ -36,14 +94,14 @@ mod tests {
     };
     let prog = Program {
       info: OldOldInfo {
-        locals: indexset! {
-          IdxVar::new("v"),
-          IdxVar::new("i"),
-          IdxVar::new("w"),
-          IdxVar::new("x"),
-          IdxVar::new("y"),
-          IdxVar::new("z"),
-          IdxVar::new("t"),
+        locals: indexmap! {
+          IdxVar::new("v") => Type::Int,
+          IdxVar::new("i") => Type::Int,
+          IdxVar::new("w") => Type::Int,
+          IdxVar::new("x") => Type::Int,
+          IdxVar::new("y") => Type::Int,
+          IdxVar::new("z") => Type::Int,
+          IdxVar::new("t") => Type::Int,
         },
       },
       constants: Default::default(),
@@ -76,9 +134,9 @@ mod tests {
     };
     let prog = Program {
       info: OldOldInfo {
-        locals: indexset! {
-          IdxVar::new("x"),
-          IdxVar::new("w"),
+        locals: indexmap! {
+          IdxVar::new("x") => Type::Int,
+          IdxVar::new("w") => Type::Int,
         },
       },
       constants: Default::default(),
@@ -105,12 +163,12 @@ mod tests {
     let label_live = hashmap! {};
     let prog = Program {
       info: OldOldInfo {
-        locals: indexset! {
-          IdxVar::new("t"),
-          IdxVar::new("x"),
-          IdxVar::new("y"),
-          IdxVar::new("z"),
-          IdxVar::new("w"),
+        locals: indexmap! {
+          IdxVar::new("t") => Type::Int,
+          IdxVar::new("x") => Type::Int,
+          IdxVar::new("y") => Type::Int,
+          IdxVar::new("z") => Type::Int,
+          IdxVar::new("w") => Type::Int,
         },
       },
       constants: Default::default(),
@@ -160,10 +218,10 @@ block4:
     };
     let prog = Program {
       info: OldOldInfo {
-        locals: indexset! {
-          IdxVar::new("tmp.0"),
-          IdxVar::new("x.0"),
-          IdxVar::new("tmp.1"),
+        locals: indexmap! {
+          IdxVar::new("tmp.0") => Type::Int,
+          IdxVar::new("x.0"  ) => Type::Int,
+          IdxVar::new("tmp.1") => Type::Int,
         },
       },
       constants: Default::default(),
@@ -212,10 +270,10 @@ block4:
     };
     let prog = Program {
       info: OldOldInfo {
-        locals: indexset! {
-          IdxVar::new("x"),
-          IdxVar::new("y"),
-          IdxVar::new("z"),
+        locals: indexmap! {
+          IdxVar::new("x") => Type::Int,
+          IdxVar::new("y") => Type::Int,
+          IdxVar::new("z") => Type::Int,
         },
       },
       constants: Default::default(),
@@ -289,11 +347,11 @@ block9:
     };
     let prog = Program {
       info: OldOldInfo {
-        locals: indexset! {
-          IdxVar::new("x.0"),
-          IdxVar::new("y.1"),
-          IdxVar::new("tmp.1"),
-          IdxVar::new("tmp.0"),
+        locals: indexmap! {
+          IdxVar::new("x.0"  ) => Type::Int,
+          IdxVar::new("y.1"  ) => Type::Int,
+          IdxVar::new("tmp.1") => Type::Int,
+          IdxVar::new("tmp.0") => Type::Int,
         },
       },
       constants: Default::default(),

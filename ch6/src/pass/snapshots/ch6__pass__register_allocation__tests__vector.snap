@@ -1,0 +1,43 @@
+---
+source: ch6/src/pass/register_allocation.rs
+expression: result.to_string_pretty()
+---
+locals: {tmp.1: Vector([Void]), tmp.2: Str, y.1: Vector([Int, Bool, Void, Vector([Void]), Str]), tmp.3: Bool, tmp.4: Bool, tmp.5: Int}
+used_callee_saved_regs: {}
+stack_space: 0 bytes
+rootstack_space: 16 bytes
+constants: {}
+
+start:
+    mov rdi, 8
+    mov rsi, r15
+    call rt_allocate
+    mov qword [r11], rax
+    mov qword [r11], 1
+    mov qword [r15], r11
+    mov rdi, 3
+    mov rsi, const_1
+    mov rdx, r15
+    call rt_new_string
+    mov qword [r15 + 8], rax
+    mov rdi, 40
+    mov rsi, r15
+    call rt_allocate
+    mov qword [r11], rax
+    mov qword [r11], 6177
+    mov qword [r11 + 8], 1
+    mov qword [r11 + 16], 0
+    mov qword [r11 + 24], qword [r15]
+    mov qword [r11 + 32], qword [r15 + 8]
+    mov qword [r15 + 8], r11
+    mov r11, qword [r15 + 8]
+    mov rcx, qword [r11 + 16]
+    mov rcx, rcx
+    xor rcx, 1
+    mov r11, qword [r15 + 8]
+    mov qword [r11 + 16], rcx
+    mov rcx, 5
+    mov r11, qword [r15 + 8]
+    mov qword [r11 + 8], rcx
+    jmp conclusion
+

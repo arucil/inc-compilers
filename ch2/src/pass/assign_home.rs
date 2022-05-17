@@ -37,6 +37,7 @@ pub fn assign_home(
       locals: prog.info.locals,
       stack_space: local_spaces.len() * 8,
     },
+    externs: prog.externs,
     constants: Default::default(),
     blocks,
   }

@@ -8,3 +8,5 @@ mod remove_complex_operands;
 pub mod shrink;
 pub mod typecheck;
 pub mod uniquify;
+pub mod move_biasing;
+pub mod register_allocation;

@@ -1,0 +1,60 @@
+---
+source: ch6/src/lib.rs
+assertion_line: 68
+expression: prog
+---
+extern rt_read_int, rt_print_int, rt_print_str, rt_print_bool
+extern rt_print_newline, rt_initialize, rt_allocate, rt_new_string
+extern rt_rootstack_begin
+section .rodata
+    const_1 db `abc`
+section .text
+
+    global _start
+_start:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 8
+    push rbx
+    mov rdi, 65536
+    mov rsi, 64
+    call rt_initialize
+    mov r15, rt_rootstack_begin
+    mov qword [r15], 0
+    mov qword [r15 + 8], 0
+    add r15, 16
+    mov rdi, 8
+    mov rsi, r15
+    call rt_allocate
+    mov r11, rax
+    mov qword [r11], 1
+    mov qword [r15], r11
+    mov qword [r15 + 8], const_1
+    mov rdi, 40
+    mov rsi, r15
+    call rt_allocate
+    mov r11, rax
+    mov qword [r11], 6177
+    mov qword [r11 + 8], 1
+    mov qword [r11 + 16], 0
+    mov rax, qword [r15]
+    mov qword [r11 + 24], rax
+    mov rax, qword [r15 + 8]
+    mov qword [r11 + 32], rax
+    mov rcx, r11
+    mov r11, rcx
+    mov rbx, qword [r11 + 16]
+    xor rbx, 1
+    mov r11, rcx
+    mov qword [r11 + 16], rbx
+    mov rbx, 5
+    mov r11, rcx
+    mov qword [r11 + 8], rbx
+    sub r15, 16
+    pop rbx
+    mov rsp, rbp
+    pop rbp
+    mov rax, 60
+    mov rdi, 0
+    syscall
+

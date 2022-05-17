@@ -1,9 +1,8 @@
 ---
 source: ch4/src/pass/explicate_control.rs
 expression: result.to_string_pretty()
-
 ---
-locals: {x.0, y.1}
+locals: {x.0: Int, y.1: Int}
 
 start:
     x.0 = (read)

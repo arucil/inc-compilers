@@ -34,7 +34,7 @@ pub fn compile(
   add_prologue(&mut prog);
   add_epilogue(&mut prog);
 
-  Ok(prog.to_nasm())
+  Ok(prog.to_nasm(true))
 }
 
 fn add_prologue(prog: &mut Program<self::pass::register_allocation::Info>) {
@@ -72,11 +72,11 @@ fn add_epilogue(prog: &mut Program<self::pass::register_allocation::Info>) {
       dest: Arg::Reg(Rdi),
     },
     Call {
-      label: "print_int".to_owned(),
+      label: "rt_print_int".to_owned(),
       arity: 0,
     },
     Call {
-      label: "print_newline".to_owned(),
+      label: "rt_print_newline".to_owned(),
       arity: 0,
     },
   ];

@@ -2,7 +2,7 @@
 source: ch4/src/pass/explicate_control.rs
 expression: result.to_string_pretty()
 ---
-locals: {y.2, x.0, x.1}
+locals: {y.2: Int, x.0: Int, x.1: Int}
 
 start:
     x.0 = 20

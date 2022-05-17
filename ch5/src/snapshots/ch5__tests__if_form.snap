@@ -2,7 +2,9 @@
 source: ch5/src/lib.rs
 expression: prog
 ---
-extern read_int, print_int, print_str, print_bool, print_newline, initialize_runtime, allocate, new_string
+extern rt_read_int, rt_print_int, rt_print_str, rt_print_bool
+extern rt_print_newline, rt_initialize, rt_allocate, rt_new_string
+extern rt_rootstack_begin
 section .text
 
     global _start
@@ -11,7 +13,7 @@ _start:
     mov rbp, rsp
     sub rsp, 8
     push rbx
-    call read_int
+    call rt_read_int
     mov rbx, rax
     cmp rbx, 1
     je block1
@@ -19,8 +21,8 @@ _start:
 
 block0:
     mov rdi, rbx
-    call print_int
-    call print_newline
+    call rt_print_int
+    call rt_print_newline
     pop rbx
     mov rsp, rbp
     pop rbp

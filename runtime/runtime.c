@@ -61,7 +61,7 @@ void *mmap(uint64_t size)
   return (void *)syscall5(9, 0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1);
 }
 
-void print_int(int64_t value)
+void rt_print_int(int64_t value)
 {
   static char buf[22];
   char *p = buf + sizeof(buf);
@@ -87,7 +87,7 @@ void print_int(int64_t value)
   write(1, p, buf + sizeof(buf) - p);
 }
 
-void print_str(uint64_t p)
+void rt_print_str(uint64_t p)
 {
   write(1, ((uint64_t *)p) + 1, *(uint64_t *)p);
 }
@@ -95,7 +95,7 @@ void print_str(uint64_t p)
 #define STR_TRUE "true"
 #define STR_FALSE "false"
 
-void print_bool(uint64_t b)
+void rt_print_bool(uint64_t b)
 {
   if (b)
   {
@@ -107,12 +107,12 @@ void print_bool(uint64_t b)
   }
 }
 
-void print_newline()
+void rt_print_newline()
 {
   write(1, "\n", 1);
 }
 
-uint64_t read_line(char *buf, uint64_t size)
+uint64_t rt_read_line(char *buf, uint64_t size)
 {
   char *p = buf;
   for (;;)
@@ -131,11 +131,11 @@ uint64_t read_line(char *buf, uint64_t size)
 
 #define ERR_INVALID_INT "invalid integer\n"
 
-int64_t read_int()
+int64_t rt_read_int()
 {
   static char buf[80];
   char *p = buf;
-  char *end = buf + read_line(buf, 80);
+  char *end = buf + rt_read_line(buf, 80);
   while (p < end && *p == ' ')
   {
     p++;
@@ -168,9 +168,9 @@ int64_t read_int()
   return neg ? -n : n;
 }
 
-void *rootstack_begin;
+void *rt_rootstack_begin;
 
-void initialize_runtime(uint64_t rootstack_size, uint64_t heap_size)
+void rt_initialize(uint64_t rootstack_size, uint64_t heap_size)
 {
 }
 
@@ -185,20 +185,19 @@ void initialize_runtime(uint64_t rootstack_size, uint64_t heap_size)
 // string:
 // bit3~bit63   string length
 
-void *allocate(uint64_t size, void *rootstack_ptr)
+void *rt_allocate(uint64_t size, void *rootstack_ptr)
 {
   // TODO error if no enough space
   return 0;
 }
 
-void *new_string(uint64_t *ptr, void *rootstack_ptr)
+void *rt_new_string(uint64_t len, uint64_t *chars, void *rootstack_ptr)
 {
-  uint64_t len = *ptr;
   uint64_t len_dqw = (len + 15) & ~15;
-  uint64_t *str = allocate(8 + len_dqw, rootstack_ptr);
-  *str = len << 3 | 0b01 << 1 | 1;
+  uint64_t *ptr = rt_allocate(8 + len_dqw, rootstack_ptr);
+  *ptr = len << 3 | 0b01 << 1 | 1;
   for (uint64_t i = 0; i < len_dqw; i++) {
-    str[i + 1] = ptr[i];
+    ptr[i + 1] = chars[i];
   }
-  return str;
+  return ptr;
 }

@@ -3,6 +3,7 @@
 use indexmap::IndexMap;
 use num_derive::{FromPrimitive, ToPrimitive};
 use std::cmp::Ordering;
+use std::collections::BTreeSet;
 use std::fmt::{self, Debug, Formatter, Write};
 use std::iter::IntoIterator;
 
@@ -10,6 +11,7 @@ use std::iter::IntoIterator;
 pub struct Program<INFO = (), VAR = !> {
   pub info: INFO,
   pub constants: IndexMap<String, String>,
+  pub externs: BTreeSet<String>,
   /// The order matters.
   pub blocks: Vec<(Label, Block<VAR>)>,
 }
@@ -157,20 +159,33 @@ impl<INFO: Debug, VAR: Debug> Program<INFO, VAR> {
     buf
   }
 
-  pub fn to_nasm(&self) -> String {
-    let mut buf =
-      "extern read_int, print_int, print_str, print_bool, print_newline, initialize_runtime, allocate, new_string\n"
-        .to_owned();
+  pub fn to_nasm(&self, str_len: bool) -> String {
+    let mut buf = String::new();
+
+    if !self.externs.is_empty() {
+      buf += "extern ";
+      let mut comma = false;
+      for sym in &self.externs {
+        if comma {
+          buf += ", ";
+        }
+        comma = true;
+        buf += sym;
+      }
+      buf += "\n";
+    }
     if !self.constants.is_empty() {
       buf += "section .rodata\n";
       for (name, str) in &self.constants {
         buf += "    ";
         buf += name;
-        buf += " dq ";
-        writeln!(&mut buf, "{}", str.len()).unwrap();
-        buf += "    ";
-        for _ in 0..name.len() {
-          buf += " ";
+        if str_len {
+          buf += " dq ";
+          writeln!(&mut buf, "{}", str.len()).unwrap();
+          buf += "    ";
+          for _ in 0..name.len() {
+            buf += " ";
+          }
         }
         buf += " db ";
         buf.push('`');
@@ -403,15 +418,21 @@ pub fn parse_code<VAR: Clone>(
       Arg::Imm(n)
     } else if arg.starts_with('[') && arg.ends_with(']') {
       let arg = &arg[1..arg.len() - 1];
-      let delim = arg.find(|c: char| !c.is_alphanumeric()).unwrap();
+      let delim = arg
+        .find(|c: char| !c.is_alphanumeric())
+        .unwrap_or(arg.len());
       let reg = Reg::from_str(&arg[..delim]).unwrap();
       let arg = arg[delim..].trim();
-      let off = if let Some(offset) = arg.strip_prefix('-') {
+      let off = if arg.is_empty() {
+        0
+      } else if let Some(offset) = arg.strip_prefix('-') {
         -offset.trim().parse::<i32>().unwrap()
       } else {
         arg[1..].trim().parse::<i32>().unwrap()
       };
       Arg::Deref(reg, off)
+    } else if arg.starts_with("const_") {
+      Arg::Label(arg.to_owned())
     } else {
       Arg::Var(make_var(arg))
     }

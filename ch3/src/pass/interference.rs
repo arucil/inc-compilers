@@ -1,4 +1,5 @@
 use super::liveness_analysis::Info as OldInfo;
+use super::VarInfo;
 use crate::location_graph::LocationGraph;
 use crate::location_set::{Location, LocationSet, VarStore};
 use asm::{Block, Instr, Program, Reg};
@@ -31,14 +32,19 @@ pub fn build_interference(
   for (_, var) in var_store.iter() {
     conflicts.insert_node(Location::from(*var));
   }
+  let mut state = State {
+    info: &prog.info,
+    conflicts,
+    var_store,
+  };
   for (label, block) in &prog.blocks {
-    build_graph(block, &live[label], var_store, &mut conflicts);
+    state.build_graph(block, &live[label]);
   }
 
   Program {
     info: Info {
+      conflicts: state.conflicts,
       locals: prog.info.locals,
-      conflicts,
       moves: LocationGraph::new(),
       var_store: prog.info.var_store,
     },
@@ -47,77 +53,97 @@ pub fn build_interference(
   }
 }
 
-fn build_graph(
-  block: &Block<IdxVar>,
-  live_sets: &[LocationSet],
-  var_store: &VarStore,
-  graph: &mut LocationGraph<Interference>,
-) {
-  for (instr, live_after) in block.code.iter().zip(live_sets.iter().skip(1)) {
-    add_instr_edges(instr, live_after, var_store, graph);
-  }
+pub struct State<'a, I> {
+  pub conflicts: LocationGraph<Interference>,
+  pub info: &'a I,
+  pub var_store: &'a VarStore,
 }
 
-fn add_instr_edges(
-  instr: &Instr<IdxVar>,
-  live_after: &LocationSet,
-  var_store: &VarStore,
-  graph: &mut LocationGraph<Interference>,
-) {
-  let mut add = |write_loc: Location| {
-    let write_loc_node = graph.insert_node(write_loc);
-    for after_loc in live_after {
-      if after_loc != write_loc {
-        let after_loc_node = graph.insert_node(after_loc);
-        graph.add_edge(write_loc_node, after_loc_node);
-      }
+impl<'a, I: VarInfo> State<'a, I> {
+  pub fn build_graph(
+    &mut self,
+    block: &Block<IdxVar>,
+    live_sets: &[LocationSet],
+  ) {
+    for (instr, live_after) in block.code.iter().zip(live_sets.iter().skip(1)) {
+      self.add_instr_edges(instr, live_after);
     }
-  };
+  }
 
-  match instr {
-    Instr::Add { dest, .. }
-    | Instr::Sub { dest, .. }
-    | Instr::Xor { dest, .. }
-    | Instr::SetIf { dest, .. }
-    | Instr::Neg(dest)
-    | Instr::Pop(dest) => {
-      if let Some(dest_loc) = Location::from_arg(dest.clone(), var_store) {
-        add(dest_loc);
-      }
-    }
-    Instr::Call { label, .. } => {
-      if label == "allocate" {
-        for reg in Reg::all_regs() {
-          add(reg.into());
-        }
-      } else {
-        for reg in Reg::caller_saved_regs() {
-          add(reg.into());
+  fn add_instr_edges(
+    &mut self,
+    instr: &Instr<IdxVar>,
+    live_after: &LocationSet,
+  ) {
+    let graph = &mut self.conflicts;
+    let mut add = |write_loc: Location| {
+      let write_loc_node = graph.insert_node(write_loc);
+      for after_loc in live_after {
+        if after_loc != write_loc {
+          let after_loc_node = graph.insert_node(after_loc);
+          graph.add_edge(write_loc_node, after_loc_node);
         }
       }
-    }
-    Instr::Mov { src, dest } | Instr::Movzx { src, dest } => {
-      if let Some(dest_loc) = Location::from_arg(dest.clone(), var_store) {
-        if let Some(src_loc) = Location::from_arg(src.clone(), var_store) {
-          let dest_loc_node = graph.insert_node(dest_loc);
-          for after_loc in live_after {
-            if after_loc != dest_loc && after_loc != src_loc {
-              let after_loc_node = graph.insert_node(after_loc);
-              graph.add_edge(dest_loc_node, after_loc_node);
-            }
-          }
-        } else {
+    };
+
+    match instr {
+      Instr::Add { dest, .. }
+      | Instr::Sub { dest, .. }
+      | Instr::Xor { dest, .. }
+      | Instr::SetIf { dest, .. }
+      | Instr::Neg(dest)
+      | Instr::Pop(dest) => {
+        if let Some(dest_loc) = Location::from_arg(dest.clone(), self.var_store)
+        {
           add(dest_loc);
         }
       }
+      Instr::Call { label, .. } => {
+        for reg in Reg::caller_saved_regs() {
+          add(reg.into());
+        }
+        if label == "rt_allocate" {
+          for after_loc in live_after {
+            for reg in Reg::all_regs() {
+              let write_loc = reg.into();
+              let write_loc_node = graph.insert_node(write_loc);
+              if after_loc != write_loc {
+                if let Some(var) = after_loc.to_arg_var(self.var_store) {
+                  if self.info.is_ref(&var) {
+                    let after_loc_node = graph.insert_node(after_loc);
+                    graph.add_edge(write_loc_node, after_loc_node);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      Instr::Mov { src, dest } | Instr::Movzx { src, dest } => {
+        if let Some(dest_loc) = Location::from_arg(dest.clone(), self.var_store)
+        {
+          if let Some(src_loc) = Location::from_arg(src.clone(), self.var_store)
+          {
+            let dest_loc_node = graph.insert_node(dest_loc);
+            for after_loc in live_after {
+              if after_loc != dest_loc && after_loc != src_loc {
+                let after_loc_node = graph.insert_node(after_loc);
+                graph.add_edge(dest_loc_node, after_loc_node);
+              }
+            }
+          } else {
+            add(dest_loc);
+          }
+        }
+      }
+      Instr::Cmp { .. }
+      | Instr::Push(_)
+      | Instr::Ret
+      | Instr::Syscall
+      | Instr::Jmp(_)
+      | Instr::JumpIf { .. } => {}
+      _ => unimplemented!(),
     }
-    Instr::Cmp { .. }
-    | Instr::Push(_)
-    | Instr::Ret
-    | Instr::Syscall
-    | Instr::Jmp(_)
-    | Instr::JumpIf { .. } => {}
-    _ => unimplemented!(),
   }
 }
 

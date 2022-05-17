@@ -6,10 +6,14 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+asm = { version = "0.1.0", path = "../asm" }
 ast = { version = "0.1.0", path = "../ast" }
 ch2 = { version = "0.1.0", path = "../ch2" }
+ch3 = { version = "0.1.0", path = "../ch3" }
 ch4 = { version = "0.1.0", path = "../ch4" }
 ch5 = { version = "0.1.0", path = "../ch5" }
+indexmap = "1.8.1"
+maplit = "1.0.2"
 support = { version = "0.1.0", path = "../support" }
 
 [dev-dependencies]

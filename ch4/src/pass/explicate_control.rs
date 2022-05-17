@@ -1,12 +1,12 @@
 use asm::Label;
 use ast::{Exp, ExpKind, IdxVar, Program, Type};
 use control::{CAtom, CCmpOp, CExp, CPrim, CProgram, CStmt, CTail};
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use std::collections::VecDeque;
 use std::fmt::{self, Debug, Formatter};
 
 pub struct CInfo {
-  pub locals: IndexSet<IdxVar>,
+  pub locals: IndexMap<IdxVar, Type>,
 }
 
 impl Debug for CInfo {
@@ -70,15 +70,18 @@ pub fn explicate_control(mut prog: Program<IdxVar, Type>) -> CProgram<CInfo> {
   }
 }
 
-pub fn collect_locals(prog: &Program<IdxVar, Type>) -> IndexSet<IdxVar> {
-  let mut locals = IndexSet::new();
+pub fn collect_locals(prog: &Program<IdxVar, Type>) -> IndexMap<IdxVar, Type> {
+  let mut locals = IndexMap::new();
   for exp in &prog.body {
     collect_exp_locals(exp, &mut locals);
   }
   locals
 }
 
-fn collect_exp_locals(exp: &Exp<IdxVar, Type>, locals: &mut IndexSet<IdxVar>) {
+fn collect_exp_locals(
+  exp: &Exp<IdxVar, Type>,
+  locals: &mut IndexMap<IdxVar, Type>,
+) {
   match &exp.kind {
     ExpKind::Int(_)
     | ExpKind::Var(_)
@@ -88,7 +91,7 @@ fn collect_exp_locals(exp: &Exp<IdxVar, Type>, locals: &mut IndexSet<IdxVar>) {
     | ExpKind::Get(_) => {}
     ExpKind::Let { var, init, body } => {
       if init.ty != Type::Void {
-        locals.insert(var.1.clone());
+        locals.insert(var.1.clone(), init.ty.clone());
       }
       collect_exp_locals(&*init, locals);
       collect_exp_locals(&*body, locals);

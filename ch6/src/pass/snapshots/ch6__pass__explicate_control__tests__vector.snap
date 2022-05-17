@@ -2,7 +2,7 @@
 source: ch6/src/pass/explicate_control.rs
 expression: result.to_string_pretty()
 ---
-locals: {y.1, tmp.1, tmp.2, tmp.3, tmp.4, tmp.5}
+locals: {y.1: Vector([Int, Bool, Void, Vector([Void]), Str]), tmp.1: Vector([Void]), tmp.2: Str, tmp.3: Bool, tmp.4: Bool, tmp.5: Int}
 
 start:
     tmp.1 = (vector (tmp.0 : Void))

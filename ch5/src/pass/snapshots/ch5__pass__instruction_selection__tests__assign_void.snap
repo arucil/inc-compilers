@@ -8,10 +8,10 @@ constants: {}
 
 start:
     mov rdi, 3
-    call print_int
-    call print_newline
+    call rt_print_int
+    call rt_print_newline
     mov rdi, 1
-    call print_bool
-    call print_newline
+    call rt_print_bool
+    call rt_print_newline
     jmp conclusion
 

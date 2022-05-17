@@ -32,72 +32,71 @@ pub fn allocate_registers(
   prog: Program<OldInfo, IdxVar>,
   available_regs: &[Reg],
 ) -> Program<Info> {
-  let reg_colors: HashMap<_, _> = available_regs
-    .iter()
-    .enumerate()
-    .map(|(i, &reg)| (reg, i as _))
-    .collect();
-  let var_store = prog.info.var_store;
-  let conflicts = prog.info.conflicts;
-  let moves = prog.info.moves;
-  let locals: Vec<_> = prog
-    .info
-    .locals
-    .iter()
-    .map(|var| var_store.get(var.clone()))
-    .collect();
-  let mut max_locals = 0;
+  let mut num_locals = 0;
+  let blocks;
+  let used_callee_saved_regs;
 
-  let mut alloc = RegisterAlloc {
-    locals: &locals,
-    var_store,
-    conflicts: &conflicts,
-    moves: &moves,
-    reg_colors: &reg_colors,
-    available_regs,
-    used_callee_saved_regs: IndexSet::new(),
-  };
+  {
+    let reg_colors: HashMap<_, _> = available_regs
+      .iter()
+      .enumerate()
+      .map(|(i, &reg)| (reg, i as _))
+      .collect();
 
-  let blocks = prog
-    .blocks
-    .into_iter()
-    .map(|(label, block)| {
-      let (block, locals) = alloc.allocate_registers_block(block);
-      if locals > max_locals {
-        max_locals = locals;
-      }
-      (label, block)
-    })
-    .collect();
+    let mut alloc = RegisterAlloc {
+      num_locals: prog.info.locals.len(),
+      conflicts: &prog.info.conflicts,
+      moves: &prog.info.moves,
+      reg_colors: &reg_colors,
+      available_regs,
+      used_callee_saved_regs: IndexSet::new(),
+      assign_instr_registers: gen_assign_instr_registers(
+        &prog.info.var_store,
+        available_regs,
+        &mut num_locals,
+      ),
+    };
+
+    blocks = prog
+      .blocks
+      .into_iter()
+      .map(|(label, block)| {
+        let block = alloc.allocate_block_registers(block);
+        (label, block)
+      })
+      .collect();
+
+    used_callee_saved_regs = alloc.used_callee_saved_regs;
+  }
 
   Program {
     info: Info {
       locals: prog.info.locals,
-      stack_space: max_locals * 8,
-      used_callee_saved_regs: alloc.used_callee_saved_regs,
+      stack_space: num_locals * 8,
+      used_callee_saved_regs,
     },
     constants: prog.constants,
     blocks,
   }
 }
 
-struct RegisterAlloc<'a> {
-  locals: &'a [Var],
-  var_store: VarStore,
-  conflicts: &'a LocationGraph<Interference>,
-  moves: &'a LocationGraph<Moves>,
-  reg_colors: &'a HashMap<Reg, u32>,
-  available_regs: &'a [Reg],
-  used_callee_saved_regs: IndexSet<Reg>,
+pub struct RegisterAlloc<'a, F> {
+  pub num_locals: usize,
+  pub conflicts: &'a LocationGraph<Interference>,
+  pub moves: &'a LocationGraph<Moves>,
+  pub reg_colors: &'a HashMap<Reg, u32>,
+  pub available_regs: &'a [Reg],
+  pub used_callee_saved_regs: IndexSet<Reg>,
+  pub assign_instr_registers: F,
 }
 
-impl<'a> RegisterAlloc<'a> {
-  fn allocate_registers_block(
-    &mut self,
-    block: Block<IdxVar>,
-  ) -> (Block, usize) {
+impl<'a, F> RegisterAlloc<'a, F>
+where
+  F: FnMut(Instr<IdxVar>, &IndexMap<Var, Color>) -> Instr,
+{
+  pub fn allocate_block_registers(&mut self, block: Block<IdxVar>) -> Block {
     let var_colors =
-      color_graph(self.conflicts, self.moves, self.locals, self.reg_colors);
+      color_graph(self.conflicts, self.moves, self.num_locals, self.reg_colors);
 
     for (_, c) in &var_colors {
       if let Some(&reg) = self.available_regs.get(c.0 as usize) {
@@ -107,39 +106,38 @@ impl<'a> RegisterAlloc<'a> {
       }
     }
 
-    let block = Block {
+    Block {
       global: block.global,
       code: block
         .code
         .into_iter()
-        .map(|instr| self.assign_instr_var(instr, &var_colors))
+        .map(|instr| (self.assign_instr_registers)(instr, &var_colors))
         .collect(),
-    };
-
-    let num_locals = var_colors
-      .values()
-      .filter(|c| c.0 as usize >= self.reg_colors.len())
-      .collect::<HashSet<_>>()
-      .len();
-
-    (block, num_locals)
+    }
   }
+}
 
-  fn assign_instr_var(
-    &mut self,
-    instr: Instr<IdxVar>,
-    var_colors: &IndexMap<Var, Color>,
-  ) -> Instr {
-    let assign = |arg: Arg<IdxVar>| match arg {
+pub fn gen_assign_instr_registers<'a>(
+  var_store: &'a VarStore,
+  available_regs: &'a [Reg],
+  num_vars: &'a mut usize,
+) -> impl (FnMut(Instr<IdxVar>, &IndexMap<Var, Color>) -> Instr) + 'a {
+  let mut vars = HashSet::new();
+
+  move |instr, var_colors| {
+    let mut assign = |arg: Arg<IdxVar>| match arg {
       Arg::Deref(reg, i) => Arg::Deref(reg, i),
       Arg::Reg(reg) => Arg::Reg(reg),
       Arg::Imm(i) => Arg::Imm(i),
       Arg::Var(var) => {
-        let i = var_colors[&self.var_store.get(var)].0 as usize;
-        if let Some(&reg) = self.available_regs.get(i) {
+        let i = var_colors[&var_store.get(var.clone())].index();
+        if let Some(&reg) = available_regs.get(i) {
           Arg::Reg(reg)
         } else {
-          let local = i - self.available_regs.len() + 1;
+          if vars.insert(var) {
+            *num_vars += 1;
+          }
+          let local = i - available_regs.len() + 1;
           Arg::Deref(Reg::Rbp, -8 * local as i32)
         }
       }
@@ -191,13 +189,19 @@ impl<'a> RegisterAlloc<'a> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct Color(u32);
+pub struct Color(u32);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct NodeState {
   location: Location,
   saturation: Saturation,
   num_moves: usize,
+}
+
+impl Color {
+  pub fn index(&self) -> usize {
+    self.0 as usize
+  }
 }
 
 impl NodeState {
@@ -280,7 +284,7 @@ impl Saturation {
 fn color_graph(
   graph: &LocationGraph<Interference>,
   moves: &LocationGraph<Moves>,
-  locals: &[Var],
+  num_locals: usize,
   reg_colors: &HashMap<Reg, u32>,
 ) -> IndexMap<Var, Color> {
   let mut queue = PriorityQueue::<NodeIndex<Interference>, NodeState>::new();
@@ -291,7 +295,7 @@ fn color_graph(
     if location.to_reg().is_none() {
       let move_node = moves.node_index(location);
       let num_moves = move_node.map_or(0, |node| moves.neighbors(node).count());
-      queue.push(node, NodeState::new(location, locals.len(), num_moves));
+      queue.push(node, NodeState::new(location, num_locals, num_moves));
     }
   }
 
@@ -596,7 +600,7 @@ mod tests {
       g
     };
     let locals = vec![x, y, z, w, v];
-    let result = color_graph(&interference, &moves, &locals, &hashmap! {});
+    let result = color_graph(&interference, &moves, locals.len(), &hashmap! {});
 
     assert_debug_snapshot!(result);
   }

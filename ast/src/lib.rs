@@ -233,4 +233,13 @@ impl Type {
       _ => None,
     }
   }
+
+  pub fn is_ref(&self) -> bool {
+    match self {
+      Self::Vector(_) => true,
+      Self::Str => true,
+      Self::Alias(_) => todo!(),
+      _ => false,
+    }
+  }
 }

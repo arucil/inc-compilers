@@ -1,12 +1,31 @@
+use super::instruction_selection::Info as OldInfo;
 use asm::{Block, Instr, Label, Program};
-use ast::IdxVar;
-use ch2::pass::instruction_selection::Info as OldInfo;
+use ast::{IdxVar, Type};
 use ch3::location_set::{LocationSet, VarStore};
-use ch3::pass::liveness_analysis::{AnalysisState, Info};
+use ch3::pass::liveness_analysis::AnalysisState;
+use indexmap::IndexMap;
 use petgraph::algo::toposort;
 use petgraph::graph::NodeIndex;
 use petgraph::Graph;
 use std::collections::HashMap;
+
+pub struct Info {
+  pub locals: IndexMap<IdxVar, Type>,
+  pub live: IndexMap<Label, Vec<LocationSet>>,
+  /// Includes all locals.
+  pub var_store: VarStore,
+}
+
+impl ch3::pass::VarInfo for Info {
+  fn is_ref(&self, var: &IdxVar) -> bool {
+    match self.locals.get(var) {
+      Some(Type::Vector(_)) => true,
+      Some(Type::Str) => true,
+      Some(Type::Alias(_)) => todo!(),
+      _ => false,
+    }
+  }
+}
 
 /// `label_live` is a map from labels to sets of live locations before the first
 /// instruction of the blocks.
@@ -15,7 +34,7 @@ pub fn analyze_liveness(
   mut label_live: HashMap<Label, LocationSet>,
 ) -> Program<Info, IdxVar> {
   let mut var_store = VarStore::new();
-  for var in &prog.info.locals {
+  for var in prog.info.locals.keys() {
     var_store.insert(var.clone());
   }
 
@@ -78,7 +97,7 @@ fn sort_blocks(
 mod tests {
   use super::*;
   use asm::Label;
-  use indexmap::indexset;
+  use indexmap::indexmap;
   use insta::assert_snapshot;
   use maplit::hashmap;
   use std::fmt::Write;
@@ -137,13 +156,13 @@ mod tests {
     };
     let prog = Program {
       info: OldInfo {
-        locals: indexset! {
-          IdxVar::new("v"),
-          IdxVar::new("w"),
-          IdxVar::new("x"),
-          IdxVar::new("y"),
-          IdxVar::new("z"),
-          IdxVar::new("t"),
+        locals: indexmap! {
+          IdxVar::new("v") => Type::Int,
+          IdxVar::new("w") => Type::Int,
+          IdxVar::new("x") => Type::Int,
+          IdxVar::new("y") => Type::Int,
+          IdxVar::new("z") => Type::Int,
+          IdxVar::new("t") => Type::Int,
         },
       },
       constants: Default::default(),
@@ -173,9 +192,9 @@ mod tests {
     };
     let prog = Program {
       info: OldInfo {
-        locals: indexset! {
-          IdxVar::new("x"),
-          IdxVar::new("w"),
+        locals: indexmap! {
+          IdxVar::new("x") => Type::Int,
+          IdxVar::new("w") => Type::Int,
         },
       },
       constants: Default::default(),
@@ -207,9 +226,9 @@ mod tests {
     };
     let prog = Program {
       info: OldInfo {
-        locals: indexset! {
-          IdxVar::new("x"),
-          IdxVar::new("w"),
+        locals: indexmap! {
+          IdxVar::new("x") => Type::Int,
+          IdxVar::new("w") => Type::Int,
         },
       },
       constants: Default::default(),
@@ -238,7 +257,7 @@ mod tests {
     let label_live = HashMap::new();
     let prog = Program {
       info: OldInfo {
-        locals: indexset! {},
+        locals: indexmap! {},
       },
       constants: Default::default(),
       blocks,
@@ -285,10 +304,10 @@ mod tests {
     };
     let prog = Program {
       info: OldInfo {
-        locals: indexset! {
-          IdxVar::new("x"),
-          IdxVar::new("y"),
-          IdxVar::new("z"),
+        locals: indexmap! {
+          IdxVar::new("x") => Type::Int,
+          IdxVar::new("y") => Type::Int,
+          IdxVar::new("z") => Type::Int,
         },
       },
       constants: Default::default(),
@@ -338,10 +357,10 @@ block4:
     };
     let prog = Program {
       info: OldInfo {
-        locals: indexset! {
-          IdxVar::new("tmp.0"),
-          IdxVar::new("x.0"),
-          IdxVar::new("tmp.1"),
+        locals: indexmap! {
+          IdxVar::new("tmp.0") => Type::Int,
+          IdxVar::new("x.0") => Type::Int,
+          IdxVar::new("tmp.1") => Type::Int,
         },
       },
       constants: Default::default(),
@@ -414,11 +433,11 @@ block9:
     };
     let prog = Program {
       info: OldInfo {
-        locals: indexset! {
-          IdxVar::new("x.0"),
-          IdxVar::new("y.1"),
-          IdxVar::new("tmp.1"),
-          IdxVar::new("tmp.0"),
+        locals: indexmap! {
+          IdxVar::new("x.0") => Type::Int,
+          IdxVar::new("y.1") => Type::Int,
+          IdxVar::new("tmp.1") => Type::Int,
+          IdxVar::new("tmp.0") => Type::Int,
         },
       },
       constants: Default::default(),

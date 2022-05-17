@@ -2,14 +2,14 @@
 source: ch4/src/pass/instruction_selection.rs
 expression: result.to_string_pretty()
 ---
-locals: {x.0, y.1}
+locals: {x.0: Int, y.1: Int}
 
 constants: {}
 
 start:
-    call read_int
+    call rt_read_int
     mov x.0, rax
-    call read_int
+    call rt_read_int
     mov y.1, rax
     cmp x.0, 1
     jl block2

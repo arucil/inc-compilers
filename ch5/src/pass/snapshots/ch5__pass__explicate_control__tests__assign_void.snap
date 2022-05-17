@@ -2,7 +2,7 @@
 source: ch5/src/pass/explicate_control.rs
 expression: result.to_string_pretty()
 ---
-locals: {y.1}
+locals: {y.1: Int}
 
 start:
     y.1 = 1

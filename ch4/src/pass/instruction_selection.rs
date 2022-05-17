@@ -1,8 +1,28 @@
 use super::explicate_control::CInfo;
 use asm::Program;
-use ast::IdxVar;
-use ch2::pass::instruction_selection::{CodeGen, Info};
+use ast::{IdxVar, Type};
+use ch2::pass::instruction_selection::CodeGen;
 use control::*;
+use indexmap::IndexMap;
+use std::fmt::{self, Debug, Formatter};
+
+pub struct Info {
+  pub locals: IndexMap<IdxVar, Type>,
+}
+
+impl Debug for Info {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    writeln!(f, "locals: {:?}\n", self.locals)
+  }
+}
+
+impl From<CInfo> for Info {
+  fn from(info: CInfo) -> Self {
+    Self {
+      locals: info.locals,
+    }
+  }
+}
 
 pub fn select_instruction(
   prog: CProgram<CInfo>,

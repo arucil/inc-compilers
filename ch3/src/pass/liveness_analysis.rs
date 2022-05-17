@@ -12,6 +12,12 @@ pub struct Info {
   pub var_store: VarStore,
 }
 
+impl super::VarInfo for Info {
+  fn is_ref(&self, _: &IdxVar) -> bool {
+    false
+  }
+}
+
 /// `label_live` is a map from labels to sets of live locations before the first
 /// instruction of the blocks.
 pub fn analyze_liveness(
