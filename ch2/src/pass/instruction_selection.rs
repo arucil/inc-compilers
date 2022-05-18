@@ -249,11 +249,13 @@ impl CodeGen {
         let mut non_unit_fields = fields.len() as i64;
         let mut ptr_mask = 0i64;
         let mut field_offsets = vec![];
-        for (i, (_, ty)) in fields.iter().enumerate() {
-          let offset = size as i32;
+        let mut i = 0;
+        for (_, ty) in &fields {
+          field_offsets.push(size as i32);
           match ty {
             Type::Void => {
               non_unit_fields -= 1;
+              continue;
             }
             Type::Int => size += 8,
             Type::Bool => size += 8,
@@ -267,9 +269,8 @@ impl CodeGen {
             }
             Type::Alias(_) => todo!(),
           }
-          field_offsets.push(offset);
+          i += 1;
         }
-        ptr_mask >>= 1;
         self.code.push(Instr::Mov {
           src: Arg::Imm(size),
           dest: Arg::Reg(Reg::Rdi),

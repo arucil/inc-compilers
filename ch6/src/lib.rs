@@ -1,3 +1,4 @@
+#![allow(incomplete_features)]
 #![feature(box_syntax, type_changing_struct_update)]
 
 use asm::{Label, Reg};

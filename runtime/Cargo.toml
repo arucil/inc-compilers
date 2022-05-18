@@ -1,0 +1,16 @@
+[package]
+name = "runtime"
+description = "This package is only used to test runtime.c"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+[build-dependencies]
+cc = "1.0.73"
+
+[dev-dependencies]
+insta = "1.14.0"
+serial_test = "0.6.0"

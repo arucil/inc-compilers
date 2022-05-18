@@ -29,9 +29,7 @@ fn add_prologue(prog: &mut Program<Info>) {
     code.push(Push(Arg::Reg(reg)));
   }
   let label_init = "rt_initialize".to_owned();
-  let label_rtstk = "rt_rootstack_begin".to_owned();
   prog.externs.insert(label_init.clone());
-  prog.externs.insert(label_rtstk.clone());
   code.extend_from_slice(&[
     Mov {
       src: Arg::Imm(65536),
@@ -46,7 +44,7 @@ fn add_prologue(prog: &mut Program<Info>) {
       arity: 2,
     },
     Mov {
-      src: Arg::Label(label_rtstk),
+      src: Arg::Reg(Rax),
       dest: Arg::Reg(R15),
     },
   ]);

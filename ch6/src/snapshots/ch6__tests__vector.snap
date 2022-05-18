@@ -2,7 +2,7 @@
 source: ch6/src/lib.rs
 expression: prog
 ---
-extern rt_allocate, rt_initialize, rt_new_string, rt_rootstack_begin
+extern rt_allocate, rt_initialize, rt_new_string
 section .rodata
     const_1 db `abc`
 section .text
@@ -16,7 +16,7 @@ _start:
     mov rdi, 65536
     mov rsi, 64
     call rt_initialize
-    mov r15, rt_rootstack_begin
+    mov r15, rax
     mov qword [r15], 0
     mov qword [r15 + 8], 0
     add r15, 16

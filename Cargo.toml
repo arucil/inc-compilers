@@ -9,5 +9,6 @@ members = [
     "ast",
     "asm",
     "control",
-    "support"
+    "support",
+    "runtime"
 ]

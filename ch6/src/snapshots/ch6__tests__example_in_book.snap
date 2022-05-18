@@ -2,7 +2,7 @@
 source: ch6/src/lib.rs
 expression: prog
 ---
-extern rt_allocate, rt_initialize, rt_print_int, rt_print_newline, rt_rootstack_begin
+extern rt_allocate, rt_initialize, rt_print_int, rt_print_newline
 section .text
 
     global _start
@@ -14,7 +14,7 @@ _start:
     mov rdi, 65536
     mov rsi, 64
     call rt_initialize
-    mov r15, rt_rootstack_begin
+    mov r15, rax
     mov qword [r15], 0
     add r15, 8
     mov rdi, 16
@@ -28,7 +28,7 @@ _start:
     mov rsi, r15
     call rt_allocate
     mov r11, rax
-    mov qword [r11], 9
+    mov qword [r11], 521
     mov rax, qword [r15]
     mov qword [r11 + 8], rax
     mov rbx, r11
