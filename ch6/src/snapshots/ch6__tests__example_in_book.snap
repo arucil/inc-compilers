@@ -23,13 +23,13 @@ _start:
     mov r11, rax
     mov qword [r11], 9
     mov qword [r11 + 8], 42
-    mov qword [r15], r11
+    mov qword [r15 - 8], r11
     mov rdi, 16
     mov rsi, r15
     call rt_allocate
     mov r11, rax
     mov qword [r11], 521
-    mov rax, qword [r15]
+    mov rax, qword [r15 - 8]
     mov qword [r11 + 8], rax
     mov rbx, r11
     mov r11, rbx

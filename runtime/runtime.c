@@ -415,8 +415,7 @@ uint64_t rt_heap_size()
 // size must be multiple of 8.
 void *rt_allocate(uint64_t size, uint64_t *rootstack_ptr)
 {
-  if (from_space_end - from_space_ptr < (ptrdiff_t)size &&
-      from_space_end - from_space_begin > (ptrdiff_t)size)
+  if (from_space_end - from_space_ptr < (ptrdiff_t)size)
   {
     rt_collect(rootstack_ptr);
   }

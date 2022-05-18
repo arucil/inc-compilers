@@ -93,7 +93,7 @@ pub fn gen_assign_instr_registers<'a>(
   num_ref_locals: &'a mut usize,
 ) -> impl (FnMut(Instr<IdxVar>, &IndexMap<Var, Color>) -> Instr) + 'a {
   let mut prim_var_indices = vec![-1; locals.len()];
-  let mut prim_var_counter = 1;
+  let mut prim_var_counter = 0;
   let mut ref_var_indices = vec![-1; locals.len()];
   let mut ref_var_counter = 0;
 
@@ -111,15 +111,15 @@ pub fn gen_assign_instr_registers<'a>(
           let i = i - available_regs.len();
           if is_ref {
             if ref_var_indices[i] < 0 {
-              ref_var_indices[i] = ref_var_counter;
               ref_var_counter += 1;
+              ref_var_indices[i] = ref_var_counter;
               *num_ref_locals += 1;
             }
-            Arg::Deref(Reg::R15, 8 * ref_var_indices[i])
+            Arg::Deref(Reg::R15, -8 * ref_var_indices[i])
           } else {
             if prim_var_indices[i] < 0 {
-              prim_var_indices[i] = prim_var_counter;
               prim_var_counter += 1;
+              prim_var_indices[i] = prim_var_counter;
               *num_prim_locals += 1;
             }
             Arg::Deref(Reg::Rbp, -8 * prim_var_indices[i])

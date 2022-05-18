@@ -66,7 +66,10 @@ fn extend_heap() {
 
     let old_heap = rt_from_space();
 
-    let _v2 = rt_allocate(512, rootstack_ptr) as *mut u64;
+    *rootstack_ptr = s as u64;
+    *rootstack_ptr.add(1) = v as u64;
+
+    let _v2 = rt_allocate(512, rootstack_ptr.add(2)) as *mut u64;
 
     let heap = rt_from_space() as *const u64;
     assert_eq!(*heap, 0b101_011);
@@ -145,7 +148,7 @@ fn collect() {
 #[serial]
 fn example_in_book() {
   unsafe {
-    let rootstack_ptr = rt_initialize(65536, 65536) as *mut u64;
+    let rootstack_ptr = rt_initialize(65536, 512) as *mut u64;
 
     // v7: [ 5 ]
     let v7 = rt_allocate(2 * 8, rootstack_ptr) as *mut u64;
@@ -213,7 +216,7 @@ fn example_in_book() {
     rt_collect(rootstack_ptr.add(3));
 
     const STR1: &str = "abcde";
-    rt_new_string(STR1.len() as u64, STR1.as_ptr(), rootstack_ptr);
+    rt_new_string(STR1.len() as u64, STR1.as_ptr(), rootstack_ptr.add(3));
 
     let heap = rt_from_space() as *const u64;
     assert_eq!(*heap, 0b11_000010_001);
@@ -234,7 +237,7 @@ fn example_in_book() {
     assert_eq!(*heap.add(15), heap.add(10) as u64);
     assert_eq!(*heap.add(16), 0b0_000001_001);
     assert_eq!(*heap.add(17), 8);
-    assert_eq!(*heap.add(18), 0b101_011);
+    assert_eq!(*heap.add(18), 7683);
     assert_eq!(*heap.add(19) & 0xff_ffff_ffff, 0x6564636261);
   }
 }
