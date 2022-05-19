@@ -16,17 +16,6 @@ pub struct Info {
   pub var_store: VarStore,
 }
 
-impl ch3::pass::VarInfo for Info {
-  fn is_ref(&self, var: &IdxVar) -> bool {
-    match self.locals.get(var) {
-      Some(Type::Vector(_)) => true,
-      Some(Type::Str) => true,
-      Some(Type::Alias(_)) => todo!(),
-      _ => false,
-    }
-  }
-}
-
 /// `label_live` is a map from labels to sets of live locations before the first
 /// instruction of the blocks.
 pub fn analyze_liveness(
@@ -167,6 +156,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -200,6 +190,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -235,6 +226,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -264,6 +256,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -316,6 +309,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -370,6 +364,7 @@ block4:
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -448,6 +443,7 @@ block9:
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let result = analyze_liveness(prog, label_live);
 

@@ -20,6 +20,8 @@ pub struct Info {
 pub fn build_interference(
   prog: Program<OldInfo, IdxVar>,
 ) -> Program<Info, IdxVar> {
+  let locals = &prog.info.locals;
+  let types = &prog.types;
   let var_store = &prog.info.var_store;
   let live = &prog.info.live;
   let mut conflicts = LocationGraph::new();
@@ -27,7 +29,7 @@ pub fn build_interference(
     conflicts.insert_node(Location::from(*var));
   }
   let mut state = State {
-    info: &prog.info,
+    var_is_ref: |var: &IdxVar| locals[var].is_ref(types),
     conflicts,
     var_store,
   };
@@ -106,6 +108,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);
@@ -142,6 +145,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);
@@ -175,6 +179,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);
@@ -229,6 +234,7 @@ block4:
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);
@@ -282,6 +288,7 @@ block4:
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);
@@ -361,6 +368,7 @@ block9:
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);

@@ -1,5 +1,4 @@
 use super::liveness_analysis::Info as OldInfo;
-use super::VarInfo;
 use crate::location_graph::LocationGraph;
 use crate::location_set::{Location, LocationSet, VarStore};
 use asm::{Block, Instr, Program, Reg};
@@ -33,7 +32,7 @@ pub fn build_interference(
     conflicts.insert_node(Location::from(*var));
   }
   let mut state = State {
-    info: &prog.info,
+    var_is_ref: |_: &IdxVar| false,
     conflicts,
     var_store,
   };
@@ -48,19 +47,20 @@ pub fn build_interference(
       moves: LocationGraph::new(),
       var_store: prog.info.var_store,
     },
-    constants: prog.constants,
-    externs: prog.externs,
-    blocks: prog.blocks,
+    ..prog
   }
 }
 
-pub struct State<'a, I> {
+pub struct State<'a, F> {
   pub conflicts: LocationGraph<Interference>,
-  pub info: &'a I,
+  pub var_is_ref: F,
   pub var_store: &'a VarStore,
 }
 
-impl<'a, I: VarInfo> State<'a, I> {
+impl<'a, F> State<'a, F>
+where
+  F: FnMut(&IdxVar) -> bool,
+{
   pub fn build_graph(
     &mut self,
     block: &Block<IdxVar>,
@@ -110,7 +110,7 @@ impl<'a, I: VarInfo> State<'a, I> {
               let write_loc_node = graph.insert_node(write_loc);
               if after_loc != write_loc {
                 if let Some(var) = after_loc.to_arg_var(self.var_store) {
-                  if self.info.is_ref(&var) {
+                  if (self.var_is_ref)(&var) {
                     let after_loc_node = graph.insert_node(after_loc);
                     graph.add_edge(write_loc_node, after_loc_node);
                   }
@@ -207,6 +207,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = build_interference(prog);
@@ -243,6 +244,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = build_interference(prog);
@@ -276,6 +278,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = build_interference(prog);

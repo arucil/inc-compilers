@@ -31,7 +31,7 @@ pub fn select_instruction<OldInfo, NewInfo>(
 where
   NewInfo: From<OldInfo>,
 {
-  let mut codegen = CodeGen::new(use_heap);
+  let mut codegen = CodeGen::new(|ty| ty.clone(), use_heap);
   let blocks = prog
     .body
     .into_iter()
@@ -43,12 +43,14 @@ where
     blocks,
     constants: result.constants,
     externs: result.externs,
+    types: prog.types,
   }
 }
 
 #[derive(Default)]
-pub struct CodeGen {
+pub struct CodeGen<F> {
   code: Vec<Instr<IdxVar>>,
+  resolve_type: F,
   constants: IndexMap<String, String>,
   externs: BTreeSet<String>,
   use_heap: bool,
@@ -59,10 +61,14 @@ pub struct CodeGenResult {
   pub externs: BTreeSet<String>,
 }
 
-impl CodeGen {
-  pub fn new(use_heap: bool) -> Self {
+impl<F> CodeGen<F>
+where
+  F: FnMut(&Type) -> Type,
+{
+  pub fn new(resolve_type: F, use_heap: bool) -> Self {
     Self {
       code: vec![],
+      resolve_type,
       constants: IndexMap::new(),
       externs: BTreeSet::new(),
       use_heap,
@@ -168,15 +174,12 @@ impl CodeGen {
         val,
       } => {
         let vec = atom_to_arg(vec);
-        // TODO remove R11 requirement
         self.code.push(Instr::Mov {
           src: vec,
           dest: Arg::Reg(Reg::R11),
         });
-        self.atom_instructions(
-          Arg::Deref(Reg::R11, calc_field_offset(&fields_before)),
-          val,
-        );
+        let offset = self.calc_field_offset(&fields_before);
+        self.atom_instructions(Arg::Deref(Reg::R11, offset), val);
       }
     }
   }
@@ -252,7 +255,7 @@ impl CodeGen {
         let mut i = 0;
         for (_, ty) in &fields {
           field_offsets.push(size as i32);
-          match ty {
+          match (self.resolve_type)(ty) {
             Type::Void => {
               non_unit_fields -= 1;
               continue;
@@ -267,7 +270,7 @@ impl CodeGen {
               size += 8;
               ptr_mask |= 1 << i;
             }
-            Type::Alias(_) => todo!(),
+            Type::Alias(_) => unreachable!(),
           }
           i += 1;
         }
@@ -303,8 +306,9 @@ impl CodeGen {
       }
       CPrim::VecRef { vec, fields_before } => {
         self.atom_instructions(Arg::Reg(Reg::R11), vec);
+        let offset = self.calc_field_offset(&fields_before);
         self.code.push(Instr::Mov {
-          src: Arg::Deref(Reg::R11, calc_field_offset(&fields_before)),
+          src: Arg::Deref(Reg::R11, offset),
           dest: target,
         });
       }
@@ -369,21 +373,21 @@ impl CodeGen {
       }
     }
   }
-}
 
-fn calc_field_offset(fields_before: &[Type]) -> i32 {
-  let mut offset = 8;
-  for field in fields_before {
-    offset += match field {
-      Type::Void => 0,
-      Type::Int => 8,
-      Type::Bool => 8,
-      Type::Str => 8,
-      Type::Vector(_) => 8,
-      Type::Alias(_) => todo!(),
-    };
+  fn calc_field_offset(&mut self, fields_before: &[Type]) -> i32 {
+    let mut offset = 8;
+    for field in fields_before {
+      offset += match (self.resolve_type)(field) {
+        Type::Void => 0,
+        Type::Int => 8,
+        Type::Bool => 8,
+        Type::Str => 8,
+        Type::Vector(_) => 8,
+        Type::Alias(_) => unreachable!(),
+      };
+    }
+    offset
   }
-  offset
 }
 
 fn atom_to_arg(atom: CAtom) -> Arg<IdxVar> {

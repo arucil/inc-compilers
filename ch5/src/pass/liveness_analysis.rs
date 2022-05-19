@@ -200,6 +200,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -233,6 +234,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -268,6 +270,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -297,6 +300,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -349,6 +353,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -403,6 +408,7 @@ block4:
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -481,6 +487,7 @@ block9:
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -529,6 +536,7 @@ block8:
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let result = analyze_liveness(prog, label_live);
 

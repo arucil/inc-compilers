@@ -1,3 +1,6 @@
+#![allow(incomplete_features)]
+#![feature(type_changing_struct_update)]
+
 use self::location_set::LocationSet;
 use asm::{Label, Reg};
 use maplit::hashmap;

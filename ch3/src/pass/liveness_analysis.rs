@@ -12,12 +12,6 @@ pub struct Info {
   pub var_store: VarStore,
 }
 
-impl super::VarInfo for Info {
-  fn is_ref(&self, _: &IdxVar) -> bool {
-    false
-  }
-}
-
 /// `label_live` is a map from labels to sets of live locations before the first
 /// instruction of the blocks.
 pub fn analyze_liveness(
@@ -48,9 +42,7 @@ pub fn analyze_liveness(
       live,
       var_store,
     },
-    constants: prog.constants,
-    externs: prog.externs,
-    blocks: prog.blocks,
+    ..prog
   }
 }
 
@@ -244,6 +236,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -277,6 +270,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -312,6 +306,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -341,6 +336,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let result = analyze_liveness(prog, label_live);
 

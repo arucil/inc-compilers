@@ -1,0 +1,5 @@
+(let ([i 0] [v (vector 1 "abcabcabcabcabcabcabcabcabcabcabcabc" #t (void))])
+  (while (< i 1000)
+    (set! v (vector i "abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789" #f (void)))
+    (set! i (+ i 1)))
+  (print (vector-ref v 2)))

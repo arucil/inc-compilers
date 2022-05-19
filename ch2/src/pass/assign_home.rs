@@ -40,6 +40,7 @@ pub fn assign_home(
     externs: prog.externs,
     constants: Default::default(),
     blocks,
+    types: prog.types,
   }
 }
 

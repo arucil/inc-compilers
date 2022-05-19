@@ -329,7 +329,7 @@ void rt_collect(uint64_t *rootstack_ptr)
   from_space_ptr = freep;
 }
 
-static void extend_heap(uint64_t size)
+static void extend_heap(uint64_t size, uint64_t *rootstack_ptr)
 {
   uint64_t old_heap_size = from_space_end - from_space_begin;
   uint64_t old_total_size = from_space_ptr - from_space_begin;
@@ -397,6 +397,11 @@ static void extend_heap(uint64_t size)
   {
     RT_FATAL_CODE("munmap() returns ", ret);
   }
+  for (uint64_t *p = rootstack_begin; p < rootstack_ptr; p++) {
+    if (*p) {
+      *p += ptr_diff;
+    }
+  }
   from_space_ptr += ptr_diff;
   from_space_begin = new_from_space_begin;
   from_space_end = from_space_begin + new_heap_size;
@@ -412,6 +417,130 @@ uint64_t rt_heap_size()
   return from_space_end - from_space_begin;
 }
 
+// static void print_hex(uint64_t n) {
+//   static const char hex[] = "0123456789ABCDEF";
+//   static char buf[17];
+//   buf[0] = hex[n >> 60 & 0xf];
+//   buf[1] = hex[n >> 56 & 0xf];
+//   buf[2] = hex[n >> 52 & 0xf];
+//   buf[3] = hex[n >> 48 & 0xf];
+//   buf[4] = hex[n >> 44 & 0xf];
+//   buf[5] = hex[n >> 40 & 0xf];
+//   buf[6] = hex[n >> 36 & 0xf];
+//   buf[7] = hex[n >> 32 & 0xf];
+//   buf[8] = hex[n >> 28 & 0xf];
+//   buf[9] = hex[n >> 24 & 0xf];
+//   buf[10] = hex[n >> 20 & 0xf];
+//   buf[11] = hex[n >> 16 & 0xf];
+//   buf[12] = hex[n >> 12 & 0xf];
+//   buf[13] = hex[n >> 8 & 0xf];
+//   buf[14] = hex[n >> 4 & 0xf];
+//   buf[15] = hex[n >> 0 & 0xf];
+//   buf[16]=' ';
+//   write(1, buf, 17);
+// }
+
+// void check_invariants(uint64_t index, uint64_t *rootstack_ptr) {
+//   for (uint64_t *p = rootstack_begin; p < rootstack_ptr; p++) {
+//     if (!*p) continue;
+//     if (*p < (uint64_t)from_space_begin || *p >= (uint64_t)from_space_ptr) {
+//       rt_print_int(index);
+//       write(1, ": rootstack offset: ", 20);
+//       rt_print_int((uint64_t)p);
+//       write(1, ", from_space_begin: ", 20);
+//       rt_print_int((uint64_t)from_space_begin);
+//       write(1, ", from_space_ptr: ", 18);
+//       rt_print_int((uint64_t)from_space_ptr);
+//       write(1, ", to_space_begin: ", 18);
+//       rt_print_int((uint64_t)to_space_begin);
+//       rt_print_newline();
+//       exit(1);
+//     }
+//   }
+//   for (uint64_t *p = from_space_begin; (void *)p < from_space_ptr;)
+//   {
+//     uint64_t tag = *p++;
+//     uint64_t type = TYPE(tag);
+//     switch (type)
+//     {
+//     case TYPE_VECTOR:
+//     {
+//       uint64_t ptr_mask = VECTOR_PTR_MASK(tag);
+//       for (uint64_t n = VECTOR_NUM_FIELDS(tag); n > 0; n--)
+//       {
+//         if (ptr_mask & 1)
+//         {
+//           void *pp = (void*)*p;
+//     if (pp < from_space_begin || pp >= from_space_ptr) {
+//       rt_print_int(index * 1000);
+//       write(1, ": tag: ", 7);
+//       rt_print_int(tag);
+//       write(1, ", ptr: ", 7);
+//       print_hex((uint64_t)pp);
+//       write(1, ", from_space_begin: ", 20);
+//       print_hex((uint64_t)from_space_begin);
+//       write(1, ", from_space_ptr: ", 18);
+//       print_hex((uint64_t)from_space_ptr);
+//       write(1, ", to_space_begin: ", 18);
+//       print_hex((uint64_t)to_space_begin);
+//       rt_print_newline();
+//       uint64_t *q = from_space_begin;
+//       for (int j = 0; j < 10; j ++) {
+//         print_hex((uint64_t)q);
+//         write(1, ": ", 2);
+//         for (int i = 0; i < 4; i++) {
+//           print_hex(*q);
+//           q++;
+//           if ((void*)q >= from_space_ptr) {exit(1);}
+//         }
+//         rt_print_newline();
+//       }
+//       exit(1);
+//     }
+//         }
+//         p++;
+//         ptr_mask >>= 1;
+//       }
+//       break;
+//     }
+//     case TYPE_STRING:
+//     {
+//       uint64_t len = STRING_LEN_ALIGNED(tag) >> 3;
+//       for (uint64_t i = 0; i < len; i++)
+//       {
+//         p++;
+//       }
+//       break;
+//     }
+//     default:
+//       RT_FATAL_CODE("invalid type ", type);
+//     }
+//   }
+// }
+
+// void dump(uint64_t index, uint64_t *rootstack_ptr) {
+//     rt_print_int(index);
+//     rt_print_newline();
+//     write(1, "rootstack: ", 11);
+//     for (uint64_t *p = rootstack_begin; p < rootstack_ptr; p++) {
+//       print_hex(*p);
+//     }
+//     rt_print_newline();
+//     write(1, "from space: \n", 13);
+//       uint64_t *q = from_space_begin;
+//       for (int j = 0; j < 10; j ++) {
+//         print_hex((uint64_t)q);
+//         write(1, ": ", 2);
+//         for (int i = 0; i < 4; i++) {
+//           print_hex(*q);
+//           q++;
+//           if ((void*)q >= from_space_ptr) {break;}
+//         }
+//         rt_print_newline();
+//           if ((void*)q >= from_space_ptr) {break;}
+//       }
+// }
+
 // size must be multiple of 8.
 void *rt_allocate(uint64_t size, uint64_t *rootstack_ptr)
 {
@@ -421,7 +550,7 @@ void *rt_allocate(uint64_t size, uint64_t *rootstack_ptr)
   }
   if (from_space_end - from_space_ptr < (ptrdiff_t)size)
   {
-    extend_heap(size);
+    extend_heap(size, rootstack_ptr);
   }
   void *ptr = from_space_ptr;
   from_space_ptr += size;

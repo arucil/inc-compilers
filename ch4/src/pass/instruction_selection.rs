@@ -28,7 +28,8 @@ pub fn select_instruction(
   prog: CProgram<CInfo>,
   use_heap: bool,
 ) -> Program<Info, IdxVar> {
-  let mut codegen = CodeGen::new(use_heap);
+  let types = prog.types;
+  let mut codegen = CodeGen::new(|ty| ty.resolved(&types), use_heap);
   let blocks = prog
     .body
     .into_iter()
@@ -42,6 +43,7 @@ pub fn select_instruction(
     blocks,
     constants: result.constants,
     externs: result.externs,
+    types,
   }
 }
 

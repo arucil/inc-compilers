@@ -234,12 +234,19 @@ impl Type {
     }
   }
 
-  pub fn is_ref(&self) -> bool {
+  pub fn is_ref(&self, types: &Arena<Type>) -> bool {
     match self {
       Self::Vector(_) => true,
       Self::Str => true,
-      Self::Alias(_) => todo!(),
+      Self::Alias(id) => types[*id].is_ref(types),
       _ => false,
+    }
+  }
+
+  pub fn resolved(&self, types: &Arena<Type>) -> Self {
+    match self {
+      Self::Alias(id) => types[*id].resolved(types),
+      _ => self.clone(),
     }
   }
 }

@@ -237,7 +237,7 @@ fn example_in_book() {
     assert_eq!(*heap.add(15), heap.add(10) as u64);
     assert_eq!(*heap.add(16), 0b0_000001_001);
     assert_eq!(*heap.add(17), 8);
-    assert_eq!(*heap.add(18), 7683);
+    assert_eq!(*heap.add(18), 43);
     assert_eq!(*heap.add(19) & 0xff_ffff_ffff, 0x6564636261);
   }
 }

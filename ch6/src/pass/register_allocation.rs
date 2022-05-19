@@ -6,6 +6,7 @@ use ch4::pass::interference::Info as OldInfo;
 use indexmap::{IndexMap, IndexSet};
 use std::collections::HashMap;
 use std::fmt::{self, Debug, Formatter};
+use id_arena::Arena;
 
 pub struct Info {
   pub locals: IndexMap<IdxVar, Type>,
@@ -54,6 +55,7 @@ pub fn allocate_registers(
       used_callee_saved_regs: IndexSet::new(),
       assign_instr_registers: gen_assign_instr_registers(
         &prog.info.locals,
+        &prog.types,
         &prog.info.var_store,
         available_regs,
         &mut num_prim_locals,
@@ -87,6 +89,7 @@ pub fn allocate_registers(
 
 pub fn gen_assign_instr_registers<'a>(
   locals: &'a IndexMap<IdxVar, Type>,
+  types: &'a Arena<Type>,
   var_store: &'a VarStore,
   available_regs: &'a [Reg],
   num_prim_locals: &'a mut usize,
@@ -103,7 +106,7 @@ pub fn gen_assign_instr_registers<'a>(
       Arg::Reg(reg) => Arg::Reg(reg),
       Arg::Imm(i) => Arg::Imm(i),
       Arg::Var(var) => {
-        let is_ref = locals[&var].is_ref();
+        let is_ref = locals[&var].is_ref(types);
         let i = var_colors[&var_store.get(var)].index();
         if let Some(&reg) = available_regs.get(i) {
           Arg::Reg(reg)
@@ -242,6 +245,7 @@ start:
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let prog = interference::build_interference(prog);
@@ -307,6 +311,7 @@ start:
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let prog = interference::build_interference(prog);
@@ -372,6 +377,7 @@ start:
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let prog = interference::build_interference(prog);

@@ -6,6 +6,8 @@ use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::fmt::{self, Debug, Formatter, Write};
 use std::iter::IntoIterator;
+use ast::Type;
+use id_arena::Arena;
 
 #[derive(Debug, Clone)]
 pub struct Program<INFO = (), VAR = !> {
@@ -14,6 +16,7 @@ pub struct Program<INFO = (), VAR = !> {
   pub externs: BTreeSet<String>,
   /// The order matters.
   pub blocks: Vec<(Label, Block<VAR>)>,
+  pub types: Arena<Type>,
 }
 
 #[derive(Clone)]

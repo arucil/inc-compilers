@@ -75,9 +75,8 @@ pub fn allocate_registers(
       stack_space: num_locals * 8,
       used_callee_saved_regs,
     },
-    constants: prog.constants,
-    externs: prog.externs,
     blocks,
+    ..prog
   }
 }
 
@@ -410,6 +409,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let prog = interference::build_interference(prog);
@@ -444,6 +444,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let prog = interference::build_interference(prog);
@@ -478,6 +479,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let prog = interference::build_interference(prog);
@@ -517,6 +519,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let prog = interference::build_interference(prog);
@@ -563,6 +566,7 @@ mod tests {
       constants: Default::default(),
       externs: Default::default(),
       blocks,
+      types: Default::default(),
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let prog = interference::build_interference(prog);

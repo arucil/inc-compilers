@@ -11,3 +11,5 @@ enum-iterator = "0.8.1"
 num-derive = "0.3.3"
 num-traits = "0.2.15"
 support = { path = "../support" }
+ast = { version = "0.1.0", path = "../ast" }
+id-arena = "2.2.1"

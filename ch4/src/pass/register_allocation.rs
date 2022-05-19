@@ -74,8 +74,7 @@ pub fn allocate_registers(
       stack_space: num_locals * 8,
       used_callee_saved_regs,
     },
-    constants: prog.constants,
-    externs: prog.externs,
     blocks,
+    ..prog
   }
 }
