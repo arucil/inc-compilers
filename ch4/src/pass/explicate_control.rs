@@ -455,14 +455,11 @@ fn explicate_exp_effect(
     ExpKind::NewLine => CTail::Seq(CStmt::NewLine, box cont),
     ExpKind::Print(args) => args.into_iter().rfold(
       CTail::Seq(CStmt::NewLine, box cont),
-      |cont, exp| {
-        CTail::Seq(
-          CStmt::Print {
-            ty: exp.ty.clone(),
-            val: atom(exp),
-          },
-          box cont,
-        )
+      |cont, exp| match exp.ty {
+        Type::Bool => CTail::Seq(CStmt::PrintBool(atom(exp)), box cont),
+        Type::Int => CTail::Seq(CStmt::PrintInt(atom(exp)), box cont),
+        Type::Str => CTail::Seq(CStmt::PrintStr(atom(exp)), box cont),
+        _ => unreachable!(),
       },
     ),
   }

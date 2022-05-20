@@ -1,7 +1,8 @@
 use std::cmp::Ordering;
 
-use crate::{Exp, ExpKind, Program};
+use crate::{Exp, ExpKind, Program, StructDef};
 use support::{CompileError, Range};
+use indexmap::IndexMap;
 
 pub type Result<T> = std::result::Result<T, CompileError>;
 
@@ -199,8 +200,20 @@ impl<'a> Parser<'a> {
   }
 }
 
-fn build_prog(input: &str, cst: Vec<Cst>) -> Result<Program> {
+fn build_prog(input: &str, mut cst: Vec<Cst>) -> Result<Program> {
+  let mut defs = IndexMap::new();
+  let mut iter = cst.into_iter().peekable();
+  while let Some(Cst::List(xs, _)) = iter.peek() {
+    if let Some(&Cst::Symbol(op_range)) = xs.first() {
+      let op = &input[op_range.start..op_range.end];
+      if op == "define-struct" {
+        let (name, st) = build_struct_def(input, xs, range)?;
+        defs.insert(name, st);
+      }
+    }
+  }
   Ok(Program {
+    defs,
     body: cst
       .into_iter()
       .map(|c| build_exp(input, c))
@@ -212,7 +225,7 @@ fn build_prog(input: &str, cst: Vec<Cst>) -> Result<Program> {
 fn build_exp(input: &str, cst: Cst) -> Result<Exp> {
   match cst {
     Cst::List(xs, range) => {
-      if let Some(&Cst::Symbol(sym_range)) = xs.get(0) {
+      if let Some(&Cst::Symbol(sym_range)) = xs.first() {
         let op = &input[sym_range.start..sym_range.end];
         match op {
           "let" => build_let(input, xs, range),
@@ -312,6 +325,9 @@ fn build_exp(input: &str, cst: Cst) -> Result<Exp> {
       ty: (),
     }),
   }
+}
+
+fn build_struct_def(input: &str, xs: Vec<Cst>, range: Range) -> Result<(String, StructDef)> {
 }
 
 fn build_let(input: &str, mut xs: Vec<Cst>, range: Range) -> Result<Exp> {

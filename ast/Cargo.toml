@@ -5,6 +5,7 @@ edition = "2018"
 
 [dependencies]
 id-arena = "2.2.1"
+indexmap = "1.8.1"
 pretty = "0.11.3"
 support = { path = "../support" }
 

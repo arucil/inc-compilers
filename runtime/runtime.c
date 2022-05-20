@@ -228,24 +228,35 @@ void *rt_initialize(uint64_t rootstack_size, uint64_t heap_size)
 
 // tag:
 // bit0         0=visited, 1=unvisited
-// bit1~bit2    0=vector   1=string
+// bit1~bit2    0=vector   1=string   2=array
 //
 // vector:
 // bit3~bit8    number of fields (exluding unit fields)
-// bit9~bit58   pointer mask
+// bit9~bit59   pointer mask
 //
 // string:
 // bit3~bit63   string length
+//
+// array:
+// bit3         pointer mask
+// bit4~bit63   length
 
 #define VISITED(tag) (((tag)&1) == 0)
 #define TYPE(tag) (((tag) >> 1) & 3)
-#define VECTOR_NUM_FIELDS(tag) (((tag) >> 3) & 0b111111)
-#define VECTOR_PTR_MASK(tag) ((tag) >> 9)
-#define MAKE_VECTOR_TAG(num_fields, ptr_mask) ((ptr_mask) << 9 | (num_fields) << 3 | 1)
-#define MAKE_STRING_TAG(len) ((len) << 3 | 3)
-#define STRING_LEN_ALIGNED(tag) ((((tag) >> 3) + 7) & ~7)
 #define TYPE_VECTOR (0)
 #define TYPE_STRING (1)
+#define TYPE_ARRAY  (2)
+
+#define MAKE_VECTOR_TAG(num_fields, ptr_mask) ((ptr_mask) << 9 | (num_fields) << 3 | 0b001)
+#define VECTOR_NUM_FIELDS(tag) (((tag) >> 3) & 0b111111)
+#define VECTOR_PTR_MASK(tag) ((tag) >> 9)
+
+#define MAKE_STRING_TAG(len) ((len) << 3 | 0b011)
+#define STRING_LEN_ALIGNED(tag) ((((tag) >> 3) + 7) & ~7)
+
+#define MAKE_ARRAY_TAG(ptr_mask, len) ((len) << 4 | ptr_mask << 3 | 0b101)
+#define ARRAY_LEN(tag) ((tag) >> 4) 
+#define ARRAY_PTR_MASK(tag) ((tag) >> 3 & 1)
 
 void rt_collect(uint64_t *rootstack_ptr)
 {
@@ -397,8 +408,10 @@ static void extend_heap(uint64_t size, uint64_t *rootstack_ptr)
   {
     RT_FATAL_CODE("munmap() returns ", ret);
   }
-  for (uint64_t *p = rootstack_begin; p < rootstack_ptr; p++) {
-    if (*p) {
+  for (uint64_t *p = rootstack_begin; p < rootstack_ptr; p++)
+  {
+    if (*p)
+    {
       *p += ptr_diff;
     }
   }

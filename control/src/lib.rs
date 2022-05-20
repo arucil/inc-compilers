@@ -42,10 +42,9 @@ pub enum CStmt {
     var: IdxVar,
     exp: CExp,
   },
-  Print {
-    val: CAtom,
-    ty: Type,
-  },
+  PrintBool(CAtom),
+  PrintInt(CAtom),
+  PrintStr(CAtom),
   NewLine,
   Read,
   VecSet {
@@ -145,8 +144,14 @@ impl Debug for CStmt {
       Self::Read => {
         write!(f, "read")
       }
-      Self::Print { val, ty } => {
-        write!(f, "print {:?} {:?}", ty, val)
+      Self::PrintBool(val) => {
+        write!(f, "print-bool {:?}", val)
+      }
+      Self::PrintInt(val) => {
+        write!(f, "print-int {:?}", val)
+      }
+      Self::PrintStr(val) => {
+        write!(f, "print-str {:?}", val)
       }
       Self::NewLine => {
         write!(f, "newline")

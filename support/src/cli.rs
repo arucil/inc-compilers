@@ -31,7 +31,7 @@ pub fn cli_main(compile: impl FnOnce(&str) -> Result<String, CompileError>) {
       println!("Run:");
       println!(
         "nasm -f elf64 {}.asm && \
-        nasm -f elf64 runtime/runtime.asm && \
+        gcc -c runtime/runtime.c -o runtime/runtime.o -O2 -Wall -Werror -fno-builtin-exit -fno-stack-protector && \
         ld -o {} runtime/runtime.o {}.o",
         binary_path.display(),
         binary_path.display(),

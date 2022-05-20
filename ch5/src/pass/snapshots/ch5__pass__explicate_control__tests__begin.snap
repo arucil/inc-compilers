@@ -12,19 +12,19 @@ block3:
     if (> x.0 10) goto block4 else goto block5
 block4:
     tmp.0 = "x="
-    print Str tmp.0
-    print Int x.0
+    print-str tmp.0
+    print-int x.0
     newline
     tmp.1 = (- y.1 1)
     x.0 = (+ x.0 tmp.1)
     tmp.2 = (- y.1 1)
     tmp.3 = (> x.0 tmp.2)
-    print Bool tmp.3
+    print-bool tmp.3
     newline
     goto block3
 block5:
     k.2 = (+ x.0 1)
-    print Int k.2
+    print-int k.2
     newline
     tmp.4 = (read)
     y.1 = 37

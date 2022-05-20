@@ -5,6 +5,7 @@ use pretty::*;
 use std::fmt::{self, Debug, Formatter};
 use std::iter;
 use support::Range;
+use indexmap::IndexMap;
 
 pub mod parser;
 
@@ -12,9 +13,13 @@ pub use parser::{parse, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Program<VAR = String, TYPE = ()> {
+  pub defs: IndexMap<String, StructDef>,
   pub body: Vec<Exp<VAR, TYPE>>,
   pub types: Arena<Type>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StructDef(IndexMap<String, Type>);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Exp<VAR = String, TYPE = ()> {
@@ -70,6 +75,7 @@ pub enum Type {
   Bool,
   Str,
   Vector(Vec<Type>),
+  Struct(IndexMap<String, Type>),
   Alias(TypeId),
   Void,
 }
@@ -238,6 +244,7 @@ impl Type {
     match self {
       Self::Vector(_) => true,
       Self::Str => true,
+      Self::Struct(_) => true,
       Self::Alias(id) => types[*id].is_ref(types),
       _ => false,
     }

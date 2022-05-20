@@ -136,28 +136,24 @@ where
     match stmt {
       CStmt::Assign { var, exp } => self.exp_instructions(Arg::Var(var), exp),
       // ch4
-      CStmt::Print { val, ty: Type::Int } => {
+      CStmt::PrintInt(val) => {
         self.atom_instructions(Arg::Reg(Reg::Rdi), val);
         let label = "rt_print_int".to_owned();
         self.externs.insert(label.clone());
         self.code.push(Instr::Call { label, arity: 0 });
       }
-      CStmt::Print {
-        val,
-        ty: Type::Bool,
-      } => {
+      CStmt::PrintBool(val) => {
         self.atom_instructions(Arg::Reg(Reg::Rdi), val);
         let label = "rt_print_bool".to_owned();
         self.externs.insert(label.clone());
         self.code.push(Instr::Call { label, arity: 0 });
       }
-      CStmt::Print { val, ty: Type::Str } => {
+      CStmt::PrintStr(val) => {
         self.atom_instructions(Arg::Reg(Reg::Rdi), val);
         let label = "rt_print_str".to_owned();
         self.externs.insert(label.clone());
         self.code.push(Instr::Call { label, arity: 0 });
       }
-      CStmt::Print { .. } => unreachable!(),
       CStmt::NewLine => {
         let label = "rt_print_newline".to_owned();
         self.externs.insert(label.clone());
@@ -262,11 +258,7 @@ where
             }
             Type::Int => size += 8,
             Type::Bool => size += 8,
-            Type::Str => {
-              size += 8;
-              ptr_mask |= 1 << i;
-            }
-            Type::Vector(_) => {
+            Type::Str | Type::Vector(_) | Type::Struct(_) => {
               size += 8;
               ptr_mask |= 1 << i;
             }
@@ -383,6 +375,7 @@ where
         Type::Bool => 8,
         Type::Str => 8,
         Type::Vector(_) => 8,
+        Type::Struct(_) => 8,
         Type::Alias(_) => unreachable!(),
       };
     }
