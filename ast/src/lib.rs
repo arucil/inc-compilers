@@ -19,7 +19,16 @@ pub struct Program<VAR = String, TYPE = ()> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StructDef(IndexMap<String, Type>);
+pub struct StructDef(IndexMap<String, TypeDef>);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TypeDef {
+  Void,
+  Bool,
+  Int,
+  Str,
+  Alias(String),
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Exp<VAR = String, TYPE = ()> {

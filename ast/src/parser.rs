@@ -1,8 +1,8 @@
 use std::cmp::Ordering;
 
-use crate::{Exp, ExpKind, Program, StructDef};
-use support::{CompileError, Range};
+use crate::{Exp, ExpKind, Program, StructDef, TypeDef};
 use indexmap::IndexMap;
+use support::{CompileError, Range};
 
 pub type Result<T> = std::result::Result<T, CompileError>;
 
@@ -13,6 +13,18 @@ enum Cst {
   String(Range),
   Number(Range),
   Boolean(bool, Range),
+}
+
+impl Cst {
+  fn range(&self) -> Range {
+    match self {
+      Self::List(_, range)
+      | Self::Symbol(range)
+      | Self::String(range)
+      | Self::Number(range)
+      | Self::Boolean(_, range) => *range,
+    }
+  }
 }
 
 struct Parser<'a> {
@@ -200,24 +212,25 @@ impl<'a> Parser<'a> {
   }
 }
 
-fn build_prog(input: &str, mut cst: Vec<Cst>) -> Result<Program> {
+fn build_prog(input: &str, cst: Vec<Cst>) -> Result<Program> {
   let mut defs = IndexMap::new();
   let mut iter = cst.into_iter().peekable();
   while let Some(Cst::List(xs, _)) = iter.peek() {
     if let Some(&Cst::Symbol(op_range)) = xs.first() {
       let op = &input[op_range.start..op_range.end];
       if op == "define-struct" {
-        let (name, st) = build_struct_def(input, xs, range)?;
-        defs.insert(name, st);
+        if let Some(Cst::List(xs, range)) = iter.next() {
+          let (name, st) = build_struct_def(input, xs, range)?;
+          defs.insert(name, st);
+        } else {
+          unreachable!()
+        }
       }
     }
   }
   Ok(Program {
     defs,
-    body: cst
-      .into_iter()
-      .map(|c| build_exp(input, c))
-      .collect::<Result<_>>()?,
+    body: iter.map(|c| build_exp(input, c)).collect::<Result<_>>()?,
     types: Default::default(),
   })
 }
@@ -327,7 +340,53 @@ fn build_exp(input: &str, cst: Cst) -> Result<Exp> {
   }
 }
 
-fn build_struct_def(input: &str, xs: Vec<Cst>, range: Range) -> Result<(String, StructDef)> {
+fn build_struct_def(
+  input: &str,
+  xs: Vec<Cst>,
+  range: Range,
+) -> Result<(String, StructDef)> {
+  if let Some(Cst::Symbol(sym_range)) = xs.get(1) {
+    let name = input[sym_range.start..sym_range.end].to_owned();
+    let mut fields = IndexMap::new();
+    for field_def in xs.into_iter().skip(2) {
+      if let Cst::List(xs, field_range) = field_def {
+        if let [Cst::Symbol(name_range), Cst::Symbol(type_range)] =
+          xs.as_slice()
+        {
+          let name = input[name_range.start..name_range.end].to_owned();
+          let ty = match &input[type_range.start..type_range.end] {
+            "Bool" => TypeDef::Bool,
+            "Int" => TypeDef::Int,
+            "Str" => TypeDef::Str,
+            "Void" => TypeDef::Void,
+            name => TypeDef::Alias(name.to_owned()),
+          };
+          if fields.insert(name, ty).is_some() {
+            return Err(CompileError {
+              range: *name_range,
+              message: "duplicate field".to_owned(),
+            });
+          }
+        } else {
+          return Err(CompileError {
+            range: field_range,
+            message: "invalid field definition".to_owned(),
+          });
+        }
+      } else {
+        return Err(CompileError {
+          range: field_def.range(),
+          message: "invalid field definition".to_owned(),
+        });
+      }
+    }
+    Ok((name, StructDef(fields)))
+  } else {
+    Err(CompileError {
+      range,
+      message: "invalid define-struct form".to_owned(),
+    })
+  }
 }
 
 fn build_let(input: &str, mut xs: Vec<Cst>, range: Range) -> Result<Exp> {
