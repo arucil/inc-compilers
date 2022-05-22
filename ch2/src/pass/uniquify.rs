@@ -12,7 +12,7 @@ pub fn uniquify(prog: Program) -> Result<Program<IdxVar>, CompileError> {
       .into_iter()
       .map(|exp| uniquify_exp(exp, &mut env, &mut counter))
       .collect::<Result<_, _>>()?,
-    types: prog.types,
+    ..prog
   })
 }
 

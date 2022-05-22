@@ -1,4 +1,5 @@
-#![feature(box_patterns, box_syntax)]
+#![allow(incomplete_features)]
+#![feature(box_patterns, box_syntax, type_changing_struct_update)]
 
 use support::CompileError;
 

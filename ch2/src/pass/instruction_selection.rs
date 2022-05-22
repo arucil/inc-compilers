@@ -258,7 +258,7 @@ where
             }
             Type::Int => size += 8,
             Type::Bool => size += 8,
-            Type::Str | Type::Vector(_) | Type::Struct(_) => {
+            Type::Str | Type::Vector(_) => {
               size += 8;
               ptr_mask |= 1 << i;
             }
@@ -375,7 +375,6 @@ where
         Type::Bool => 8,
         Type::Str => 8,
         Type::Vector(_) => 8,
-        Type::Struct(_) => 8,
         Type::Alias(_) => unreachable!(),
       };
     }

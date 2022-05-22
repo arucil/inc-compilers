@@ -87,6 +87,7 @@ pub fn typecheck(prog: Program) -> Result<Program<String, Type>> {
     })
     .collect::<Result<_>>()?;
   Ok(Program {
+    defs: prog.defs,
     body,
     types: checker.types,
   })

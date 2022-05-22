@@ -84,7 +84,6 @@ pub enum Type {
   Bool,
   Str,
   Vector(Vec<Type>),
-  Struct(IndexMap<String, Type>),
   Alias(TypeId),
   Void,
 }
@@ -253,7 +252,6 @@ impl Type {
     match self {
       Self::Vector(_) => true,
       Self::Str => true,
-      Self::Struct(_) => true,
       Self::Alias(id) => types[*id].is_ref(types),
       _ => false,
     }
