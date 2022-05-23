@@ -19,7 +19,7 @@ pub struct Program<VAR = String, TYPE = ()> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StructDef(IndexMap<String, TypeDef>);
+pub struct StructDef(pub IndexMap<String, TypeDef>);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TypeDef {
@@ -27,7 +27,7 @@ pub enum TypeDef {
   Bool,
   Int,
   Str,
-  Alias(String),
+  Alias(Range, String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,6 +42,10 @@ pub enum ExpKind<VAR, TYPE> {
   Int(i64),
   Prim {
     op: (Range, &'static str),
+    args: Vec<Exp<VAR, TYPE>>,
+  },
+  Call {
+    name: (Range, String),
     args: Vec<Exp<VAR, TYPE>>,
   },
   Var(VAR),
@@ -142,6 +146,17 @@ impl<VAR: Debug, TYPE: Debug> Exp<VAR, TYPE> {
         .append(
           RcDoc::intersperse(
             iter::once(RcDoc::text(op.1))
+              .chain(args.iter().map(|arg| arg.to_doc())),
+            Doc::line(),
+          )
+          .nest(1)
+          .group(),
+        )
+        .append(RcDoc::text(")")),
+      ExpKind::Call { name, args } => RcDoc::text("(")
+        .append(
+          RcDoc::intersperse(
+            iter::once(RcDoc::text(&name.1))
               .chain(args.iter().map(|arg| arg.to_doc())),
             Doc::line(),
           )

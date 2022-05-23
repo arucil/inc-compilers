@@ -58,6 +58,17 @@ pub fn uniquify_exp<TYPE>(
       range,
       ty,
     }),
+    ExpKind::Call { name, args } => Ok(Exp {
+      kind: ExpKind::Call {
+        name,
+        args: args
+          .into_iter()
+          .map(|exp| uniquify_exp(exp, env, counter))
+          .collect::<Result<_, _>>()?,
+      },
+      range,
+      ty,
+    }),
     ExpKind::Let {
       var: var @ (var_range, _),
       init: box init,

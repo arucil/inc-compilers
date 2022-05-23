@@ -225,6 +225,8 @@ start:
     mov tmp.5, 5
     mov r11, y.1
     mov [r11 + 8], tmp.5
+    mov r11, y.1
+    mov tmp.6, [r11 + 24]
     jmp conclusion
     "#,
     );
@@ -240,6 +242,7 @@ start:
           IdxVar::new("tmp.3") => Type::Bool,
           IdxVar::new("tmp.4") => Type::Bool,
           IdxVar::new("tmp.5") => Type::Int,
+          IdxVar::new("tmp.6") => Type::Vector(vec![Type::Void]),
         },
       },
       constants: Default::default(),

@@ -1,0 +1,17 @@
+---
+source: ch6/src/pass/instruction_selection.rs
+expression: result.to_string_pretty()
+---
+locals: {x.0: Alias(Id { idx: 0 })}
+
+constants: {}
+
+start:
+    mov rdi, 8
+    mov rsi, r15
+    call rt_allocate
+    mov r11, rax
+    mov qword [r11], 1
+    mov x.0, r11
+    jmp conclusion
+

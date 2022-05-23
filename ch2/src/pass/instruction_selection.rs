@@ -286,7 +286,7 @@ where
           dest: Arg::Deref(Reg::R11, 0),
         });
         for ((field, ty), offset) in fields.into_iter().zip(field_offsets) {
-          if ty == Type::Void {
+          if (self.resolve_type)(&ty) == Type::Void {
             continue;
           }
           self.atom_instructions(Arg::Deref(Reg::R11, offset), field);

@@ -1,5 +1,6 @@
-use ast::{Exp, ExpKind, Program, Type};
+use ast::{Exp, ExpKind, Program, StructDef, Type, TypeDef};
 use id_arena::Arena;
+use indexmap::IndexMap;
 use maplit::hashmap;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -70,7 +71,7 @@ static PRIM_TYPES: Lazy<HashMap<&'static str, PrimType>> = Lazy::new(|| {
 });
 
 pub fn typecheck(prog: Program) -> Result<Program<String, Type>> {
-  let mut checker = TypeChecker::new();
+  let mut checker = TypeChecker::new(&prog.defs)?;
   let body = prog
     .body
     .into_iter()
@@ -93,15 +94,94 @@ pub fn typecheck(prog: Program) -> Result<Program<String, Type>> {
   })
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct TypeChecker {
   env: HashMap<String, Type>,
+  funcs: HashMap<String, FuncType>,
   pub types: Arena<Type>,
 }
 
+#[derive(Debug, Clone)]
+struct FuncType {
+  args: Vec<Type>,
+  ret: RetType,
+}
+
+#[derive(Debug, Clone)]
+enum RetType {
+  Constructor(Type),
+  Selector { index: usize, set: bool, ret: Type },
+}
+
 impl TypeChecker {
-  pub fn new() -> Self {
-    Self::default()
+  pub fn new(defs: &IndexMap<String, StructDef>) -> Result<Self> {
+    let mut types = Arena::new();
+    let mut funcs = HashMap::new();
+    let mut type_ids = HashMap::new();
+    for name in defs.keys() {
+      type_ids.insert(name, types.alloc(Type::Void));
+    }
+    for (name, StructDef(fields)) in defs {
+      let id = type_ids[name];
+      let fields = fields
+        .iter()
+        .enumerate()
+        .map(|(index, (field_name, def))| {
+          let ty = match def {
+            TypeDef::Void => Type::Void,
+            TypeDef::Bool => Type::Bool,
+            TypeDef::Int => Type::Int,
+            TypeDef::Str => Type::Str,
+            TypeDef::Alias(range, alias) => {
+              if let Some(id) = type_ids.get(alias) {
+                Type::Alias(*id)
+              } else {
+                return Err(CompileError {
+                  range: *range,
+                  message: format!("type {} not found", alias),
+                });
+              }
+            }
+          };
+          funcs.insert(
+            format!("{}-{}", name, field_name),
+            FuncType {
+              args: vec![Type::Alias(id)],
+              ret: RetType::Selector {
+                index,
+                set: false,
+                ret: ty.clone(),
+              },
+            },
+          );
+          funcs.insert(
+            format!("set-{}-{}!", name, field_name),
+            FuncType {
+              args: vec![Type::Alias(id), ty.clone()],
+              ret: RetType::Selector {
+                index,
+                set: true,
+                ret: Type::Void,
+              },
+            },
+          );
+          Ok(ty)
+        })
+        .collect::<Result<Vec<Type>>>()?;
+      funcs.insert(
+        name.clone(),
+        FuncType {
+          args: fields.clone(),
+          ret: RetType::Constructor(Type::Alias(id)),
+        },
+      );
+      *types.get_mut(id).unwrap() = Type::Vector(fields);
+    }
+    Ok(Self {
+      env: HashMap::new(),
+      funcs,
+      types,
+    })
   }
 
   pub fn typecheck(&mut self, exp: Exp) -> Result<Exp<String, Type>> {
@@ -175,6 +255,64 @@ impl TypeChecker {
           range,
           ty,
         })
+      }
+      ExpKind::Call { name, args } => {
+        let mut args = args
+          .into_iter()
+          .map(|arg| self.typecheck_exp(arg))
+          .collect::<Result<Vec<_>>>()?;
+        let FuncType { args: arg_tys, ret } =
+          self.funcs.get(&name.1).ok_or_else(|| CompileError {
+            range: name.0,
+            message: format!("function {} not found", name.1),
+          })?;
+        if args.len() != arg_tys.len() {
+          return Err(CompileError {
+            range: exp.range,
+            message: format!("arity mismatch for {}", name.1),
+          });
+        }
+        if !args.iter().zip(arg_tys).all(|(x, y)| x.ty == *y) {
+          return Err(CompileError {
+            range,
+            message: format!("type mismatch for {}", name.1),
+          });
+        }
+        match ret {
+          RetType::Constructor(ty) => Ok(Exp {
+            kind: ExpKind::Prim {
+              op: (name.0, "vector"),
+              args,
+            },
+            range,
+            ty: ty.clone(),
+          }),
+          RetType::Selector { index, set, ret } => {
+            args.insert(
+              1,
+              Exp {
+                kind: ExpKind::Int(*index as i64),
+                range: name.0,
+                ty: Type::Int,
+              },
+            );
+            Ok(Exp {
+              kind: if *set {
+                ExpKind::Prim {
+                  op: (name.0, "vector-set!"),
+                  args,
+                }
+              } else {
+                ExpKind::Prim {
+                  op: (name.0, "vector-ref"),
+                  args,
+                }
+              },
+              range,
+              ty: ret.clone(),
+            })
+          }
+        }
       }
       ExpKind::Let { var, init, body } => {
         let init = self.typecheck_exp(*init)?;

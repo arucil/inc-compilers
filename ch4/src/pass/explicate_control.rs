@@ -4,6 +4,7 @@ use control::{CAtom, CCmpOp, CExp, CPrim, CProgram, CStmt, CTail};
 use indexmap::IndexMap;
 use std::collections::VecDeque;
 use std::fmt::{self, Debug, Formatter};
+use id_arena::Arena;
 
 pub struct CInfo {
   pub locals: IndexMap<IdxVar, Type>,
@@ -11,16 +12,17 @@ pub struct CInfo {
 
 impl Debug for CInfo {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-    writeln!(f, "locals: {:?}\n", self.locals)
+    write!(f, "locals: {:?}", self.locals)
   }
 }
 
-struct State {
+struct State<'a> {
   blocks: Vec<(Label, CTail)>,
   label_index: u32,
+  types: &'a Arena<Type>,
 }
 
-impl State {
+impl<'a> State<'a> {
   fn new_label(&mut self) -> Label {
     let label = Label::Tmp(self.label_index);
     self.label_index += 1;
@@ -50,6 +52,10 @@ impl State {
       _ => CTail::Goto(self.add_block(tail)),
     }
   }
+
+  fn resolve_type(&self, ty: &Type) -> Type {
+    ty.resolved(self.types)
+  }
 }
 
 pub fn explicate_control(mut prog: Program<IdxVar, Type>) -> CProgram<CInfo> {
@@ -57,8 +63,10 @@ pub fn explicate_control(mut prog: Program<IdxVar, Type>) -> CProgram<CInfo> {
   let mut state = State {
     blocks: vec![],
     label_index: 0,
+    types: &prog.types,
   };
-  let start = explicate_tail(&mut state, prog.body.pop().unwrap());
+  let last = explicate_tail(&mut state, prog.body.pop().unwrap());
+  let start = explicate_effect(&mut state, prog.body.into_iter(), last);
   state.blocks.insert(0, (Label::Start, start));
 
   let blocks = remove_unreachable_blocks(state.blocks);
@@ -97,6 +105,11 @@ fn collect_exp_locals(
       collect_exp_locals(&*body, locals);
     }
     ExpKind::Prim { op: _, args } => {
+      for arg in args {
+        collect_exp_locals(arg, locals);
+      }
+    }
+    ExpKind::Call { name: _, args } => {
       for arg in args {
         collect_exp_locals(arg, locals);
       }
@@ -189,16 +202,21 @@ fn explicate_tail(state: &mut State, exp: Exp<IdxVar, Type>) -> CTail {
     ExpKind::Prim {
       op: (_, "vector-length"),
       mut args,
-    } => match args.pop().unwrap().ty {
+    } => match state.resolve_type(&args.pop().unwrap().ty) {
       Type::Vector(fields) => {
         CTail::Return(CExp::Atom(CAtom::Int(fields.len() as i64)))
       }
-      Type::Alias(_) => todo!(),
+      Type::Alias(_) => unreachable!(),
       _ => unreachable!(),
     },
     ExpKind::Prim { op: (_, op), args } => {
-      CTail::Return(CExp::Prim(prim(op, args)))
+      if exp.ty == Type::Void {
+        CTail::Return(CExp::Atom(CAtom::Void))
+      } else {
+        CTail::Return(CExp::Prim(prim(state, op, args)))
+      }
     }
+    ExpKind::Call { .. } => todo!(),
     ExpKind::Let { var, init, body } => {
       let cont = explicate_tail(state, *body);
       explicate_assign(state, var.1, *init, cont)
@@ -254,7 +272,7 @@ fn explicate_assign(
     ExpKind::Prim {
       op: (_, "vector-length"),
       mut args,
-    } => match args.pop().unwrap().ty {
+    } => match state.resolve_type(&args.pop().unwrap().ty) {
       Type::Vector(fields) => {
         let assign = CStmt::Assign {
           var,
@@ -262,14 +280,14 @@ fn explicate_assign(
         };
         CTail::Seq(assign, box cont)
       }
-      Type::Alias(_) => todo!(),
+      Type::Alias(_) => unreachable!(),
       _ => unreachable!(),
     },
     ExpKind::Prim { op: (_, op), args } => {
       if init.ty == Type::Void {
         cont
       } else {
-        let prim = prim(op, args);
+        let prim = prim(state, op, args);
         let assign = CStmt::Assign {
           var,
           exp: CExp::Prim(prim),
@@ -277,6 +295,7 @@ fn explicate_assign(
         CTail::Seq(assign, box cont)
       }
     }
+    ExpKind::Call { .. } => todo!(),
     ExpKind::Let {
       var: (_, var1),
       init: init1,
@@ -349,6 +368,7 @@ fn explicate_pred(
         alt,
       }
     }
+    ExpKind::Call { .. } => todo!(),
     ExpKind::If {
       cond: cond1,
       conseq: conseq1,
@@ -409,19 +429,23 @@ fn explicate_exp_effect(
       let index = args.pop().unwrap();
       let vec = args.pop().unwrap();
       match index.kind {
-        ExpKind::Int(index) => match &vec.ty {
-          Type::Vector(fields) => {
-            let fields_before = fields[..index as usize].to_vec();
-            CTail::Seq(
-              CStmt::VecSet {
-                vec: atom(vec),
-                fields_before,
-                val: atom(val),
-              },
-              box cont,
-            )
+        ExpKind::Int(index) => match state.resolve_type(&vec.ty) {
+          Type::Vector(mut fields) => {
+            if val.ty == Type::Void {
+              cont
+            } else {
+              fields.truncate(index as usize);
+              CTail::Seq(
+                CStmt::VecSet {
+                  vec: atom(vec),
+                  fields_before: fields,
+                  val: atom(val),
+                },
+                box cont,
+              )
+            }
           }
-          Type::Alias(_) => todo!(),
+          Type::Alias(_) => unreachable!(),
           _ => unreachable!(),
         },
         _ => unreachable!(),
@@ -430,6 +454,7 @@ fn explicate_exp_effect(
     ExpKind::Prim { op: _, args } => {
       explicate_effect(state, args.into_iter(), cont)
     }
+    ExpKind::Call { .. } => todo!(),
     ExpKind::Let { var, init, body } => {
       let body = explicate_exp_effect(state, *body, cont);
       explicate_assign(state, var.1, *init, body)
@@ -476,7 +501,7 @@ fn atom(exp: Exp<IdxVar, Type>) -> CAtom {
   }
 }
 
-fn prim(op: &str, mut args: Vec<Exp<IdxVar, Type>>) -> CPrim {
+fn prim(state: &State, op: &str, mut args: Vec<Exp<IdxVar, Type>>) -> CPrim {
   match op {
     "read" => CPrim::Read,
     "-" => {
@@ -517,13 +542,12 @@ fn prim(op: &str, mut args: Vec<Exp<IdxVar, Type>>) -> CPrim {
       let vec = args.pop().unwrap();
       match index.kind {
         ExpKind::Int(index) => {
-          let ty = vec.ty.clone();
-          match ty {
+          match state.resolve_type(&vec.ty) {
             Type::Vector(fields) => CPrim::VecRef {
               vec: atom(vec),
               fields_before: fields[..index as usize].to_vec(),
             },
-            Type::Alias(_) => todo!(),
+            Type::Alias(_) => unreachable!(),
             _ => unreachable!(),
           }
         }

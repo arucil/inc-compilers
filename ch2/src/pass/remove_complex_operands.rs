@@ -52,6 +52,15 @@ fn mon_exp<TYPE: Clone>(
       },
       counter,
     ),
+    ExpKind::Call { name, args } => mon_prim(
+      args,
+      |args| Exp {
+        kind: ExpKind::Call { name, args },
+        range,
+        ty,
+      },
+      counter,
+    ),
     // ch4
     ExpKind::If { cond, conseq, alt } => Exp {
       kind: ExpKind::If {
@@ -149,6 +158,18 @@ fn atom_exp<TYPE: Clone>(
         .collect();
       let exp = Exp {
         kind: ExpKind::Prim { op, args },
+        range: exp.range,
+        ty: exp.ty,
+      };
+      assign_var(exp, tmps, counter)
+    }
+    ExpKind::Call { name, args } => {
+      let args = args
+        .into_iter()
+        .map(|arg| atom_exp(arg, tmps, counter))
+        .collect();
+      let exp = Exp {
+        kind: ExpKind::Call { name, args },
         range: exp.range,
         ty: exp.ty,
       };

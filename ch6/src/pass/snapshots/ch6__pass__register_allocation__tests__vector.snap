@@ -2,9 +2,9 @@
 source: ch6/src/pass/register_allocation.rs
 expression: result.to_string_pretty()
 ---
-locals: {tmp.1: Vector([Void]), tmp.2: Str, y.1: Vector([Int, Bool, Void, Vector([Void]), Str]), tmp.3: Bool, tmp.4: Bool, tmp.5: Int}
+locals: {tmp.1: Vector([Void]), tmp.2: Str, y.1: Vector([Int, Bool, Void, Vector([Void]), Str]), tmp.3: Bool, tmp.4: Bool, tmp.5: Int, tmp.6: Vector([Void])}
 used_callee_saved_regs: {}
-stack_space: 0 bytes
+stack_space: 8 bytes
 rootstack_space: 16 bytes
 constants: {}
 
@@ -29,15 +29,17 @@ start:
     mov qword [r11 + 16], 0
     mov qword [r11 + 24], qword [r15 - 8]
     mov qword [r11 + 32], qword [r15 - 16]
-    mov qword [r15 - 16], r11
-    mov r11, qword [r15 - 16]
-    mov rcx, qword [r11 + 16]
-    mov rcx, rcx
-    xor rcx, 1
-    mov r11, qword [r15 - 16]
-    mov qword [r11 + 16], rcx
-    mov rcx, 5
-    mov r11, qword [r15 - 16]
-    mov qword [r11 + 8], rcx
+    mov rcx, r11
+    mov r11, rcx
+    mov qword [rbp - 8], qword [r11 + 16]
+    mov qword [rbp - 8], qword [rbp - 8]
+    xor qword [rbp - 8], 1
+    mov r11, rcx
+    mov qword [r11 + 16], qword [rbp - 8]
+    mov qword [rbp - 8], 5
+    mov r11, rcx
+    mov qword [r11 + 8], qword [rbp - 8]
+    mov r11, rcx
+    mov rcx, qword [r11 + 24]
     jmp conclusion
 

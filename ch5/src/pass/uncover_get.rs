@@ -4,7 +4,7 @@ use std::collections::HashSet;
 pub fn uncover_get<TYPE>(prog: Program<IdxVar, TYPE>) -> Program<IdxVar, TYPE> {
   Program {
     body: prog.body.into_iter().map(uncover_exp).collect(),
-    types: prog.types,
+    ..prog
   }
 }
 
@@ -75,6 +75,17 @@ fn mark_mutable_vars<TYPE>(
       range: exp.range,
       ty: exp.ty,
     },
+    ExpKind::Call { name, args } => Exp {
+      kind: ExpKind::Call {
+        name,
+        args: args
+          .into_iter()
+          .map(|exp| mark_mutable_vars(exp, set_vars))
+          .collect(),
+      },
+      range: exp.range,
+      ty: exp.ty,
+    },
     ExpKind::Print(args) => Exp {
       kind: ExpKind::Print(
         args
@@ -132,6 +143,11 @@ fn collect_set_vars<TYPE>(
       collect_set_vars(alt, set_vars);
     }
     ExpKind::Prim { args, .. } => {
+      for exp in args {
+        collect_set_vars(exp, set_vars);
+      }
+    }
+    ExpKind::Call { args, .. } => {
       for exp in args {
         collect_set_vars(exp, set_vars);
       }

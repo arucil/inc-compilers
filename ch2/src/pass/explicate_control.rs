@@ -10,7 +10,7 @@ pub struct CInfo {
 
 impl Debug for CInfo {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-    writeln!(f, "locals: {:?}\n", self.locals)
+    write!(f, "locals: {:?}", self.locals)
   }
 }
 
@@ -110,6 +110,11 @@ fn collect_exp_locals<TYPE>(
       collect_exp_locals(&*body, locals);
     }
     ExpKind::Prim { op: _, args } => {
+      for arg in args {
+        collect_exp_locals(arg, locals);
+      }
+    }
+    ExpKind::Call { name: _, args } => {
       for arg in args {
         collect_exp_locals(arg, locals);
       }

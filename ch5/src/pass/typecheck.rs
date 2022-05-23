@@ -5,14 +5,16 @@ use support::CompileError;
 pub type Result<T> = std::result::Result<T, CompileError>;
 
 pub fn typecheck(prog: Program) -> Result<Program<String, Type>> {
-  let mut checker = TypeChecker::new();
+  let mut checker = TypeChecker::new(&prog.defs)?;
+  let last = prog.body.len() - 1;
   let body = prog
     .body
     .into_iter()
-    .map(|exp| {
+    .enumerate()
+    .map(|(i, exp)| {
       let range = exp.range;
       let exp = checker.typecheck(exp)?;
-      if exp.ty != Type::Void {
+      if i == last && exp.ty != Type::Void {
         return Err(CompileError {
           range,
           message: format!("expected Void, found {:?}", exp.ty),
@@ -22,6 +24,7 @@ pub fn typecheck(prog: Program) -> Result<Program<String, Type>> {
     })
     .collect::<Result<_>>()?;
   Ok(Program {
+    defs: prog.defs,
     body,
     types: checker.types,
   })

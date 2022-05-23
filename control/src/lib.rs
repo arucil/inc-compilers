@@ -97,7 +97,20 @@ pub enum CAtom {
 impl<INFO: Debug> CProgram<INFO> {
   #[allow(unused)]
   pub fn to_string_pretty(&self) -> String {
-    let mut buf = format!("{:?}", self.info);
+    let mut buf = format!("{:?}\n", self.info);
+    if self.types.len() != 0 {
+      write!(&mut buf, "types: ");
+      let mut comma = false;
+      for (id, ty) in &self.types {
+        if comma {
+          write!(&mut buf, ", ");
+        }
+        comma = true;
+        write!(&mut buf, "{} => {:?}", id.index(), ty);
+      }
+      writeln!(&mut buf);
+    }
+    writeln!(&mut buf);
     for (label, block) in &self.body {
       writeln!(&mut buf, "{:?}:", label).unwrap();
       writeln!(&mut buf, "{:?}", block).unwrap();

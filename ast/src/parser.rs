@@ -225,7 +225,11 @@ fn build_prog(input: &str, cst: Vec<Cst>) -> Result<Program> {
         } else {
           unreachable!()
         }
+      } else {
+        break;
       }
+    } else {
+      break;
     }
   }
   Ok(Program {
@@ -279,9 +283,16 @@ fn build_exp(input: &str, cst: Cst) -> Result<Exp> {
                 ty: (),
               })
             } else {
-              Err(CompileError {
+              let name = (sym_range, op.to_owned());
+              let args = xs
+                .into_iter()
+                .skip(1)
+                .map(|c| build_exp(input, c))
+                .collect::<Result<_>>()?;
+              Ok(Exp {
+                kind: ExpKind::Call { name, args },
                 range,
-                message: "unrecognized form".to_owned(),
+                ty: (),
               })
             }
           }
@@ -359,7 +370,7 @@ fn build_struct_def(
             "Int" => TypeDef::Int,
             "Str" => TypeDef::Str,
             "Void" => TypeDef::Void,
-            name => TypeDef::Alias(name.to_owned()),
+            name => TypeDef::Alias(*type_range, name.to_owned()),
           };
           if fields.insert(name, ty).is_some() {
             return Err(CompileError {
