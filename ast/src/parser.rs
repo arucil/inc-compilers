@@ -269,6 +269,7 @@ fn build_exp(input: &str, cst: Cst) -> Result<Exp> {
               "vector-length",
               "vector-ref",
               "vector-set!",
+              "make-vector",
             ];
             if let Some(&op) = OPERATORS.iter().find(|&&s| s == op) {
               let op = (sym_range, op);

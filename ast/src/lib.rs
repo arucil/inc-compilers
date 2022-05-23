@@ -88,6 +88,7 @@ pub enum Type {
   Bool,
   Str,
   Vector(Vec<Type>),
+  Array(Box<Type>),
   Alias(TypeId),
   Void,
 }
