@@ -128,6 +128,14 @@ where
           self.code.push(Instr::Jmp(alt));
           return;
         }
+        // ch6
+        CTail::Exit(code) => {
+          self.atom_instructions(Arg::Reg(Reg::Rdi), code);
+          let label = "rt_exit".to_owned();
+          self.externs.insert(label.clone());
+          self.code.push(Instr::Call { label, arity: 1 });
+          return;
+        }
       }
     }
   }
@@ -164,18 +172,72 @@ where
         self.externs.insert(label.clone());
         self.code.push(Instr::Call { label, arity: 0 })
       }
-      CStmt::VecSet {
-        vec,
+      CStmt::TupSet {
+        tup,
         fields_before,
         val,
       } => {
-        let vec = atom_to_arg(vec);
+        let tup = atom_to_arg(tup);
         self.code.push(Instr::Mov {
-          src: vec,
+          src: tup,
           dest: Arg::Reg(Reg::R11),
         });
         let offset = self.calc_field_offset(&fields_before);
         self.atom_instructions(Arg::Deref(Reg::R11, offset), val);
+      }
+      CStmt::CheckBounds { vec, index } => {
+        let vec = atom_to_arg(vec);
+        let index = atom_to_arg(index);
+
+        let label = "rt_check_array_bounds".to_owned();
+        self.externs.insert(label.clone());
+        self.code.push(Instr::Mov {
+          src: vec,
+          dest: Arg::Reg(Reg::Rdi),
+        });
+        self.code.push(Instr::Mov {
+          src: index,
+          dest: Arg::Reg(Reg::Rsi),
+        });
+        self.code.push(Instr::Call { label, arity: 2 });
+      }
+      CStmt::ArrSet { vec, index, val } => {
+        let vec = atom_to_arg(vec);
+        let index = atom_to_arg(index);
+
+        let label = "rt_check_array_bounds".to_owned();
+        self.externs.insert(label.clone());
+        self.code.push(Instr::Mov {
+          src: vec.clone(),
+          dest: Arg::Reg(Reg::Rdi),
+        });
+        self.code.push(Instr::Mov {
+          src: index.clone(),
+          dest: Arg::Reg(Reg::Rsi),
+        });
+        self.code.push(Instr::Call { label, arity: 2 });
+
+        self.code.push(Instr::Mov {
+          src: index,
+          dest: Arg::Reg(Reg::R11),
+        });
+        self.code.push(Instr::Add {
+          src: Arg::Imm(1),
+          dest: Arg::Reg(Reg::R11),
+        });
+        self.code.push(Instr::Shl {
+          src: Arg::Reg(Reg::R11),
+          count: Arg::Imm(3),
+        });
+        self.code.push(Instr::Add {
+          src: vec,
+          dest: Arg::Reg(Reg::R11),
+        });
+        let val = atom_to_arg(val);
+        self.code.push(Instr::Mov {
+          src: val,
+          dest: Arg::Deref(Reg::R11, 0),
+        });
       }
     }
   }
@@ -243,7 +305,7 @@ where
         });
       }
       // ch6
-      CPrim::Vector(fields) => {
+      CPrim::Tuple(fields) => {
         let mut size = 8;
         let mut non_unit_fields = fields.len() as i64;
         let mut ptr_mask = 0i64;
@@ -258,7 +320,7 @@ where
             }
             Type::Int => size += 8,
             Type::Bool => size += 8,
-            Type::Str | Type::Vector(_) => {
+            Type::Str | Type::Tuple(_) | Type::Array(_) => {
               size += 8;
               ptr_mask |= 1 << i;
             }
@@ -296,15 +358,123 @@ where
           dest: target,
         })
       }
-      CPrim::VecRef { vec, fields_before } => {
-        self.atom_instructions(Arg::Reg(Reg::R11), vec);
+      CPrim::MakeArr { len, val, ty } => {
+        let len = atom_to_arg(len);
+
+        let width = self.type_size(&ty);
+        match width {
+          0 => {
+            self.code.push(Instr::Mov {
+              src: Arg::Imm(8),
+              dest: Arg::Reg(Reg::Rdi),
+            });
+          }
+          8 => {
+            self.code.push(Instr::Mov {
+              src: len.clone(),
+              dest: Arg::Reg(Reg::Rdi),
+            });
+            let label = "rt_check_array_length".to_owned();
+            self.externs.insert(label.clone());
+            self.code.push(Instr::Call { label, arity: 1 });
+
+            self.code.push(Instr::Mov {
+              src: len,
+              dest: Arg::Reg(Reg::Rdi),
+            });
+            self.code.push(Instr::Add {
+              src: Arg::Imm(1),
+              dest: Arg::Reg(Reg::Rdi),
+            });
+            self.code.push(Instr::Shl {
+              src: Arg::Reg(Reg::Rdi),
+              count: Arg::Imm(3),
+            });
+          }
+          _ => unreachable!(),
+        }
+        self.code.push(Instr::Mov {
+          src: Arg::Reg(Reg::R15),
+          dest: Arg::Reg(Reg::Rsi),
+        });
+        let label = "rt_allocate".to_owned();
+        self.externs.insert(label.clone());
+        self.code.push(Instr::Call { label, arity: 2 });
+
+        match width {
+          0 => {
+            self.code.push(Instr::Mov {
+              src: Arg::Reg(Reg::Rax),
+              dest: target,
+            });
+          }
+          8 => {
+            let val = atom_to_arg(val);
+            self.code.push(Instr::Mov {
+              src: Arg::Reg(Reg::Rax),
+              dest: Arg::Reg(Reg::Rdi),
+            });
+            self.code.push(Instr::Mov {
+              src: val,
+              dest: Arg::Reg(Reg::Rsi),
+            });
+            let label = "rt_fill_array".to_owned();
+            self.externs.insert(label.clone());
+            self.code.push(Instr::Call { label, arity: 2 });
+            self.code.push(Instr::Mov {
+              src: Arg::Reg(Reg::Rax),
+              dest: target,
+            });
+          }
+          _ => unreachable!(),
+        }
+      }
+      CPrim::TupRef { tup, fields_before } => {
+        self.atom_instructions(Arg::Reg(Reg::R11), tup);
         let offset = self.calc_field_offset(&fields_before);
         self.code.push(Instr::Mov {
           src: Arg::Deref(Reg::R11, offset),
           dest: target,
         });
       }
-      CPrim::VecLen(arg) => {
+      CPrim::ArrRef { vec, index } => {
+        let vec = atom_to_arg(vec);
+        let index = atom_to_arg(index);
+
+        let label = "rt_check_array_bounds".to_owned();
+        self.externs.insert(label.clone());
+        self.code.push(Instr::Mov {
+          src: vec.clone(),
+          dest: Arg::Reg(Reg::Rdi),
+        });
+        self.code.push(Instr::Mov {
+          src: index.clone(),
+          dest: Arg::Reg(Reg::Rsi),
+        });
+        self.code.push(Instr::Call { label, arity: 2 });
+
+        self.code.push(Instr::Mov {
+          src: index,
+          dest: Arg::Reg(Reg::R11),
+        });
+        self.code.push(Instr::Add {
+          src: Arg::Imm(1),
+          dest: Arg::Reg(Reg::R11),
+        });
+        self.code.push(Instr::Shl {
+          src: Arg::Reg(Reg::R11),
+          count: Arg::Imm(3),
+        });
+        self.code.push(Instr::Add {
+          src: vec,
+          dest: Arg::Reg(Reg::R11),
+        });
+        self.code.push(Instr::Mov {
+          src: Arg::Deref(Reg::R11, 0),
+          dest: target,
+        });
+      }
+      CPrim::TupLen(arg) => {
         self.atom_instructions(Arg::Reg(Reg::R11), arg);
         self.code.push(Instr::Mov {
           src: Arg::Deref(Reg::R11, 0),
@@ -317,6 +487,17 @@ where
         self.code.push(Instr::And {
           src: Arg::Imm(0b111111),
           dest: target,
+        });
+      }
+      CPrim::ArrLen(arg) => {
+        self.atom_instructions(Arg::Reg(Reg::R11), arg);
+        self.code.push(Instr::Mov {
+          src: Arg::Deref(Reg::R11, 0),
+          dest: target.clone(),
+        });
+        self.code.push(Instr::Shr {
+          src: target,
+          count: Arg::Imm(4),
         });
       }
     }
@@ -369,16 +550,21 @@ where
   fn calc_field_offset(&mut self, fields_before: &[Type]) -> i32 {
     let mut offset = 8;
     for field in fields_before {
-      offset += match (self.resolve_type)(field) {
-        Type::Void => 0,
-        Type::Int => 8,
-        Type::Bool => 8,
-        Type::Str => 8,
-        Type::Vector(_) => 8,
-        Type::Alias(_) => unreachable!(),
-      };
+      offset += self.type_size(field);
     }
     offset
+  }
+
+  fn type_size(&mut self, ty: &Type) -> i32 {
+    match (self.resolve_type)(ty) {
+      Type::Void => 0,
+      Type::Int => 8,
+      Type::Bool => 8,
+      Type::Str => 8,
+      Type::Tuple(_) => 8,
+      Type::Array(_) => 8,
+      Type::Alias(_) => unreachable!(),
+    }
   }
 }
 

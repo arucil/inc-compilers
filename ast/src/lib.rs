@@ -87,7 +87,7 @@ pub enum Type {
   Int,
   Bool,
   Str,
-  Vector(Vec<Type>),
+  Tuple(Vec<Type>),
   Array(Box<Type>),
   Alias(TypeId),
   Void,
@@ -256,17 +256,10 @@ impl<VAR: Debug, TYPE: Debug> Exp<VAR, TYPE> {
 }
 
 impl Type {
-  pub fn to_vector<'a>(&'a self, types: &'a Arena<Type>) -> Option<&[Type]> {
-    match self {
-      Self::Vector(types) => Some(types),
-      Self::Alias(id) => types.get(*id).unwrap().to_vector(types),
-      _ => None,
-    }
-  }
-
   pub fn is_ref(&self, types: &Arena<Type>) -> bool {
     match self {
-      Self::Vector(_) => true,
+      Self::Tuple(_) => true,
+      Self::Array(_) => true,
       Self::Str => true,
       Self::Alias(id) => types[*id].is_ref(types),
       _ => false,

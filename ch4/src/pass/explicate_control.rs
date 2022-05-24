@@ -1,10 +1,10 @@
 use asm::Label;
 use ast::{Exp, ExpKind, IdxVar, Program, Type};
 use control::{CAtom, CCmpOp, CExp, CPrim, CProgram, CStmt, CTail};
+use id_arena::Arena;
 use indexmap::IndexMap;
 use std::collections::VecDeque;
 use std::fmt::{self, Debug, Formatter};
-use id_arena::Arena;
 
 pub struct CInfo {
   pub locals: IndexMap<IdxVar, Type>,
@@ -200,15 +200,35 @@ fn explicate_tail(state: &mut State, exp: Exp<IdxVar, Type>) -> CTail {
     }
     // TODO this should be removed in chapter 9
     ExpKind::Prim {
-      op: (_, "vector-length"),
+      op: (_, op @ "vector-length"),
       mut args,
     } => match state.resolve_type(&args.pop().unwrap().ty) {
-      Type::Vector(fields) => {
+      Type::Tuple(fields) => {
         CTail::Return(CExp::Atom(CAtom::Int(fields.len() as i64)))
       }
-      Type::Alias(_) => unreachable!(),
+      Type::Array(_) => CTail::Return(CExp::Prim(prim(state, op, args))),
       _ => unreachable!(),
     },
+    ExpKind::Prim {
+      op: (_, "vector-ref"),
+      mut args,
+    } if matches!(state.resolve_type(&args[0].ty), Type::Array(_))
+      && exp.ty == Type::Void =>
+    {
+      let index = args.pop().unwrap();
+      let vec = args.pop().unwrap();
+      CTail::Seq(
+        CStmt::CheckBounds {
+          vec: atom(vec),
+          index: atom(index),
+        },
+        box CTail::Return(CExp::Atom(CAtom::Void)),
+      )
+    }
+    ExpKind::Prim {
+      op: (_, "exit"),
+      mut args,
+    } => CTail::Exit(atom(args.pop().unwrap())),
     ExpKind::Prim { op: (_, op), args } => {
       if exp.ty == Type::Void {
         CTail::Return(CExp::Atom(CAtom::Void))
@@ -269,20 +289,44 @@ fn explicate_assign(
       op: (_, "vector-set!"),
       ..
     } => explicate_exp_effect(state, init, cont),
+    // TODO this should be removed in chapter 9
     ExpKind::Prim {
-      op: (_, "vector-length"),
+      op: (_, op @ "vector-length"),
       mut args,
     } => match state.resolve_type(&args.pop().unwrap().ty) {
-      Type::Vector(fields) => {
+      Type::Tuple(fields) => {
         let assign = CStmt::Assign {
           var,
           exp: CExp::Atom(CAtom::Int(fields.len() as i64)),
         };
         CTail::Seq(assign, box cont)
       }
-      Type::Alias(_) => unreachable!(),
+      Type::Array(_) => {
+        let prim = prim(state, op, args);
+        let assign = CStmt::Assign {
+          var,
+          exp: CExp::Prim(prim),
+        };
+        CTail::Seq(assign, box cont)
+      }
       _ => unreachable!(),
     },
+    ExpKind::Prim {
+      op: (_, "vector-ref"),
+      mut args,
+    } if matches!(state.resolve_type(&args[0].ty), Type::Array(_))
+      && init.ty == Type::Void =>
+    {
+      let index = args.pop().unwrap();
+      let vec = args.pop().unwrap();
+      CTail::Seq(
+        CStmt::CheckBounds {
+          vec: atom(vec),
+          index: atom(index),
+        },
+        box cont,
+      )
+    }
     ExpKind::Prim { op: (_, op), args } => {
       if init.ty == Type::Void {
         cont
@@ -428,16 +472,16 @@ fn explicate_exp_effect(
       let val = args.pop().unwrap();
       let index = args.pop().unwrap();
       let vec = args.pop().unwrap();
-      match index.kind {
-        ExpKind::Int(index) => match state.resolve_type(&vec.ty) {
-          Type::Vector(mut fields) => {
+      match state.resolve_type(&vec.ty) {
+        Type::Tuple(mut fields) => match index.kind {
+          ExpKind::Int(index) => {
             if val.ty == Type::Void {
               cont
             } else {
               fields.truncate(index as usize);
               CTail::Seq(
-                CStmt::VecSet {
-                  vec: atom(vec),
+                CStmt::TupSet {
+                  tup: atom(vec),
                   fields_before: fields,
                   val: atom(val),
                 },
@@ -445,11 +489,45 @@ fn explicate_exp_effect(
               )
             }
           }
-          Type::Alias(_) => unreachable!(),
           _ => unreachable!(),
         },
+        Type::Array(_) => {
+          if val.ty == Type::Void {
+            CTail::Seq(
+              CStmt::CheckBounds {
+                vec: atom(vec),
+                index: atom(index),
+              },
+              box cont,
+            )
+          } else {
+            CTail::Seq(
+              CStmt::ArrSet {
+                vec: atom(vec),
+                index: atom(index),
+                val: atom(val),
+              },
+              box cont,
+            )
+          }
+        }
+        Type::Alias(_) => unreachable!(),
         _ => unreachable!(),
       }
+    }
+    ExpKind::Prim {
+      op: (_, "vector-ref"),
+      mut args,
+    } => {
+      let index = args.pop().unwrap();
+      let vec = args.pop().unwrap();
+      CTail::Seq(
+        CStmt::CheckBounds {
+          vec: atom(vec),
+          index: atom(index),
+        },
+        box cont,
+      )
     }
     ExpKind::Prim { op: _, args } => {
       explicate_effect(state, args.into_iter(), cont)
@@ -528,7 +606,17 @@ fn prim(state: &State, op: &str, mut args: Vec<Exp<IdxVar, Type>>) -> CPrim {
       let arg1 = args.pop().unwrap();
       CPrim::Cmp(op.parse().unwrap(), atom(arg1), atom(arg2))
     }
-    "vector" => CPrim::Vector(
+    "make-vector" => {
+      let val = args.pop().unwrap();
+      let ty = val.ty.clone();
+      let len = args.pop().unwrap();
+      CPrim::MakeArr {
+        len: atom(len),
+        val: atom(val),
+        ty,
+      }
+    }
+    "vector" => CPrim::Tuple(
       args
         .into_iter()
         .map(|arg| {
@@ -540,15 +628,19 @@ fn prim(state: &State, op: &str, mut args: Vec<Exp<IdxVar, Type>>) -> CPrim {
     "vector-ref" => {
       let index = args.pop().unwrap();
       let vec = args.pop().unwrap();
-      match index.kind {
-        ExpKind::Int(index) => {
-          match state.resolve_type(&vec.ty) {
-            Type::Vector(fields) => CPrim::VecRef {
-              vec: atom(vec),
-              fields_before: fields[..index as usize].to_vec(),
-            },
-            Type::Alias(_) => unreachable!(),
-            _ => unreachable!(),
+      match state.resolve_type(&vec.ty) {
+        Type::Tuple(fields) => match index.kind {
+          ExpKind::Int(index) => CPrim::TupRef {
+            tup: atom(vec),
+            fields_before: fields[..index as usize].to_vec(),
+          },
+          _ => unreachable!(),
+        },
+        Type::Array(ty) => {
+          assert_ne!(*ty, Type::Void);
+          CPrim::ArrRef {
+            vec: atom(vec),
+            index: atom(index),
           }
         }
         _ => unreachable!(),
@@ -556,7 +648,11 @@ fn prim(state: &State, op: &str, mut args: Vec<Exp<IdxVar, Type>>) -> CPrim {
     }
     "vector-length" => {
       let arg = args.pop().unwrap();
-      CPrim::VecLen(atom(arg))
+      match state.resolve_type(&arg.ty) {
+        Type::Tuple(_) => CPrim::TupLen(atom(arg)),
+        Type::Array(_) => CPrim::ArrLen(atom(arg)),
+        _ => unreachable!(),
+      }
     }
     _ => unreachable!("{}", op),
   }

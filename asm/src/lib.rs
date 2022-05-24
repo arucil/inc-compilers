@@ -74,6 +74,10 @@ pub enum Instr<VAR = !> {
     src: Arg<VAR>,
     count: Arg<VAR>,
   },
+  Shl {
+    src: Arg<VAR>,
+    count: Arg<VAR>,
+  },
   And {
     src: Arg<VAR>,
     dest: Arg<VAR>,
@@ -241,6 +245,7 @@ impl<VAR: Debug> Debug for Instr<VAR> {
       Self::SetIf { cmp, dest } => write!(f, "set{:?} {:?}", cmp, dest),
       Self::JumpIf { cmp, label } => write!(f, "j{:?} {:?}", cmp, label),
       Self::Shr { src, count } => write!(f, "shr {:?}, {:?}", src, count),
+      Self::Shl { src, count } => write!(f, "shl {:?}, {:?}", src, count),
       Self::And { src, dest } => write!(f, "and {:?}, {:?}", dest, src),
     }
   }

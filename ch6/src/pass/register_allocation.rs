@@ -236,13 +236,13 @@ start:
     let prog = Program {
       info: OldOldInfo {
         locals: indexmap! {
-          IdxVar::new("tmp.1") => Type::Vector(vec![Type::Void]),
+          IdxVar::new("tmp.1") => Type::Tuple(vec![Type::Void]),
           IdxVar::new("tmp.2") => Type::Str,
-          IdxVar::new("y.1") => Type::Vector(vec![Type::Int, Type::Bool, Type::Void, Type::Vector(vec![Type::Void]), Type::Str]),
+          IdxVar::new("y.1") => Type::Tuple(vec![Type::Int, Type::Bool, Type::Void, Type::Tuple(vec![Type::Void]), Type::Str]),
           IdxVar::new("tmp.3") => Type::Bool,
           IdxVar::new("tmp.4") => Type::Bool,
           IdxVar::new("tmp.5") => Type::Int,
-          IdxVar::new("tmp.6") => Type::Vector(vec![Type::Void]),
+          IdxVar::new("tmp.6") => Type::Tuple(vec![Type::Void]),
         },
       },
       constants: Default::default(),
@@ -303,9 +303,9 @@ start:
     let prog = Program {
       info: OldOldInfo {
         locals: indexmap! {
-          IdxVar::new("tmp.1") => Type::Vector(vec![Type::Void]),
+          IdxVar::new("tmp.1") => Type::Tuple(vec![Type::Void]),
           IdxVar::new("tmp.2") => Type::Str,
-          IdxVar::new("y.1") => Type::Vector(vec![Type::Int, Type::Bool, Type::Void, Type::Vector(vec![Type::Void]), Type::Str]),
+          IdxVar::new("y.1") => Type::Tuple(vec![Type::Int, Type::Bool, Type::Void, Type::Tuple(vec![Type::Void]), Type::Str]),
           IdxVar::new("tmp.3") => Type::Bool,
           IdxVar::new("tmp.4") => Type::Bool,
           IdxVar::new("tmp.5") => Type::Int,
@@ -369,9 +369,9 @@ start:
     let prog = Program {
       info: OldOldInfo {
         locals: indexmap! {
-          IdxVar::new("tmp.1") => Type::Vector(vec![Type::Void]),
+          IdxVar::new("tmp.1") => Type::Tuple(vec![Type::Void]),
           IdxVar::new("tmp.2") => Type::Str,
-          IdxVar::new("y.1") => Type::Vector(vec![Type::Int, Type::Bool, Type::Void, Type::Vector(vec![Type::Void]), Type::Str]),
+          IdxVar::new("y.1") => Type::Tuple(vec![Type::Int, Type::Bool, Type::Void, Type::Tuple(vec![Type::Void]), Type::Str]),
           IdxVar::new("tmp.3") => Type::Bool,
           IdxVar::new("tmp.4") => Type::Bool,
           IdxVar::new("tmp.5") => Type::Int,

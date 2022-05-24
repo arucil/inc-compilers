@@ -11,7 +11,7 @@
   {                                                                        \
     static const char *msg = __FILE__ ":" STR(__LINE__) ":" STR(MSG) "\n"; \
     write(1, msg, sizeof(msg) - 1);                                        \
-    exit(1);                                                               \
+    rt_exit(1);                                                               \
   } while (0)
 #define RT_FATAL_CODE(MSG, CODE)                                      \
   do                                                                  \
@@ -20,14 +20,14 @@
     write(1, msg, sizeof(msg) - 1);                                   \
     rt_print_int(CODE);                                               \
     rt_print_newline();                                               \
-    exit(1);                                                          \
+    rt_exit(1);                                                          \
   } while (0)
 
 typedef unsigned long uint64_t;
 typedef long int64_t;
 typedef long ptrdiff_t;
 
-static void exit(uint64_t code) __attribute__((noreturn));
+void rt_exit(uint64_t code) __attribute__((noreturn));
 
 static __attribute__((naked)) uint64_t syscall5(
     uint64_t number,
@@ -55,7 +55,7 @@ static __attribute__((naked)) uint64_t syscall5(
       "ret");
 }
 
-static void exit(uint64_t code)
+void rt_exit(uint64_t code)
 {
   syscall5(60, code, 0, 0, 0, 0);
   __builtin_unreachable();
@@ -243,19 +243,19 @@ void *rt_initialize(uint64_t rootstack_size, uint64_t heap_size)
 
 #define VISITED(tag) (((tag)&1) == 0)
 #define TYPE(tag) (((tag) >> 1) & 3)
-#define TYPE_VECTOR (0)
+#define TYPE_TUPLE (0)
 #define TYPE_STRING (1)
-#define TYPE_ARRAY  (2)
+#define TYPE_ARRAY (2)
 
-#define MAKE_VECTOR_TAG(num_fields, ptr_mask) ((ptr_mask) << 9 | (num_fields) << 3 | 0b001)
-#define VECTOR_NUM_FIELDS(tag) (((tag) >> 3) & 0b111111)
-#define VECTOR_PTR_MASK(tag) ((tag) >> 9)
+#define MAKE_TUPLE_TAG(num_fields, ptr_mask) ((ptr_mask) << 9 | (num_fields) << 3 | 0b001)
+#define TUPLE_NUM_FIELDS(tag) (((tag) >> 3) & 0b111111)
+#define TUPLE_PTR_MASK(tag) ((tag) >> 9)
 
 #define MAKE_STRING_TAG(len) ((len) << 3 | 0b011)
 #define STRING_LEN_ALIGNED(tag) ((((tag) >> 3) + 7) & ~7)
 
 #define MAKE_ARRAY_TAG(ptr_mask, len) ((len) << 4 | ptr_mask << 3 | 0b101)
-#define ARRAY_LEN(tag) ((tag) >> 4) 
+#define ARRAY_LEN(tag) ((tag) >> 4)
 #define ARRAY_PTR_MASK(tag) ((tag) >> 3 & 1)
 
 void rt_collect(uint64_t *rootstack_ptr)
@@ -271,11 +271,14 @@ void rt_collect(uint64_t *rootstack_ptr)
     uint64_t len;                           \
     switch (type)                           \
     {                                       \
-    case TYPE_VECTOR:                       \
-      len = VECTOR_NUM_FIELDS(tag);         \
+    case TYPE_TUPLE:                        \
+      len = TUPLE_NUM_FIELDS(tag);          \
       break;                                \
     case TYPE_STRING:                       \
       len = STRING_LEN_ALIGNED(tag) >> 3;   \
+      break;                                \
+    case TYPE_ARRAY:                        \
+      len = ARRAY_LEN(tag);                 \
       break;                                \
     default:                                \
       RT_FATAL_CODE("invalid type ", type); \
@@ -303,9 +306,10 @@ void rt_collect(uint64_t *rootstack_ptr)
     uint64_t type = TYPE(tag);
     switch (type)
     {
-    case TYPE_VECTOR:
-      uint64_t ptr_mask = VECTOR_PTR_MASK(tag);
-      for (uint64_t n = VECTOR_NUM_FIELDS(tag); n > 0; n--)
+    case TYPE_TUPLE:
+    {
+      uint64_t ptr_mask = TUPLE_PTR_MASK(tag);
+      for (uint64_t n = TUPLE_NUM_FIELDS(tag); n > 0; n--)
       {
         if (ptr_mask & 1)
         {
@@ -325,9 +329,36 @@ void rt_collect(uint64_t *rootstack_ptr)
         scanp++;
       }
       break;
+    }
     case TYPE_STRING:
       scanp += STRING_LEN_ALIGNED(tag) >> 3;
       break;
+    case TYPE_ARRAY:
+    {
+      if (ARRAY_PTR_MASK(tag))
+      {
+        for (uint64_t n = ARRAY_LEN(tag); n > 0; n--)
+        {
+          uint64_t *old_objp = (uint64_t *)*scanp;
+          uint64_t old_tag = *old_objp;
+          if (VISITED(old_tag))
+          {
+            *scanp = old_tag; // forward pointer
+          }
+          else
+          {
+            *scanp = (uint64_t)freep;
+            COPY_OBJECT;
+          }
+          scanp++;
+        }
+      }
+      else
+      {
+        scanp += ARRAY_LEN(tag);
+      }
+      break;
+    }
     default:
       RT_FATAL_CODE("invalid type ", type);
     }
@@ -373,10 +404,10 @@ static void extend_heap(uint64_t size, uint64_t *rootstack_ptr)
     uint64_t type = TYPE(tag);
     switch (type)
     {
-    case TYPE_VECTOR:
+    case TYPE_TUPLE:
     {
-      uint64_t ptr_mask = VECTOR_PTR_MASK(tag);
-      for (uint64_t n = VECTOR_NUM_FIELDS(tag); n > 0; n--)
+      uint64_t ptr_mask = TUPLE_PTR_MASK(tag);
+      for (uint64_t n = TUPLE_NUM_FIELDS(tag); n > 0; n--)
       {
         if (ptr_mask & 1)
         {
@@ -396,6 +427,25 @@ static void extend_heap(uint64_t size, uint64_t *rootstack_ptr)
       for (uint64_t i = 0; i < len; i++)
       {
         *to_ptr++ = *ptr++;
+      }
+      break;
+    }
+    case TYPE_ARRAY:
+    {
+      uint64_t len = ARRAY_LEN(tag);
+      if (ARRAY_PTR_MASK(tag))
+      {
+        for (uint64_t i = 0; i < len; i++)
+        {
+          *to_ptr++ = (uint64_t)((void *)(*ptr++) + ptr_diff);
+        }
+      }
+      else
+      {
+        for (uint64_t i = 0; i < len; i++)
+        {
+          *to_ptr++ = *ptr++;
+        }
       }
       break;
     }
@@ -467,7 +517,7 @@ uint64_t rt_heap_size()
 //       write(1, ", to_space_begin: ", 18);
 //       rt_print_int((uint64_t)to_space_begin);
 //       rt_print_newline();
-//       exit(1);
+//       rt_exit(1);
 //     }
 //   }
 //   for (uint64_t *p = from_space_begin; (void *)p < from_space_ptr;)
@@ -478,8 +528,8 @@ uint64_t rt_heap_size()
 //     {
 //     case TYPE_VECTOR:
 //     {
-//       uint64_t ptr_mask = VECTOR_PTR_MASK(tag);
-//       for (uint64_t n = VECTOR_NUM_FIELDS(tag); n > 0; n--)
+//       uint64_t ptr_mask = TUPLE_PTR_MASK(tag);
+//       for (uint64_t n = TUPLE_NUM_FIELDS(tag); n > 0; n--)
 //       {
 //         if (ptr_mask & 1)
 //         {
@@ -508,7 +558,7 @@ uint64_t rt_heap_size()
 //         }
 //         rt_print_newline();
 //       }
-//       exit(1);
+//       rt_exit(1);
 //     }
 //         }
 //         p++;
@@ -609,4 +659,12 @@ void *rt_new_string(uint64_t len, const char *chars, uint64_t *rootstack_ptr)
     }
   }
   return s;
+}
+
+void *rt_fill_array(uint64_t *ptr, uint64_t init)
+{
+  for (uint64_t i = ARRAY_LEN(*ptr); i > 0; i--) {
+    ptr[i] = init;
+  }
+  return ptr;
 }

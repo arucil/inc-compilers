@@ -32,7 +32,7 @@ mod tests {
     let prog = Program {
       info: OldOldInfo {
         locals: indexmap! {
-          IdxVar::new("x") => Type::Vector(vec![Type::Int]),
+          IdxVar::new("x") => Type::Tuple(vec![Type::Int]),
           IdxVar::new("w") => Type::Int,
         },
       },

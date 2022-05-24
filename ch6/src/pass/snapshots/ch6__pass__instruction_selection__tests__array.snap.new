@@ -1,0 +1,71 @@
+---
+source: ch6/src/pass/instruction_selection.rs
+assertion_line: 68
+expression: result.to_string_pretty()
+---
+locals: {x.0: Array(Bool), y.1: Array(Int), z.2: Array(Array(Bool)), t.3: Array(Void), tmp.0: Int}
+
+constants: {}
+
+start:
+    mov rdi, 3
+    call rt_check_array_length
+    mov rdi, 3
+    add rdi, 1
+    shl rdi, 3
+    mov rsi, r15
+    call rt_allocate
+    mov rdi, rax
+    mov rsi, 1
+    call rt_fill_array
+    mov x.0, rax
+    mov rdi, 0
+    call rt_check_array_length
+    mov rdi, 0
+    add rdi, 1
+    shl rdi, 3
+    mov rsi, r15
+    call rt_allocate
+    mov rdi, rax
+    mov rsi, 2
+    call rt_fill_array
+    mov y.1, rax
+    mov rdi, 2
+    call rt_check_array_length
+    mov rdi, 2
+    add rdi, 1
+    shl rdi, 3
+    mov rsi, r15
+    call rt_allocate
+    mov rdi, rax
+    mov rsi, x.0
+    call rt_fill_array
+    mov z.2, rax
+    mov rdi, 8
+    mov rsi, r15
+    call rt_allocate
+    mov t.3, rax
+    mov rdi, x.0
+    mov rsi, 1
+    call rt_check_array_bounds
+    mov r11, 1
+    add r11, 1
+    shl r11, 3
+    add r11, x.0
+    mov qword [r11], 0
+    mov rdi, t.3
+    mov rsi, 3
+    call rt_check_array_bounds
+    mov rdi, y.1
+    mov rsi, 0
+    call rt_check_array_bounds
+    mov r11, 0
+    add r11, 1
+    shl r11, 3
+    add r11, y.1
+    mov tmp.0, qword [r11]
+    mov rdi, t.3
+    mov rsi, tmp.0
+    call rt_check_array_bounds
+    jmp conclusion
+

@@ -48,4 +48,27 @@ mod tests {
     let result = explicate_control::explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
   }
+
+  #[test]
+  fn array() {
+    let prog = ast::parse(
+      r#"
+(let ([x (make-vector 3 #t)]
+      [y (make-vector 0 2)]
+      [z (make-vector 2 x)]
+      [t (make-vector 10 (void))]
+      [u (void)])
+  (vector-set! x 1 #f)
+  (vector-set! t 3 (void))
+  (set! u (vector-ref t (vector-ref y 0))))
+      "#,
+    )
+    .unwrap();
+    let prog = typecheck::typecheck(prog).unwrap();
+    let prog = shrink::shrink(prog);
+    let prog = uniquify::uniquify(prog);
+    let prog = remove_complex_operands::remove_complex_operands(prog);
+    let result = explicate_control::explicate_control(prog);
+    assert_snapshot!(result.to_string_pretty());
+  }
 }

@@ -26,6 +26,7 @@ pub struct CParam {
 pub enum CTail {
   Seq(CStmt, Box<CTail>),
   Return(CExp),
+  Exit(CAtom),
   Goto(Label),
   If {
     cmp: CCmpOp,
@@ -47,8 +48,17 @@ pub enum CStmt {
   PrintStr(CAtom),
   NewLine,
   Read,
-  VecSet {
+  CheckBounds {
     vec: CAtom,
+    index: CAtom,
+  },
+  ArrSet {
+    vec: CAtom,
+    index: CAtom,
+    val: CAtom,
+  },
+  TupSet {
+    tup: CAtom,
     fields_before: Vec<Type>,
     val: CAtom,
   },
@@ -68,12 +78,22 @@ pub enum CPrim {
   Sub(CAtom, CAtom),
   Not(CAtom),
   Cmp(CCmpOp, CAtom, CAtom),
-  Vector(Vec<(CAtom, Type)>),
-  VecRef {
+  MakeArr {
+    len: CAtom,
+    val: CAtom,
+    ty: Type,
+  },
+  ArrRef {
     vec: CAtom,
+    index: CAtom,
+  },
+  ArrLen(CAtom),
+  Tuple(Vec<(CAtom, Type)>),
+  TupRef {
+    tup: CAtom,
     fields_before: Vec<Type>,
   },
-  VecLen(CAtom),
+  TupLen(CAtom),
 }
 
 #[derive(Clone, Copy)]
@@ -129,6 +149,7 @@ impl Debug for CTail {
           tail = tail1;
         }
         Self::Return(exp) => return write!(f, "    return {:?}", exp),
+        Self::Exit(exp) => return write!(f, "    exit {:?}", exp),
         Self::Goto(label) => return write!(f, "    goto {:?}", label),
         Self::If {
           cmp,
@@ -169,12 +190,18 @@ impl Debug for CStmt {
       Self::NewLine => {
         write!(f, "newline")
       }
-      Self::VecSet {
-        vec,
+      Self::TupSet {
+        tup,
         fields_before,
         val,
       } => {
-        write!(f, "vector-set! {:?} {:?} {:?}", vec, fields_before, val)
+        write!(f, "vector-set! {:?} {:?} {:?}", tup, fields_before, val)
+      }
+      Self::ArrSet { vec, index, val } => {
+        write!(f, "vector-set! {:?} {:?} {:?}", vec, index, val)
+      }
+      Self::CheckBounds { vec, index } => {
+        write!(f, "check-bounds {:?} {:?}", vec, index)
       }
     }
   }
@@ -210,17 +237,26 @@ impl Debug for CPrim {
       Self::Cmp(op, arg1, arg2) => {
         write!(f, "({:?} {:?} {:?})", op, arg1, arg2)
       }
-      Self::Vector(fields) => {
+      Self::MakeArr { len, val, ty } => {
+        write!(f, "(make-vector {:?} {:?} : {:?})", len, val, ty)
+      }
+      Self::ArrRef { vec, index } => {
+        write!(f, "(vector-ref {:?} {:?})", vec, index)
+      }
+      Self::ArrLen(arg) => {
+        write!(f, "(vector-length {:?})", arg)
+      }
+      Self::Tuple(fields) => {
         write!(f, "(vector")?;
         for (field, ty) in fields {
           write!(f, " ({:?} : {:?})", field, ty)?;
         }
         write!(f, ")")
       }
-      Self::VecRef { vec, fields_before } => {
-        write!(f, "(vector-ref {:?} {:?})", vec, fields_before)
+      Self::TupRef { tup, fields_before } => {
+        write!(f, "(vector-ref {:?} {:?})", tup, fields_before)
       }
-      Self::VecLen(arg) => {
+      Self::TupLen(arg) => {
         write!(f, "(vector-length {:?})", arg)
       }
     }

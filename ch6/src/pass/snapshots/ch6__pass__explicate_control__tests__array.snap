@@ -1,0 +1,17 @@
+---
+source: ch6/src/pass/explicate_control.rs
+expression: result.to_string_pretty()
+---
+locals: {x.0: Array(Bool), y.1: Array(Int), z.2: Array(Array(Bool)), t.3: Array(Void), tmp.0: Int}
+
+start:
+    x.0 = (make-vector 3 #t : Bool)
+    y.1 = (make-vector 0 2 : Int)
+    z.2 = (make-vector 2 x.0 : Array(Bool))
+    t.3 = (make-vector 10 #<void> : Void)
+    vector-set! x.0 1 #f
+    check-bounds t.3 3
+    tmp.0 = (vector-ref y.1 0)
+    check-bounds t.3 tmp.0
+    return #<void>
+

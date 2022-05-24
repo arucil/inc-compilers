@@ -2,7 +2,7 @@
 source: ch6/src/pass/instruction_selection.rs
 expression: result.to_string_pretty()
 ---
-locals: {y.1: Vector([Int, Bool, Void, Vector([Void]), Str]), tmp.1: Vector([Void]), tmp.2: Str, tmp.3: Bool, tmp.4: Bool, tmp.5: Int, tmp.6: Vector([Void])}
+locals: {y.1: Tuple([Int, Bool, Void, Tuple([Void]), Str]), tmp.1: Tuple([Void]), tmp.2: Str, tmp.3: Bool, tmp.4: Bool, tmp.5: Int, tmp.6: Tuple([Void])}
 
 constants: {"const_1": "abc"}
 

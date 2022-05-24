@@ -11,6 +11,7 @@ pub type Result<T> = std::result::Result<T, CompileError>;
 enum PrimType {
   Fixed { args: Vec<Type>, ret: Type },
   Overloaded(Vec<PrimType>),
+  MakeVec,
   Vector,
   Eq,
   VecRef,
@@ -63,6 +64,7 @@ static PRIM_TYPES: Lazy<HashMap<&'static str, PrimType>> = Lazy::new(|| {
       PrimType::new_binary(Int, Int, Bool),
       PrimType::new_binary(Str, Str, Bool)]),
     "eq?" => PrimType::Eq,
+    "make-vector" => PrimType::MakeVec,
     "vector" => PrimType::Vector,
     "vector-ref" => PrimType::VecRef,
     "vector-set!" => PrimType::VecSet,
@@ -175,7 +177,7 @@ impl TypeChecker {
           ret: RetType::Constructor(Type::Alias(id)),
         },
       );
-      *types.get_mut(id).unwrap() = Type::Vector(fields);
+      *types.get_mut(id).unwrap() = Type::Tuple(fields);
     }
     Ok(Self {
       env: HashMap::new(),
@@ -187,6 +189,10 @@ impl TypeChecker {
   pub fn typecheck(&mut self, exp: Exp) -> Result<Exp<String, Type>> {
     self.env.clear();
     self.typecheck_exp(exp)
+  }
+
+  fn resolve_type(&self, ty: &Type) -> Type {
+    ty.resolved(&self.types)
   }
 
   fn typecheck_exp(&mut self, exp: Exp) -> Result<Exp<String, Type>> {
@@ -502,18 +508,38 @@ impl TypeChecker {
           })
         }
       }
+      PrimType::MakeVec => {
+        if args.len() == 2 {
+          if args[0].ty != Type::Int {
+            Err(CompileError {
+              range,
+              message: format!(
+                "expected Int for 1st argument of make-vector, found {:?}",
+                args[0].ty
+              ),
+            })
+          } else {
+            Ok(Type::Array(box args[1].ty.clone()))
+          }
+        } else {
+          Err(CompileError {
+            range,
+            message: "arity mismatch for make-vector".to_owned(),
+          })
+        }
+      }
       PrimType::Vector => {
-        Ok(Type::Vector(args.iter().map(|e| e.ty.clone()).collect()))
+        Ok(Type::Tuple(args.iter().map(|e| e.ty.clone()).collect()))
       }
       PrimType::VecLen => {
         if args.len() == 1 {
-          if args[0].ty.to_vector(&self.types).is_some() {
-            Ok(Type::Int)
-          } else {
-            Err(CompileError {
+          match self.resolve_type(&args[0].ty) {
+            Type::Tuple(_) | Type::Array(_) => Ok(Type::Int),
+            Type::Alias(_) => unreachable!(),
+            _ => Err(CompileError {
               range,
               message: "type mismatch".to_owned(),
-            })
+            }),
           }
         } else {
           Err(CompileError {
@@ -524,65 +550,97 @@ impl TypeChecker {
       }
       PrimType::VecRef => {
         if args.len() == 2 {
-          if let Some(types) = args[0].ty.to_vector(&self.types) {
-            if let ExpKind::Int(k) = &args[1].kind {
-              if *k >= 0 && (*k as usize) < types.len() {
-                Ok(types[*k as usize].clone())
-              } else {
-                Err(CompileError {
-                  range,
-                  message: "tuple index out of range".to_owned(),
-                })
-              }
-            } else {
-              Err(CompileError {
-                range,
-                message: "expected int literal".to_owned(),
-              })
-            }
-          } else {
-            Err(CompileError {
-              range,
-              message: "type mismatch".to_owned(),
-            })
-          }
-        } else {
-          Err(CompileError {
-            range,
-            message: "arity mismatch".to_owned(),
-          })
-        }
-      }
-      PrimType::VecSet => {
-        if args.len() == 3 {
-          if let Some(types) = args[0].ty.to_vector(&self.types) {
-            if let ExpKind::Int(k) = &args[1].kind {
-              if *k >= 0 && (*k as usize) < types.len() {
-                if types[*k as usize] == args[2].ty {
-                  Ok(Type::Void)
+          match self.resolve_type(&args[0].ty) {
+            Type::Tuple(fields) => {
+              if let ExpKind::Int(k) = &args[1].kind {
+                if *k >= 0 && (*k as usize) < fields.len() {
+                  Ok(fields[*k as usize].clone())
                 } else {
                   Err(CompileError {
                     range,
-                    message: "type mismatch".to_owned(),
+                    message: "tuple index out of range".to_owned(),
                   })
                 }
               } else {
                 Err(CompileError {
                   range,
-                  message: "tuple index out of range".to_owned(),
+                  message: "expected int literal".to_owned(),
                 })
               }
-            } else {
-              Err(CompileError {
-                range,
-                message: "expected int literal".to_owned(),
-              })
             }
-          } else {
-            Err(CompileError {
+            Type::Array(ty) => {
+              if self.resolve_type(&args[1].ty) == Type::Int {
+                Ok(*ty)
+              } else {
+                Err(CompileError {
+                  range,
+                  message: "type mismatch for 2nd argument of vector-ref"
+                    .to_owned(),
+                })
+              }
+            }
+            _ => Err(CompileError {
+              range,
+              message: "type mismatch for 1st argument of vector-ref"
+                .to_owned(),
+            }),
+          }
+        } else {
+          Err(CompileError {
+            range,
+            message: "arity mismatch for vector-ref".to_owned(),
+          })
+        }
+      }
+      PrimType::VecSet => {
+        if args.len() == 3 {
+          match self.resolve_type(&args[0].ty) {
+            Type::Tuple(fields) => {
+              if let ExpKind::Int(k) = &args[1].kind {
+                if *k >= 0 && (*k as usize) < fields.len() {
+                  if fields[*k as usize] == args[2].ty {
+                    Ok(Type::Void)
+                  } else {
+                    Err(CompileError {
+                      range,
+                      message: "type mismatch".to_owned(),
+                    })
+                  }
+                } else {
+                  Err(CompileError {
+                    range,
+                    message: "tuple index out of range".to_owned(),
+                  })
+                }
+              } else {
+                Err(CompileError {
+                  range,
+                  message: "expected int literal".to_owned(),
+                })
+              }
+            }
+            Type::Array(ty) => {
+              if self.resolve_type(&args[1].ty) != Type::Int {
+                return Err(CompileError {
+                  range,
+                  message: "type mismatch for 2nd argument of vector-set!"
+                    .to_owned(),
+                });
+              }
+              if self.resolve_type(&args[2].ty) == self.resolve_type(&ty) {
+                Ok(Type::Void)
+              } else {
+                Err(CompileError {
+                  range,
+                  message: "type mismatch for 3rd argument of vector-set!"
+                    .to_owned(),
+                })
+              }
+            }
+            _ => Err(CompileError {
               range,
               message: "type mismatch".to_owned(),
-            })
+            }),
           }
         } else {
           Err(CompileError {

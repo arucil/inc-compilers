@@ -15,6 +15,7 @@ pub fn compile(
   use Reg::*;
   let prog = ast::parse(input)?;
   let prog = ch5::pass::typecheck::typecheck(prog)?;
+  let prog = self::pass::array_bounds::insert_bounds_check(prog);
   let prog = ch4::pass::shrink::shrink(prog);
   let prog = ch4::pass::uniquify::uniquify(prog);
   let prog = ch5::pass::uncover_get::uncover_get(prog);

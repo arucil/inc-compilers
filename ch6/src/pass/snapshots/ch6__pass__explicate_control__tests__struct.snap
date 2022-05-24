@@ -3,7 +3,7 @@ source: ch6/src/pass/explicate_control.rs
 expression: result.to_string_pretty()
 ---
 locals: {y.1: Alias(Id { idx: 1 }), tmp.1: Alias(Id { idx: 0 }), tmp.2: Str, tmp.3: Bool, tmp.4: Bool, tmp.5: Int, tmp.6: Alias(Id { idx: 0 })}
-types: 0 => Vector([Void]), 1 => Vector([Int, Bool, Void, Alias(Id { idx: 0 }), Str])
+types: 0 => Tuple([Void]), 1 => Tuple([Int, Bool, Void, Alias(Id { idx: 0 }), Str])
 
 start:
     tmp.1 = (vector (tmp.0 : Void))
