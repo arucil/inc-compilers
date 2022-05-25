@@ -7,6 +7,8 @@ mod tests {
   use ch5::pass::typecheck;
   use insta::assert_snapshot;
 
+  use crate::pass::array_bounds;
+
   #[test]
   fn vector() {
     let prog = ast::parse(
@@ -20,6 +22,7 @@ mod tests {
     )
     .unwrap();
     let prog = typecheck::typecheck(prog).unwrap();
+    let prog = array_bounds::insert_bounds_check(prog);
     let prog = shrink::shrink(prog);
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
@@ -42,6 +45,7 @@ mod tests {
     )
     .unwrap();
     let prog = typecheck::typecheck(prog).unwrap();
+    let prog = array_bounds::insert_bounds_check(prog);
     let prog = shrink::shrink(prog);
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
@@ -60,11 +64,13 @@ mod tests {
       [u (void)])
   (vector-set! x 1 #f)
   (vector-set! t 3 (void))
-  (set! u (vector-ref t (vector-ref y 0))))
+  (set! u (vector-ref t (vector-ref y 0)))
+  (print (vector-length t)))
       "#,
     )
     .unwrap();
     let prog = typecheck::typecheck(prog).unwrap();
+    let prog = array_bounds::insert_bounds_check(prog);
     let prog = shrink::shrink(prog);
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);

@@ -29,7 +29,7 @@ pub fn select_instruction(
   use_heap: bool,
 ) -> Program<Info, IdxVar> {
   let types = prog.types;
-  let mut codegen = CodeGen::new(|ty| ty.resolved(&types), use_heap);
+  let mut codegen = CodeGen::new(&types, use_heap);
   let blocks = prog
     .body
     .into_iter()

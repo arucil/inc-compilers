@@ -11,6 +11,7 @@ asm = { path = "../asm" }
 support = { path = "../support" }
 indexmap = "1.8.1"
 control = { path = "../control" }
+id-arena = "2.2.1"
 
 [dev-dependencies]
 insta = "1.14.0"

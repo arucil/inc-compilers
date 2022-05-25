@@ -6,7 +6,11 @@ use std::ffi::c_void;
 
 extern "C" {
   fn rt_initialize(rootstack_size: u64, heap_size: u64) -> *mut u64;
-  fn rt_allocate(size: u64, rootstack_ptr: *const u64) -> *const c_void;
+  fn rt_allocate(
+    tag: u64,
+    size: u64,
+    rootstack_ptr: *const u64,
+  ) -> *const c_void;
   fn rt_collect(rootstack_ptr: *const u64);
   fn rt_new_string(
     size: u64,
@@ -57,8 +61,7 @@ fn extend_heap() {
     let s = rt_new_string(STR1.len() as u64, STR1.as_ptr(), rootstack_ptr)
       as *const u64;
 
-    let v = rt_allocate(5 * 8, rootstack_ptr) as *mut u64;
-    *v = 0b0101_000100_001;
+    let v = rt_allocate(0b0101_000100_001, 5 * 8, rootstack_ptr) as *mut u64;
     *v.add(1) = s as u64;
     *v.add(2) = 100;
     *v.add(3) = v as u64;
@@ -69,7 +72,7 @@ fn extend_heap() {
     *rootstack_ptr = s as u64;
     *rootstack_ptr.add(1) = v as u64;
 
-    let _v2 = rt_allocate(512, rootstack_ptr.add(2)) as *mut u64;
+    let _v2 = rt_allocate(1, 512, rootstack_ptr.add(2)) as *mut u64;
 
     let heap = rt_from_space() as *const u64;
     assert_eq!(*heap, 0b101_011);
@@ -99,8 +102,7 @@ fn collect() {
     let s = rt_new_string(STR1.len() as u64, STR1.as_ptr(), rootstack_ptr)
       as *const u64;
 
-    let v = rt_allocate(5 * 8, rootstack_ptr) as *mut u64;
-    *v = 0b0101_000100_001;
+    let v = rt_allocate(0b0101_000100_001, 5 * 8, rootstack_ptr) as *mut u64;
     *v.add(1) = s as u64;
     *v.add(2) = 100;
     *v.add(3) = v as u64;
@@ -151,61 +153,51 @@ fn example_in_book() {
     let rootstack_ptr = rt_initialize(65536, 512) as *mut u64;
 
     // v7: [ 5 ]
-    let v7 = rt_allocate(2 * 8, rootstack_ptr) as *mut u64;
-    *v7 = 0b0_000001_001;
+    let v7 = rt_allocate(0b0_000001_001, 2 * 8, rootstack_ptr) as *mut u64;
     *v7.add(1) = 8;
 
     // v1: [ #t | 42 ]
-    let v1 = rt_allocate(3 * 8, rootstack_ptr) as *mut u64;
-    *v1 = 0b00_000010_001;
+    let v1 = rt_allocate(0b00_000010_001, 3 * 8, rootstack_ptr) as *mut u64;
     *v1.add(1) = 1;
     *v1.add(2) = 42;
 
     // v2: [ 3 | v1 ]
-    let v2 = rt_allocate(3 * 8, rootstack_ptr) as *mut u64;
-    *v2 = 0b10_000010_001;
+    let v2 = rt_allocate(0b10_000010_001, 3 * 8, rootstack_ptr) as *mut u64;
     *v2.add(1) = 3;
     *v2.add(2) = v1 as u64;
 
     // v3: [ 7 | 5 | v2 ]
-    let v3 = rt_allocate(4 * 8, rootstack_ptr) as *mut u64;
-    *v3 = 0b100_000011_001;
+    let v3 = rt_allocate(0b100_000011_001, 4 * 8, rootstack_ptr) as *mut u64;
     *v3.add(1) = 7;
     *v3.add(2) = 5;
     *v3.add(3) = v2 as u64;
 
     // v9: [ v10 | 6 ]
-    let v9 = rt_allocate(3 * 8, rootstack_ptr) as *mut u64;
-    *v9 = 0b01_000010_001;
+    let v9 = rt_allocate(0b01_000010_001, 3 * 8, rootstack_ptr) as *mut u64;
     *v9.add(2) = 6;
 
     // v8: [ v7 ]
-    let v8 = rt_allocate(2 * 8, rootstack_ptr) as *mut u64;
-    *v8 = 0b1_000001_001;
+    let v8 = rt_allocate(0b1_000001_001, 2 * 8, rootstack_ptr) as *mut u64;
     *v8.add(1) = v7 as u64;
 
     // v4: [ v3 | v1 ]
-    let v4 = rt_allocate(3 * 8, rootstack_ptr) as *mut u64;
-    *v4 = 0b11_000010_001;
+    let v4 = rt_allocate(0b11_000010_001, 3 * 8, rootstack_ptr) as *mut u64;
     *v4.add(1) = v3 as u64;
     *v4.add(2) = v1 as u64;
 
     // v10: [ 2 | v9 ]
-    let v10 = rt_allocate(3 * 8, rootstack_ptr) as *mut u64;
-    *v10 = 0b10_000010_001;
+    let v10 = rt_allocate(0b10_000010_001, 3 * 8, rootstack_ptr) as *mut u64;
     *v10.add(1) = 2;
     *v10.add(2) = v9 as u64;
 
     *v9.add(1) = v10 as u64;
 
     // v5: [ 8 ]
-    let v5 = rt_allocate(2 * 8, rootstack_ptr) as *mut u64;
-    *v5 = 0b0_000001_001;
+    let v5 = rt_allocate(0b0_000001_001, 2 * 8, rootstack_ptr) as *mut u64;
     *v5.add(1) = 8;
 
     // v6: [ v5 | 4 ]
-    let v6 = rt_allocate(3 * 8, rootstack_ptr) as *mut u64;
-    *v6 = 0b01_000010_001;
+    let v6 = rt_allocate(0b01_000010_001, 3 * 8, rootstack_ptr) as *mut u64;
     *v6.add(1) = v5 as u64;
     *v6.add(2) = 4;
 

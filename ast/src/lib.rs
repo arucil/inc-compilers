@@ -1,11 +1,11 @@
 #![feature(never_type, box_syntax)]
 
 use id_arena::{Arena, Id};
+use indexmap::IndexMap;
 use pretty::*;
 use std::fmt::{self, Debug, Formatter};
 use std::iter;
 use support::Range;
-use indexmap::IndexMap;
 
 pub mod parser;
 
@@ -80,6 +80,16 @@ pub enum ExpKind<VAR, TYPE> {
     Vec<Exp<VAR, TYPE>>,
   ),
   NewLine,
+  Error(Error<VAR, TYPE>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Error<VAR, TYPE> {
+  Length(Box<Exp<VAR, TYPE>>),
+  OutOfBounds {
+    index: Box<Exp<VAR, TYPE>>,
+    len: Box<Exp<VAR, TYPE>>,
+  },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -251,6 +261,26 @@ impl<VAR: Debug, TYPE: Debug> Exp<VAR, TYPE> {
         )
         .append(RcDoc::text(")")),
       ExpKind::NewLine => RcDoc::text("(newline)"),
+      ExpKind::Error(Error::Length(arg)) => RcDoc::text("(")
+        .append(
+          RcDoc::text("length-error")
+            .append(Doc::line())
+            .append(arg.to_doc())
+            .nest(1)
+            .group(),
+        )
+        .append(RcDoc::text(")")),
+      ExpKind::Error(Error::OutOfBounds{index,len}) => RcDoc::text("(")
+        .append(
+          RcDoc::text("out-of-bounds-error")
+            .append(Doc::line())
+            .append(index.to_doc())
+            .append(Doc::line())
+            .append(len.to_doc())
+            .nest(1)
+            .group(),
+        )
+        .append(RcDoc::text(")")),
     }
   }
 }

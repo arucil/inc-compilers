@@ -93,7 +93,9 @@ where
       | Instr::Xor { dest, .. }
       | Instr::SetIf { dest, .. }
       | Instr::Neg(dest)
-      | Instr::Pop(dest) => {
+      | Instr::Pop(dest)
+      | Instr::And { dest, .. }
+      | Instr::Or { dest, .. } => {
         if let Some(dest_loc) = Location::from_arg(dest.clone(), self.var_store)
         {
           add(dest_loc);
@@ -143,7 +145,12 @@ where
       | Instr::Syscall
       | Instr::Jmp(_)
       | Instr::JumpIf { .. } => {}
-      _ => unimplemented!(),
+      Instr::Shl { src, .. } | Instr::Shr { src, .. } => {
+        if let Some(dest_loc) = Location::from_arg(src.clone(), self.var_store)
+        {
+          add(dest_loc);
+        }
+      }
     }
   }
 }

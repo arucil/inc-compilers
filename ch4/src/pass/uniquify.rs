@@ -1,15 +1,13 @@
 use ast::{IdxVar, Program};
-use ch2::pass::uniquify::uniquify_exp;
-use std::collections::HashMap;
+use ch2::pass::uniquify::Uniq;
 
 pub fn uniquify<TYPE>(prog: Program<String, TYPE>) -> Program<IdxVar, TYPE> {
-  let mut counter = 0;
-  let mut env = HashMap::new();
+  let mut uniq = Uniq::new();
   Program {
     body: prog
       .body
       .into_iter()
-      .map(|exp| uniquify_exp(exp, &mut env, &mut counter).unwrap())
+      .map(|exp| uniq.uniquify_exp(exp).unwrap())
       .collect(),
     ..prog
   }

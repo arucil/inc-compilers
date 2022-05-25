@@ -1,4 +1,4 @@
-use ast::{Exp, ExpKind, IdxVar, Program};
+use ast::{Error, Exp, ExpKind, IdxVar, Program};
 use std::collections::HashSet;
 
 pub fn uncover_get<TYPE>(prog: Program<IdxVar, TYPE>) -> Program<IdxVar, TYPE> {
@@ -114,6 +114,21 @@ fn mark_mutable_vars<TYPE>(
       ty: exp.ty,
     },
     ExpKind::Get(_) => unreachable!(),
+    ExpKind::Error(Error::Length(len)) => Exp {
+      kind: ExpKind::Error(Error::Length(box mark_mutable_vars(
+        *len, set_vars,
+      ))),
+      range: exp.range,
+      ty: exp.ty,
+    },
+    ExpKind::Error(Error::OutOfBounds { index, len }) => Exp {
+      kind: ExpKind::Error(Error::OutOfBounds {
+        index: box mark_mutable_vars(*index, set_vars),
+        len: box mark_mutable_vars(*len, set_vars),
+      }),
+      range: exp.range,
+      ty: exp.ty,
+    },
   }
 }
 
@@ -167,5 +182,10 @@ fn collect_set_vars<TYPE>(
       collect_set_vars(body, set_vars);
     }
     ExpKind::Get(_) => unreachable!(),
+    ExpKind::Error(Error::Length(len)) => collect_set_vars(len, set_vars),
+    ExpKind::Error(Error::OutOfBounds { index, len }) => {
+      collect_set_vars(index, set_vars);
+      collect_set_vars(len, set_vars);
+    }
   }
 }

@@ -133,7 +133,7 @@ pub fn gen_assign_instr_registers<'a>(
       Arg::Label(l) => Arg::Label(l),
     };
 
-    let instr = match instr {
+    match instr {
       Instr::Add { src, dest } => Instr::Add {
         src: assign(src),
         dest: assign(dest),
@@ -170,9 +170,23 @@ pub fn gen_assign_instr_registers<'a>(
         src: assign(src),
         dest: assign(dest),
       },
-      _ => unreachable!("{:?}", instr),
-    };
-    instr
+      Instr::And { src, dest } => Instr::And {
+        src: assign(src),
+        dest: assign(dest),
+      },
+      Instr::Or { src, dest } => Instr::Or {
+        src: assign(src),
+        dest: assign(dest),
+      },
+      Instr::Shl { src, count } => Instr::Shl {
+        src: assign(src),
+        count: assign(count),
+      },
+      Instr::Shr { src, count } => Instr::Shr {
+        src: assign(src),
+        count: assign(count),
+      },
+    }
   }
 }
 

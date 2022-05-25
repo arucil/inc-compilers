@@ -1,4 +1,4 @@
-use ast::{Exp, ExpKind, IdxVar, Program};
+use ast::{Error, Exp, ExpKind, IdxVar, Program};
 use support::Range;
 
 pub fn remove_complex_operands<TYPE: Clone>(
@@ -110,6 +110,28 @@ fn mon_exp<TYPE: Clone>(
     ),
     ExpKind::Str(..) => exp,
     ExpKind::NewLine => exp,
+    ExpKind::Error(Error::Length(len)) => mon_prim(
+      vec![*len],
+      |mut args| Exp {
+        kind: ExpKind::Error(Error::Length(box args.pop().unwrap())),
+        range,
+        ty,
+      },
+      counter,
+    ),
+    ExpKind::Error(Error::OutOfBounds { index, len }) => mon_prim(
+      vec![*index, *len],
+      |mut args| {
+        let len = box args.pop().unwrap();
+        let index = box args.pop().unwrap();
+        Exp {
+          kind: ExpKind::Error(Error::OutOfBounds { index, len }),
+          range,
+          ty,
+        }
+      },
+      counter,
+    ),
   }
 }
 
@@ -194,6 +216,10 @@ fn atom_exp<TYPE: Clone>(
     ExpKind::Void => exp,
     // ExpKind::Str(..) => exp,
     ExpKind::NewLine => exp,
+    ExpKind::Error(_) => {
+      let exp = mon_exp(exp, counter);
+      assign_var(exp, tmps, counter)
+    }
   }
 }
 

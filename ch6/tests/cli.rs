@@ -6,6 +6,16 @@ fn example_in_book() {
 }
 
 #[test]
+fn example_in_book_struct() {
+  TestCli::new("ch6", "tests/fixtures").test("example_in_book_struct");
+}
+
+#[test]
 fn r#loop() {
   TestCli::new("ch6", "tests/fixtures").test("loop");
+}
+
+#[test]
+fn array() {
+  TestCli::new("ch6", "tests/fixtures").test("array");
 }

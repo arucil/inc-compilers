@@ -81,7 +81,9 @@ impl<'a> AnalysisState<'a> {
       }
       Instr::Add { src, dest }
       | Instr::Sub { src, dest }
-      | Instr::Xor { src, dest } => {
+      | Instr::Xor { src, dest }
+      | Instr::And { src, dest }
+      | Instr::Or { src, dest } => {
         self.add_arg(before, src);
         self.add_arg(before, dest);
       }
@@ -122,7 +124,10 @@ impl<'a> AnalysisState<'a> {
           before.add_reg(reg);
         }
       }
-      _ => unimplemented!("{:?}", ins),
+      Instr::Shl { src, count } | Instr::Shr { src, count } => {
+        self.add_arg(before, src);
+        self.add_arg(before, count);
+      }
     }
   }
 

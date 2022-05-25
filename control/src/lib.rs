@@ -26,7 +26,7 @@ pub struct CParam {
 pub enum CTail {
   Seq(CStmt, Box<CTail>),
   Return(CExp),
-  Exit(CAtom),
+  Error(CError),
   Goto(Label),
   If {
     cmp: CCmpOp,
@@ -35,6 +35,12 @@ pub enum CTail {
     conseq: Label,
     alt: Label,
   },
+}
+
+#[derive(Clone)]
+pub enum CError {
+  Length(CAtom),
+  OutOfBounds { index: CAtom, len: CAtom },
 }
 
 #[derive(Clone)]
@@ -48,10 +54,6 @@ pub enum CStmt {
   PrintStr(CAtom),
   NewLine,
   Read,
-  CheckBounds {
-    vec: CAtom,
-    index: CAtom,
-  },
   ArrSet {
     vec: CAtom,
     index: CAtom,
@@ -149,7 +151,12 @@ impl Debug for CTail {
           tail = tail1;
         }
         Self::Return(exp) => return write!(f, "    return {:?}", exp),
-        Self::Exit(exp) => return write!(f, "    exit {:?}", exp),
+        Self::Error(CError::Length(arg)) => {
+          return write!(f, "    length-error {:?}", arg)
+        }
+        Self::Error(CError::OutOfBounds { index, len }) => {
+          return write!(f, "    out-of-bounds-error {:?} {:?}", index, len)
+        }
         Self::Goto(label) => return write!(f, "    goto {:?}", label),
         Self::If {
           cmp,
@@ -199,9 +206,6 @@ impl Debug for CStmt {
       }
       Self::ArrSet { vec, index, val } => {
         write!(f, "vector-set! {:?} {:?} {:?}", vec, index, val)
-      }
-      Self::CheckBounds { vec, index } => {
-        write!(f, "check-bounds {:?} {:?}", vec, index)
       }
     }
   }
@@ -289,7 +293,7 @@ impl Debug for CAtom {
 }
 
 #[derive(Debug, Clone)]
-pub struct InvalidCmpOp;
+pub struct InvalidCmpOp(String);
 
 impl FromStr for CCmpOp {
   type Err = InvalidCmpOp;
@@ -301,7 +305,7 @@ impl FromStr for CCmpOp {
       ">=" => Ok(Self::Ge),
       "<" => Ok(Self::Lt),
       "<=" => Ok(Self::Le),
-      _ => Err(InvalidCmpOp),
+      _ => Err(InvalidCmpOp(s.to_owned())),
     }
   }
 }

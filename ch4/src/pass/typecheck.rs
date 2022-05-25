@@ -450,6 +450,7 @@ impl TypeChecker {
         range,
         ty: Type::Void,
       }),
+      ExpKind::Error(_) => unreachable!(),
     }
   }
 

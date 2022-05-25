@@ -257,6 +257,8 @@ fn build_exp(input: &str, cst: Cst) -> Result<Exp> {
               "read",
               "+",
               "-",
+              "*",
+              "/",
               "and",
               "or",
               "not",

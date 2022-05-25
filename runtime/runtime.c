@@ -11,7 +11,7 @@
   {                                                                        \
     static const char *msg = __FILE__ ":" STR(__LINE__) ":" STR(MSG) "\n"; \
     write(1, msg, sizeof(msg) - 1);                                        \
-    rt_exit(1);                                                               \
+    exit(1);                                                               \
   } while (0)
 #define RT_FATAL_CODE(MSG, CODE)                                      \
   do                                                                  \
@@ -20,14 +20,14 @@
     write(1, msg, sizeof(msg) - 1);                                   \
     rt_print_int(CODE);                                               \
     rt_print_newline();                                               \
-    rt_exit(1);                                                          \
+    exit(1);                                                          \
   } while (0)
 
 typedef unsigned long uint64_t;
 typedef long int64_t;
 typedef long ptrdiff_t;
 
-void rt_exit(uint64_t code) __attribute__((noreturn));
+static void exit(uint64_t code) __attribute__((noreturn));
 
 static __attribute__((naked)) uint64_t syscall5(
     uint64_t number,
@@ -55,7 +55,7 @@ static __attribute__((naked)) uint64_t syscall5(
       "ret");
 }
 
-void rt_exit(uint64_t code)
+static void exit(uint64_t code)
 {
   syscall5(60, code, 0, 0, 0, 0);
   __builtin_unreachable();
@@ -95,6 +95,42 @@ static int munmap(uint64_t *ptr, uint64_t size)
   return (int)syscall5(11, (uint64_t)ptr, size, 0, 0, 0);
 }
 
+// tag:
+// bit0         0=visited, 1=unvisited
+// bit1~bit2    0=vector   1=string   2=array
+//
+// vector:
+// bit3~bit8    number of fields (exluding unit fields)
+// bit9~bit59   pointer mask
+//
+// string:
+// bit3~bit63   string length
+//
+// array:
+// bit3         pointer mask
+// bit4         unit mask
+// bit5~bit63   length
+
+#define align8(x) (((x) + 7) & ~7)
+
+#define VISITED(tag) (((tag)&1) == 0)
+#define TYPE(tag) (((tag) >> 1) & 3)
+#define TYPE_TUPLE (0)
+#define TYPE_STRING (1)
+#define TYPE_ARRAY (2)
+
+#define MAKE_TUPLE_TAG(num_fields, ptr_mask) ((ptr_mask) << 9 | (num_fields) << 3 | 0b001)
+#define TUPLE_NUM_FIELDS(tag) (((tag) >> 3) & 0b111111)
+#define TUPLE_PTR_MASK(tag) ((tag) >> 9)
+
+#define MAKE_STRING_TAG(len) ((len) << 3 | 0b011)
+#define STRING_LEN(tag) ((tag) >> 3)
+
+#define MAKE_ARRAY_TAG(ptr_mask, unit_mask, len) ((len) << 5 | (unit_mask) << 4 | (ptr_mask) << 3 | 0b101)
+#define ARRAY_LEN(tag) ((tag) >> 5)
+#define ARRAY_IS_PTR(tag) (((tag) >> 3) & 1)
+#define ARRAY_IS_UNIT(tag) (((tag) >> 4) & 1)
+
 void rt_print_int(int64_t value)
 {
   static char buf[22];
@@ -121,9 +157,14 @@ void rt_print_int(int64_t value)
   write(1, p, buf + sizeof(buf) - p);
 }
 
-void rt_print_str(uint64_t p)
+void rt_print_str_const(uint64_t p)
 {
   write(1, ((uint64_t *)p) + 1, *(uint64_t *)p);
+}
+
+void rt_print_str(uint64_t p)
+{
+  write(1, ((uint64_t *)p) + 1, STRING_LEN(*(uint64_t *)p));
 }
 
 #define STR_TRUE "true"
@@ -226,38 +267,6 @@ void *rt_initialize(uint64_t rootstack_size, uint64_t heap_size)
   return rootstack_begin;
 }
 
-// tag:
-// bit0         0=visited, 1=unvisited
-// bit1~bit2    0=vector   1=string   2=array
-//
-// vector:
-// bit3~bit8    number of fields (exluding unit fields)
-// bit9~bit59   pointer mask
-//
-// string:
-// bit3~bit63   string length
-//
-// array:
-// bit3         pointer mask
-// bit4~bit63   length
-
-#define VISITED(tag) (((tag)&1) == 0)
-#define TYPE(tag) (((tag) >> 1) & 3)
-#define TYPE_TUPLE (0)
-#define TYPE_STRING (1)
-#define TYPE_ARRAY (2)
-
-#define MAKE_TUPLE_TAG(num_fields, ptr_mask) ((ptr_mask) << 9 | (num_fields) << 3 | 0b001)
-#define TUPLE_NUM_FIELDS(tag) (((tag) >> 3) & 0b111111)
-#define TUPLE_PTR_MASK(tag) ((tag) >> 9)
-
-#define MAKE_STRING_TAG(len) ((len) << 3 | 0b011)
-#define STRING_LEN_ALIGNED(tag) ((((tag) >> 3) + 7) & ~7)
-
-#define MAKE_ARRAY_TAG(ptr_mask, len) ((len) << 4 | ptr_mask << 3 | 0b101)
-#define ARRAY_LEN(tag) ((tag) >> 4)
-#define ARRAY_PTR_MASK(tag) ((tag) >> 3 & 1)
-
 void rt_collect(uint64_t *rootstack_ptr)
 {
 
@@ -275,10 +284,13 @@ void rt_collect(uint64_t *rootstack_ptr)
       len = TUPLE_NUM_FIELDS(tag);          \
       break;                                \
     case TYPE_STRING:                       \
-      len = STRING_LEN_ALIGNED(tag) >> 3;   \
+      len = align8(STRING_LEN(tag)) >> 3;   \
       break;                                \
     case TYPE_ARRAY:                        \
-      len = ARRAY_LEN(tag);                 \
+      if (ARRAY_IS_UNIT(tag))               \
+        len = 0;                            \
+      else                                  \
+        len = ARRAY_LEN(tag);               \
       break;                                \
     default:                                \
       RT_FATAL_CODE("invalid type ", type); \
@@ -331,11 +343,15 @@ void rt_collect(uint64_t *rootstack_ptr)
       break;
     }
     case TYPE_STRING:
-      scanp += STRING_LEN_ALIGNED(tag) >> 3;
+      scanp += align8(STRING_LEN(tag)) >> 3;
       break;
     case TYPE_ARRAY:
     {
-      if (ARRAY_PTR_MASK(tag))
+      if (ARRAY_IS_UNIT(tag))
+      {
+        break;
+      }
+      if (ARRAY_IS_PTR(tag))
       {
         for (uint64_t n = ARRAY_LEN(tag); n > 0; n--)
         {
@@ -423,7 +439,7 @@ static void extend_heap(uint64_t size, uint64_t *rootstack_ptr)
     }
     case TYPE_STRING:
     {
-      uint64_t len = STRING_LEN_ALIGNED(tag) >> 3;
+      uint64_t len = align8(STRING_LEN(tag)) >> 3;
       for (uint64_t i = 0; i < len; i++)
       {
         *to_ptr++ = *ptr++;
@@ -432,8 +448,12 @@ static void extend_heap(uint64_t size, uint64_t *rootstack_ptr)
     }
     case TYPE_ARRAY:
     {
+      if (ARRAY_IS_UNIT(tag))
+      {
+        break;
+      }
       uint64_t len = ARRAY_LEN(tag);
-      if (ARRAY_PTR_MASK(tag))
+      if (ARRAY_IS_PTR(tag))
       {
         for (uint64_t i = 0; i < len; i++)
         {
@@ -480,26 +500,15 @@ uint64_t rt_heap_size()
   return from_space_end - from_space_begin;
 }
 
-// static void print_hex(uint64_t n) {
+// static void print_hex(uint64_t n)
+// {
 //   static const char hex[] = "0123456789ABCDEF";
-//   static char buf[17];
-//   buf[0] = hex[n >> 60 & 0xf];
-//   buf[1] = hex[n >> 56 & 0xf];
-//   buf[2] = hex[n >> 52 & 0xf];
-//   buf[3] = hex[n >> 48 & 0xf];
-//   buf[4] = hex[n >> 44 & 0xf];
-//   buf[5] = hex[n >> 40 & 0xf];
-//   buf[6] = hex[n >> 36 & 0xf];
-//   buf[7] = hex[n >> 32 & 0xf];
-//   buf[8] = hex[n >> 28 & 0xf];
-//   buf[9] = hex[n >> 24 & 0xf];
-//   buf[10] = hex[n >> 20 & 0xf];
-//   buf[11] = hex[n >> 16 & 0xf];
-//   buf[12] = hex[n >> 12 & 0xf];
-//   buf[13] = hex[n >> 8 & 0xf];
-//   buf[14] = hex[n >> 4 & 0xf];
-//   buf[15] = hex[n >> 0 & 0xf];
-//   buf[16]=' ';
+//   char buf[17];
+//   for (uint64_t i = 0; i < 16; i++)
+//   {
+//     buf[15 - i] = hex[n >> (4 * i) & 15];
+//   }
+//   buf[16] = ' ';
 //   write(1, buf, 17);
 // }
 
@@ -517,7 +526,7 @@ uint64_t rt_heap_size()
 //       write(1, ", to_space_begin: ", 18);
 //       rt_print_int((uint64_t)to_space_begin);
 //       rt_print_newline();
-//       rt_exit(1);
+//       exit(1);
 //     }
 //   }
 //   for (uint64_t *p = from_space_begin; (void *)p < from_space_ptr;)
@@ -558,7 +567,7 @@ uint64_t rt_heap_size()
 //         }
 //         rt_print_newline();
 //       }
-//       rt_exit(1);
+//       exit(1);
 //     }
 //         }
 //         p++;
@@ -568,7 +577,7 @@ uint64_t rt_heap_size()
 //     }
 //     case TYPE_STRING:
 //     {
-//       uint64_t len = STRING_LEN_ALIGNED(tag) >> 3;
+//       uint64_t len = align8(STRING_LEN(tag)) >> 3;
 //       for (uint64_t i = 0; i < len; i++)
 //       {
 //         p++;
@@ -581,32 +590,43 @@ uint64_t rt_heap_size()
 //   }
 // }
 
-// void dump(uint64_t index, uint64_t *rootstack_ptr) {
-//     rt_print_int(index);
-//     rt_print_newline();
-//     write(1, "rootstack: ", 11);
-//     for (uint64_t *p = rootstack_begin; p < rootstack_ptr; p++) {
-//       print_hex(*p);
+// void dump(uint64_t index, uint64_t *rootstack_ptr)
+// {
+//   rt_print_int(index);
+//   rt_print_newline();
+//   write(1, "rootstack: ", 11);
+//   for (uint64_t *p = rootstack_begin; p < rootstack_ptr; p++)
+//   {
+//     print_hex(*p);
+//   }
+//   rt_print_newline();
+//   write(1, "from space: \n", 13);
+//   uint64_t *q = from_space_begin;
+//   for (int j = 0; j < 10; j++)
+//   {
+//     print_hex((uint64_t)q);
+//     write(1, ": ", 2);
+//     for (int i = 0; i < 4; i++)
+//     {
+//       print_hex(*q);
+//       q++;
+//       if ((void *)q >= from_space_ptr)
+//       {
+//         break;
+//       }
 //     }
 //     rt_print_newline();
-//     write(1, "from space: \n", 13);
-//       uint64_t *q = from_space_begin;
-//       for (int j = 0; j < 10; j ++) {
-//         print_hex((uint64_t)q);
-//         write(1, ": ", 2);
-//         for (int i = 0; i < 4; i++) {
-//           print_hex(*q);
-//           q++;
-//           if ((void*)q >= from_space_ptr) {break;}
-//         }
-//         rt_print_newline();
-//           if ((void*)q >= from_space_ptr) {break;}
-//       }
+//     if ((void *)q >= from_space_ptr)
+//     {
+//       break;
+//     }
+//   }
 // }
 
-// size must be multiple of 8.
-void *rt_allocate(uint64_t size, uint64_t *rootstack_ptr)
+// size must be multiple of 8, excluding the tag.
+void *rt_allocate(uint64_t tag, uint64_t size, uint64_t *rootstack_ptr)
 {
+  size += 8;
   if (from_space_end - from_space_ptr < (ptrdiff_t)size)
   {
     rt_collect(rootstack_ptr);
@@ -615,17 +635,17 @@ void *rt_allocate(uint64_t size, uint64_t *rootstack_ptr)
   {
     extend_heap(size, rootstack_ptr);
   }
-  void *ptr = from_space_ptr;
+  uint64_t *ptr = from_space_ptr;
+  *ptr = tag;
   from_space_ptr += size;
   return ptr;
 }
 
 void *rt_new_string(uint64_t len, const char *chars, uint64_t *rootstack_ptr)
 {
-  uint64_t len_aligned = (len + 7) & ~7;
-  uint64_t *s = rt_allocate(8 + len_aligned, rootstack_ptr);
-  uint64_t *ptr = s;
-  *ptr++ = MAKE_STRING_TAG(len);
+  uint64_t len_aligned = align8(len);
+  uint64_t *s = rt_allocate(MAKE_STRING_TAG(len), len_aligned, rootstack_ptr);
+  uint64_t *ptr = s + 1;
   for (uint64_t i = 0; i < (len >> 3); i++)
   {
     ptr[i] = ((const uint64_t *)chars)[i];
@@ -663,8 +683,30 @@ void *rt_new_string(uint64_t len, const char *chars, uint64_t *rootstack_ptr)
 
 void *rt_fill_array(uint64_t *ptr, uint64_t init)
 {
-  for (uint64_t i = ARRAY_LEN(*ptr); i > 0; i--) {
+  for (uint64_t i = ARRAY_LEN(*ptr); i > 0; i--)
+  {
     ptr[i] = init;
   }
   return ptr;
+}
+
+__attribute__((noreturn)) void rt_length_error(int64_t len)
+{
+#define NEG_LENGTH "negative length: "
+  write(1, NEG_LENGTH, sizeof(NEG_LENGTH) - 1);
+  rt_print_int(len);
+  rt_print_newline();
+  exit(1);
+}
+
+__attribute__((noreturn)) void rt_out_of_bounds_error(int64_t index, int64_t len)
+{
+#define OUT_OF_BOUNDS1 "out of bounds: "
+#define OUT_OF_BOUNDS2 ", length: "
+  write(1, OUT_OF_BOUNDS1, sizeof(OUT_OF_BOUNDS1) - 1);
+  rt_print_int(index);
+  write(1, OUT_OF_BOUNDS2, sizeof(OUT_OF_BOUNDS2) - 1);
+  rt_print_int(len);
+  rt_print_newline();
+  exit(1);
 }

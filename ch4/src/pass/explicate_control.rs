@@ -1,6 +1,6 @@
 use asm::Label;
-use ast::{Exp, ExpKind, IdxVar, Program, Type};
-use control::{CAtom, CCmpOp, CExp, CPrim, CProgram, CStmt, CTail};
+use ast::{Error, Exp, ExpKind, IdxVar, Program, Type};
+use control::{CAtom, CCmpOp, CError, CExp, CPrim, CProgram, CStmt, CTail};
 use id_arena::Arena;
 use indexmap::IndexMap;
 use std::collections::VecDeque;
@@ -138,6 +138,11 @@ fn collect_exp_locals(
       }
     }
     ExpKind::NewLine => {}
+    ExpKind::Error(Error::Length(len)) => collect_exp_locals(len, locals),
+    ExpKind::Error(Error::OutOfBounds { index, len }) => {
+      collect_exp_locals(index, locals);
+      collect_exp_locals(len, locals);
+    }
   }
 }
 
@@ -201,8 +206,8 @@ fn explicate_tail(state: &mut State, exp: Exp<IdxVar, Type>) -> CTail {
     // TODO this should be removed in chapter 9
     ExpKind::Prim {
       op: (_, op @ "vector-length"),
-      mut args,
-    } => match state.resolve_type(&args.pop().unwrap().ty) {
+      args,
+    } => match state.resolve_type(&args[0].ty) {
       Type::Tuple(fields) => {
         CTail::Return(CExp::Atom(CAtom::Int(fields.len() as i64)))
       }
@@ -210,25 +215,9 @@ fn explicate_tail(state: &mut State, exp: Exp<IdxVar, Type>) -> CTail {
       _ => unreachable!(),
     },
     ExpKind::Prim {
-      op: (_, "vector-ref"),
+      op: (_, "length-error"),
       mut args,
-    } if matches!(state.resolve_type(&args[0].ty), Type::Array(_))
-      && exp.ty == Type::Void =>
-    {
-      let index = args.pop().unwrap();
-      let vec = args.pop().unwrap();
-      CTail::Seq(
-        CStmt::CheckBounds {
-          vec: atom(vec),
-          index: atom(index),
-        },
-        box CTail::Return(CExp::Atom(CAtom::Void)),
-      )
-    }
-    ExpKind::Prim {
-      op: (_, "exit"),
-      mut args,
-    } => CTail::Exit(atom(args.pop().unwrap())),
+    } => CTail::Error(CError::Length(atom(args.pop().unwrap()))),
     ExpKind::Prim { op: (_, op), args } => {
       if exp.ty == Type::Void {
         CTail::Return(CExp::Atom(CAtom::Void))
@@ -256,6 +245,17 @@ fn explicate_tail(state: &mut State, exp: Exp<IdxVar, Type>) -> CTail {
     | ExpKind::NewLine => {
       explicate_exp_effect(state, exp, CTail::Return(CExp::Atom(CAtom::Void)))
     }
+    ExpKind::Error(err) => explicate_error(err),
+  }
+}
+
+fn explicate_error(err: Error<IdxVar, Type>) -> CTail {
+  match err {
+    Error::Length(len) => CTail::Error(CError::Length(atom(*len))),
+    Error::OutOfBounds { index, len } => CTail::Error(CError::OutOfBounds {
+      index: atom(*index),
+      len: atom(*len),
+    }),
   }
 }
 
@@ -292,8 +292,8 @@ fn explicate_assign(
     // TODO this should be removed in chapter 9
     ExpKind::Prim {
       op: (_, op @ "vector-length"),
-      mut args,
-    } => match state.resolve_type(&args.pop().unwrap().ty) {
+      args,
+    } => match state.resolve_type(&args[0].ty) {
       Type::Tuple(fields) => {
         let assign = CStmt::Assign {
           var,
@@ -311,22 +311,6 @@ fn explicate_assign(
       }
       _ => unreachable!(),
     },
-    ExpKind::Prim {
-      op: (_, "vector-ref"),
-      mut args,
-    } if matches!(state.resolve_type(&args[0].ty), Type::Array(_))
-      && init.ty == Type::Void =>
-    {
-      let index = args.pop().unwrap();
-      let vec = args.pop().unwrap();
-      CTail::Seq(
-        CStmt::CheckBounds {
-          vec: atom(vec),
-          index: atom(index),
-        },
-        box cont,
-      )
-    }
     ExpKind::Prim { op: (_, op), args } => {
       if init.ty == Type::Void {
         cont
@@ -362,6 +346,7 @@ fn explicate_assign(
     | ExpKind::Print { .. }
     | ExpKind::NewLine
     | ExpKind::Set { .. } => explicate_exp_effect(state, init, cont),
+    ExpKind::Error(err) => explicate_error(err),
   }
 }
 
@@ -438,6 +423,7 @@ fn explicate_pred(
     | ExpKind::Set { .. } => {
       unreachable!()
     }
+    ExpKind::Error(err) => explicate_error(err),
   }
 }
 
@@ -493,13 +479,7 @@ fn explicate_exp_effect(
         },
         Type::Array(_) => {
           if val.ty == Type::Void {
-            CTail::Seq(
-              CStmt::CheckBounds {
-                vec: atom(vec),
-                index: atom(index),
-              },
-              box cont,
-            )
+            cont
           } else {
             CTail::Seq(
               CStmt::ArrSet {
@@ -514,20 +494,6 @@ fn explicate_exp_effect(
         Type::Alias(_) => unreachable!(),
         _ => unreachable!(),
       }
-    }
-    ExpKind::Prim {
-      op: (_, "vector-ref"),
-      mut args,
-    } => {
-      let index = args.pop().unwrap();
-      let vec = args.pop().unwrap();
-      CTail::Seq(
-        CStmt::CheckBounds {
-          vec: atom(vec),
-          index: atom(index),
-        },
-        box cont,
-      )
     }
     ExpKind::Prim { op: _, args } => {
       explicate_effect(state, args.into_iter(), cont)
@@ -565,6 +531,7 @@ fn explicate_exp_effect(
         _ => unreachable!(),
       },
     ),
+    ExpKind::Error(err) => explicate_error(err),
   }
 }
 

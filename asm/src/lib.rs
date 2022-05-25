@@ -82,6 +82,10 @@ pub enum Instr<VAR = !> {
     src: Arg<VAR>,
     dest: Arg<VAR>,
   },
+  Or {
+    src: Arg<VAR>,
+    dest: Arg<VAR>,
+  },
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -247,6 +251,7 @@ impl<VAR: Debug> Debug for Instr<VAR> {
       Self::Shr { src, count } => write!(f, "shr {:?}, {:?}", src, count),
       Self::Shl { src, count } => write!(f, "shl {:?}, {:?}", src, count),
       Self::And { src, dest } => write!(f, "and {:?}, {:?}", dest, src),
+      Self::Or { src, dest } => write!(f, "or {:?}, {:?}", dest, src),
     }
   }
 }

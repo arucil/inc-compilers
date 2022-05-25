@@ -7,11 +7,11 @@ locals: {x.0: Alias(Id { idx: 0 })}
 constants: {}
 
 start:
-    mov rdi, 8
-    mov rsi, r15
+    mov rdi, 1
+    mov rsi, 0
+    mov rdx, r15
     call rt_allocate
     mov r11, rax
-    mov qword [r11], 1
     mov x.0, r11
     jmp conclusion
 

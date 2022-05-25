@@ -2,8 +2,9 @@ use super::explicate_control::CInfo;
 use asm::{Arg, Block, ByteReg, Instr, Label, Program, Reg};
 use ast::{IdxVar, Type};
 use control::*;
+use id_arena::Arena;
 use indexmap::{IndexMap, IndexSet};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::fmt::{self, Debug, Formatter};
 
 pub struct Info {
@@ -31,7 +32,8 @@ pub fn select_instruction<OldInfo, NewInfo>(
 where
   NewInfo: From<OldInfo>,
 {
-  let mut codegen = CodeGen::new(|ty| ty.clone(), use_heap);
+  let types = Arena::new();
+  let mut codegen = CodeGen::new(&types, use_heap);
   let blocks = prog
     .body
     .into_iter()
@@ -47,11 +49,11 @@ where
   }
 }
 
-#[derive(Default)]
-pub struct CodeGen<F> {
+pub struct CodeGen<'a> {
   code: Vec<Instr<IdxVar>>,
-  resolve_type: F,
+  types: &'a Arena<Type>,
   constants: IndexMap<String, String>,
+  const_indices: HashMap<String, usize>,
   externs: BTreeSet<String>,
   use_heap: bool,
 }
@@ -61,15 +63,13 @@ pub struct CodeGenResult {
   pub externs: BTreeSet<String>,
 }
 
-impl<F> CodeGen<F>
-where
-  F: FnMut(&Type) -> Type,
-{
-  pub fn new(resolve_type: F, use_heap: bool) -> Self {
+impl<'a> CodeGen<'a> {
+  pub fn new(types: &'a Arena<Type>, use_heap: bool) -> Self {
     Self {
       code: vec![],
-      resolve_type,
+      types,
       constants: IndexMap::new(),
+      const_indices: HashMap::new(),
       externs: BTreeSet::new(),
       use_heap,
     }
@@ -129,11 +129,19 @@ where
           return;
         }
         // ch6
-        CTail::Exit(code) => {
-          self.atom_instructions(Arg::Reg(Reg::Rdi), code);
-          let label = "rt_exit".to_owned();
+        CTail::Error(CError::Length(len)) => {
+          self.atom_instructions(Arg::Reg(Reg::Rdi), len);
+          let label = "rt_length_error".to_owned();
           self.externs.insert(label.clone());
           self.code.push(Instr::Call { label, arity: 1 });
+          return;
+        }
+        CTail::Error(CError::OutOfBounds { index, len }) => {
+          self.atom_instructions(Arg::Reg(Reg::Rdi), index);
+          self.atom_instructions(Arg::Reg(Reg::Rsi), len);
+          let label = "rt_out_of_bounds_error".to_owned();
+          self.externs.insert(label.clone());
+          self.code.push(Instr::Call { label, arity: 2 });
           return;
         }
       }
@@ -148,19 +156,25 @@ where
         self.atom_instructions(Arg::Reg(Reg::Rdi), val);
         let label = "rt_print_int".to_owned();
         self.externs.insert(label.clone());
-        self.code.push(Instr::Call { label, arity: 0 });
+        self.code.push(Instr::Call { label, arity: 1 });
       }
       CStmt::PrintBool(val) => {
         self.atom_instructions(Arg::Reg(Reg::Rdi), val);
         let label = "rt_print_bool".to_owned();
         self.externs.insert(label.clone());
-        self.code.push(Instr::Call { label, arity: 0 });
+        self.code.push(Instr::Call { label, arity: 1 });
       }
       CStmt::PrintStr(val) => {
         self.atom_instructions(Arg::Reg(Reg::Rdi), val);
-        let label = "rt_print_str".to_owned();
-        self.externs.insert(label.clone());
-        self.code.push(Instr::Call { label, arity: 0 });
+        if self.use_heap {
+          let label = "rt_print_str".to_owned();
+          self.externs.insert(label.clone());
+          self.code.push(Instr::Call { label, arity: 1 });
+        } else {
+          let label = "rt_print_str_const".to_owned();
+          self.externs.insert(label.clone());
+          self.code.push(Instr::Call { label, arity: 1 });
+        }
       }
       CStmt::NewLine => {
         let label = "rt_print_newline".to_owned();
@@ -185,37 +199,9 @@ where
         let offset = self.calc_field_offset(&fields_before);
         self.atom_instructions(Arg::Deref(Reg::R11, offset), val);
       }
-      CStmt::CheckBounds { vec, index } => {
-        let vec = atom_to_arg(vec);
-        let index = atom_to_arg(index);
-
-        let label = "rt_check_array_bounds".to_owned();
-        self.externs.insert(label.clone());
-        self.code.push(Instr::Mov {
-          src: vec,
-          dest: Arg::Reg(Reg::Rdi),
-        });
-        self.code.push(Instr::Mov {
-          src: index,
-          dest: Arg::Reg(Reg::Rsi),
-        });
-        self.code.push(Instr::Call { label, arity: 2 });
-      }
       CStmt::ArrSet { vec, index, val } => {
         let vec = atom_to_arg(vec);
         let index = atom_to_arg(index);
-
-        let label = "rt_check_array_bounds".to_owned();
-        self.externs.insert(label.clone());
-        self.code.push(Instr::Mov {
-          src: vec.clone(),
-          dest: Arg::Reg(Reg::Rdi),
-        });
-        self.code.push(Instr::Mov {
-          src: index.clone(),
-          dest: Arg::Reg(Reg::Rsi),
-        });
-        self.code.push(Instr::Call { label, arity: 2 });
 
         self.code.push(Instr::Mov {
           src: index,
@@ -306,14 +292,15 @@ where
       }
       // ch6
       CPrim::Tuple(fields) => {
-        let mut size = 8;
+        let mut size = 0;
         let mut non_unit_fields = fields.len() as i64;
         let mut ptr_mask = 0i64;
         let mut field_offsets = vec![];
+        const BASE_OFFSET: i32 = 8;
         let mut i = 0;
         for (_, ty) in &fields {
-          field_offsets.push(size as i32);
-          match (self.resolve_type)(ty) {
+          field_offsets.push(size as i32 + BASE_OFFSET);
+          match ty.resolved(self.types) {
             Type::Void => {
               non_unit_fields -= 1;
               continue;
@@ -329,26 +316,26 @@ where
           i += 1;
         }
         self.code.push(Instr::Mov {
-          src: Arg::Imm(size),
+          src: Arg::Imm(ptr_mask << 9 | non_unit_fields << 3 | 1),
           dest: Arg::Reg(Reg::Rdi),
         });
         self.code.push(Instr::Mov {
-          src: Arg::Reg(Reg::R15),
+          src: Arg::Imm(size),
           dest: Arg::Reg(Reg::Rsi),
+        });
+        self.code.push(Instr::Mov {
+          src: Arg::Reg(Reg::R15),
+          dest: Arg::Reg(Reg::Rdx),
         });
         let label = "rt_allocate".to_owned();
         self.externs.insert(label.clone());
-        self.code.push(Instr::Call { label, arity: 2 });
+        self.code.push(Instr::Call { label, arity: 3 });
         self.code.push(Instr::Mov {
           src: Arg::Reg(Reg::Rax),
           dest: Arg::Reg(Reg::R11),
         });
-        self.code.push(Instr::Mov {
-          src: Arg::Imm(ptr_mask << 9 | non_unit_fields << 3 | 1),
-          dest: Arg::Deref(Reg::R11, 0),
-        });
         for ((field, ty), offset) in fields.into_iter().zip(field_offsets) {
-          if (self.resolve_type)(&ty) == Type::Void {
+          if ty.resolved(self.types) == Type::Void {
             continue;
           }
           self.atom_instructions(Arg::Deref(Reg::R11, offset), field);
@@ -365,41 +352,43 @@ where
         match width {
           0 => {
             self.code.push(Instr::Mov {
-              src: Arg::Imm(8),
-              dest: Arg::Reg(Reg::Rdi),
+              src: Arg::Imm(0),
+              dest: Arg::Reg(Reg::Rsi),
             });
           }
           8 => {
             self.code.push(Instr::Mov {
               src: len.clone(),
-              dest: Arg::Reg(Reg::Rdi),
-            });
-            let label = "rt_check_array_length".to_owned();
-            self.externs.insert(label.clone());
-            self.code.push(Instr::Call { label, arity: 1 });
-
-            self.code.push(Instr::Mov {
-              src: len,
-              dest: Arg::Reg(Reg::Rdi),
-            });
-            self.code.push(Instr::Add {
-              src: Arg::Imm(1),
-              dest: Arg::Reg(Reg::Rdi),
+              dest: Arg::Reg(Reg::Rsi),
             });
             self.code.push(Instr::Shl {
-              src: Arg::Reg(Reg::Rdi),
+              src: Arg::Reg(Reg::Rsi),
               count: Arg::Imm(3),
             });
           }
           _ => unreachable!(),
         }
+        let ptr_mask = if ty.is_ref(self.types) { 0b1000 } else { 0 };
+        let unit_mask = if width == 0 { 0b10000 } else { 0 };
+        self.code.push(Instr::Mov {
+          src: len,
+          dest: Arg::Reg(Reg::Rdi),
+        });
+        self.code.push(Instr::Shl {
+          src: Arg::Reg(Reg::Rdi),
+          count: Arg::Imm(5),
+        });
+        self.code.push(Instr::Or {
+          src: Arg::Imm(unit_mask | ptr_mask | 0b101),
+          dest: Arg::Reg(Reg::Rdi),
+        });
         self.code.push(Instr::Mov {
           src: Arg::Reg(Reg::R15),
-          dest: Arg::Reg(Reg::Rsi),
+          dest: Arg::Reg(Reg::Rdx),
         });
         let label = "rt_allocate".to_owned();
         self.externs.insert(label.clone());
-        self.code.push(Instr::Call { label, arity: 2 });
+        self.code.push(Instr::Call { label, arity: 3 });
 
         match width {
           0 => {
@@ -440,18 +429,6 @@ where
       CPrim::ArrRef { vec, index } => {
         let vec = atom_to_arg(vec);
         let index = atom_to_arg(index);
-
-        let label = "rt_check_array_bounds".to_owned();
-        self.externs.insert(label.clone());
-        self.code.push(Instr::Mov {
-          src: vec.clone(),
-          dest: Arg::Reg(Reg::Rdi),
-        });
-        self.code.push(Instr::Mov {
-          src: index.clone(),
-          dest: Arg::Reg(Reg::Rsi),
-        });
-        self.code.push(Instr::Call { label, arity: 2 });
 
         self.code.push(Instr::Mov {
           src: index,
@@ -497,7 +474,7 @@ where
         });
         self.code.push(Instr::Shr {
           src: target,
-          count: Arg::Imm(4),
+          count: Arg::Imm(5),
         });
       }
     }
@@ -514,9 +491,15 @@ where
       // ch5
       CAtom::Void => {}
       CAtom::Str(s) => {
-        let label = format!("const_{}", self.constants.len() + 1);
         let len = s.len();
-        self.constants.insert(label.clone(), s);
+        let label;
+        if let Some(i) = self.const_indices.get(&s) {
+          label = self.constants.get_index(*i).unwrap().0.clone();
+        } else {
+          label = format!("const_{}", self.constants.len() + 1);
+          let i = self.constants.insert_full(label.clone(), s.clone()).0;
+          self.const_indices.insert(s, i);
+        }
         if self.use_heap {
           self.code.push(Instr::Mov {
             src: Arg::Imm(len as i64),
@@ -556,7 +539,7 @@ where
   }
 
   fn type_size(&mut self, ty: &Type) -> i32 {
-    match (self.resolve_type)(ty) {
+    match ty.resolved(self.types) {
       Type::Void => 0,
       Type::Int => 8,
       Type::Bool => 8,

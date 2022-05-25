@@ -143,6 +143,7 @@ fn collect_exp_locals<TYPE>(
       }
     }
     ExpKind::NewLine => {}
+    ExpKind::Error(_) => unreachable!(),
   }
 }
 
