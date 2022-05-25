@@ -1,1 +1,3 @@
 *.asm
+./array
+./array_length_error

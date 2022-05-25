@@ -131,7 +131,7 @@ static int munmap(uint64_t *ptr, uint64_t size)
 #define ARRAY_IS_PTR(tag) (((tag) >> 3) & 1)
 #define ARRAY_IS_UNIT(tag) (((tag) >> 4) & 1)
 
-void rt_print_int(int64_t value)
+static void print_int(int fd, int64_t value)
 {
   static char buf[22];
   char *p = buf + sizeof(buf);
@@ -154,7 +154,12 @@ void rt_print_int(int64_t value)
   {
     *--p = '-';
   }
-  write(1, p, buf + sizeof(buf) - p);
+  write(fd, p, buf + sizeof(buf) - p);
+}
+
+void rt_print_int(int64_t value)
+{
+  print_int(1, value);
 }
 
 void rt_print_str_const(uint64_t p)
@@ -180,6 +185,11 @@ void rt_print_bool(uint64_t b)
   {
     write(1, STR_FALSE, sizeof(STR_FALSE) - 1);
   }
+}
+
+static void print_newline(int fd)
+{
+  write(fd, "\n", 1);
 }
 
 void rt_print_newline()
@@ -693,20 +703,32 @@ void *rt_fill_array(uint64_t *ptr, uint64_t init)
 __attribute__((noreturn)) void rt_length_error(int64_t len)
 {
 #define NEG_LENGTH "negative length: "
-  write(1, NEG_LENGTH, sizeof(NEG_LENGTH) - 1);
-  rt_print_int(len);
-  rt_print_newline();
+  write(2, NEG_LENGTH, sizeof(NEG_LENGTH) - 1);
+  print_int(2, len);
+  print_newline(2);
   exit(1);
 }
 
 __attribute__((noreturn)) void rt_out_of_bounds_error(int64_t index, int64_t len)
 {
-#define OUT_OF_BOUNDS1 "out of bounds: "
+#define OUT_OF_BOUNDS1 "index out of bounds: "
 #define OUT_OF_BOUNDS2 ", length: "
-  write(1, OUT_OF_BOUNDS1, sizeof(OUT_OF_BOUNDS1) - 1);
-  rt_print_int(index);
-  write(1, OUT_OF_BOUNDS2, sizeof(OUT_OF_BOUNDS2) - 1);
-  rt_print_int(len);
-  rt_print_newline();
+  write(2, OUT_OF_BOUNDS1, sizeof(OUT_OF_BOUNDS1) - 1);
+  print_int(2, index);
+  write(2, OUT_OF_BOUNDS2, sizeof(OUT_OF_BOUNDS2) - 1);
+  print_int(2, len);
+  print_newline(2);
   exit(1);
+}
+
+__attribute__((noreturn)) void rt_div_by_0_error()
+{
+#define DIV_BY_0 "division by zero"
+  write(2, DIV_BY_0, sizeof(DIV_BY_0) - 1);
+  print_newline(2);
+  exit(1);
+}
+
+uint64_t *rt_append_string(uint64_t *s1, uint64_t *s2)
+{
 }

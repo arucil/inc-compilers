@@ -132,6 +132,7 @@ fn mon_exp<TYPE: Clone>(
       },
       counter,
     ),
+    ExpKind::Error(Error::DivByZero) => exp,
   }
 }
 

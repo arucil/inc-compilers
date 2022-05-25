@@ -41,6 +41,7 @@ pub enum CTail {
 pub enum CError {
   Length(CAtom),
   OutOfBounds { index: CAtom, len: CAtom },
+  DivByZero,
 }
 
 #[derive(Clone)]
@@ -78,6 +79,9 @@ pub enum CPrim {
   Neg(CAtom),
   Add(CAtom, CAtom),
   Sub(CAtom, CAtom),
+  Mul(CAtom, CAtom),
+  Div(CAtom, CAtom),
+  Rem(CAtom, CAtom),
   Not(CAtom),
   Cmp(CCmpOp, CAtom, CAtom),
   MakeArr {
@@ -96,6 +100,8 @@ pub enum CPrim {
     fields_before: Vec<Type>,
   },
   TupLen(CAtom),
+  StrAppend(CAtom, CAtom),
+  StrLen(CAtom),
 }
 
 #[derive(Clone, Copy)]
@@ -156,6 +162,9 @@ impl Debug for CTail {
         }
         Self::Error(CError::OutOfBounds { index, len }) => {
           return write!(f, "    out-of-bounds-error {:?} {:?}", index, len)
+        }
+        Self::Error(CError::DivByZero ) => {
+          return write!(f, "    div-by-zero-error")
         }
         Self::Goto(label) => return write!(f, "    goto {:?}", label),
         Self::If {
@@ -229,6 +238,15 @@ impl Debug for CPrim {
       Self::Sub(arg1, arg2) => {
         write!(f, "(- {:?} {:?})", arg1, arg2)
       }
+      Self::Mul(arg1, arg2) => {
+        write!(f, "(* {:?} {:?})", arg1, arg2)
+      }
+      Self::Div(arg1, arg2) => {
+        write!(f, "(/ {:?} {:?})", arg1, arg2)
+      }
+      Self::Rem(arg1, arg2) => {
+        write!(f, "(% {:?} {:?})", arg1, arg2)
+      }
       Self::Neg(arg) => {
         write!(f, "(- {:?})", arg)
       }
@@ -262,6 +280,12 @@ impl Debug for CPrim {
       }
       Self::TupLen(arg) => {
         write!(f, "(vector-length {:?})", arg)
+      }
+      Self::StrAppend(arg1, arg2) => {
+        write!(f, "(string-append {:?} {:?})", arg1, arg2)
+      }
+      Self::StrLen(arg) => {
+        write!(f, "(string-length {:?})", arg)
       }
     }
   }

@@ -19,3 +19,18 @@ fn r#loop() {
 fn array() {
   TestCli::new("ch6", "tests/fixtures").test("array");
 }
+
+#[test]
+fn array_length_error() {
+  TestCli::new("ch6", "tests/fixtures").test("array_length_error");
+}
+
+#[test]
+fn array_ref_index_error() {
+  TestCli::new("ch6", "tests/fixtures").test("array_ref_index_error");
+}
+
+#[test]
+fn array_set_index_error() {
+  TestCli::new("ch6", "tests/fixtures").test("array_set_index_error");
+}

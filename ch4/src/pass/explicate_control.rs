@@ -143,6 +143,7 @@ fn collect_exp_locals(
       collect_exp_locals(index, locals);
       collect_exp_locals(len, locals);
     }
+    ExpKind::Error(Error::DivByZero) => {}
   }
 }
 
@@ -256,6 +257,7 @@ fn explicate_error(err: Error<IdxVar, Type>) -> CTail {
       index: atom(*index),
       len: atom(*len),
     }),
+    Error::DivByZero => CTail::Error(CError::DivByZero),
   }
 }
 
@@ -549,6 +551,11 @@ fn atom(exp: Exp<IdxVar, Type>) -> CAtom {
 fn prim(state: &State, op: &str, mut args: Vec<Exp<IdxVar, Type>>) -> CPrim {
   match op {
     "read" => CPrim::Read,
+    "+" => {
+      let arg2 = args.pop().unwrap();
+      let arg1 = args.pop().unwrap();
+      CPrim::Add(atom(arg1), atom(arg2))
+    }
     "-" => {
       if args.len() == 1 {
         let arg = args.pop().unwrap();
@@ -558,11 +565,6 @@ fn prim(state: &State, op: &str, mut args: Vec<Exp<IdxVar, Type>>) -> CPrim {
         let arg1 = args.pop().unwrap();
         CPrim::Sub(atom(arg1), atom(arg2))
       }
-    }
-    "+" => {
-      let arg2 = args.pop().unwrap();
-      let arg1 = args.pop().unwrap();
-      CPrim::Add(atom(arg1), atom(arg2))
     }
     "not" => {
       let arg = args.pop().unwrap();

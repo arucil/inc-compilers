@@ -90,6 +90,7 @@ pub enum Error<VAR, TYPE> {
     index: Box<Exp<VAR, TYPE>>,
     len: Box<Exp<VAR, TYPE>>,
   },
+  DivByZero,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -270,7 +271,7 @@ impl<VAR: Debug, TYPE: Debug> Exp<VAR, TYPE> {
             .group(),
         )
         .append(RcDoc::text(")")),
-      ExpKind::Error(Error::OutOfBounds{index,len}) => RcDoc::text("(")
+      ExpKind::Error(Error::OutOfBounds { index, len }) => RcDoc::text("(")
         .append(
           RcDoc::text("out-of-bounds-error")
             .append(Doc::line())
@@ -281,6 +282,7 @@ impl<VAR: Debug, TYPE: Debug> Exp<VAR, TYPE> {
             .group(),
         )
         .append(RcDoc::text(")")),
+      ExpKind::Error(Error::DivByZero) => RcDoc::text("(div-by-zero)"),
     }
   }
 }

@@ -35,6 +35,8 @@ pub enum Instr<VAR = !> {
     src: Arg<VAR>,
     dest: Arg<VAR>,
   },
+  IMul(Arg<VAR>),
+  IDiv(Arg<VAR>),
   Mov {
     src: Arg<VAR>,
     dest: Arg<VAR>,
@@ -234,6 +236,8 @@ impl<VAR: Debug> Debug for Instr<VAR> {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     match self {
       Self::Add { src, dest } => write!(f, "add {:?}, {:?}", dest, src),
+      Self::IMul(src) => write!(f, "imul {:?}", src),
+      Self::IDiv(src) => write!(f, "idiv {:?}", src),
       Self::Mov { src, dest } => write!(f, "mov {:?}, {:?}", dest, src),
       Self::Call { label, .. } => write!(f, "call {}", label),
       Self::Jmp(label) => write!(f, "jmp {:?}", label),

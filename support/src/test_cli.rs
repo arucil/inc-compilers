@@ -1,7 +1,7 @@
 use assert_cmd::Command;
 use scopeguard::defer;
-use std::fs;
 use std::ffi::OsStr;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Once;
 
@@ -27,7 +27,7 @@ impl TestCli {
     }
   }
 
-  pub fn test<S: AsRef<str>>(&self, prog_name: S) {
+  pub fn test<S: AsRef<str>>(self, prog_name: S) {
     let prog = prog_name.as_ref();
     let mut cmd = Command::cargo_bin(&self.bin).unwrap();
     cmd.arg(self.base_dir.join(format!("{}.prog", prog)));
@@ -66,19 +66,40 @@ impl TestCli {
     });
     let mut tested = false;
     for input in inputs {
+      let stdin = fs::read_to_string(self.base_dir.join(&input)).unwrap();
+      let mut test = Command::new(format!("./{}", prog))
+        .write_stdin(stdin)
+        .assert();
+
+      let status = self
+        .base_dir
+        .join(format!("{}.status", &input[..input.len() - ".input".len()]));
+      if status.exists() {
+        let exit_code = fs::read_to_string(status)
+          .unwrap()
+          .trim()
+          .parse::<i32>()
+          .unwrap();
+        test = test.code(exit_code);
+      } else {
+        test = test.success();
+      };
+
       let output = self
         .base_dir
         .join(format!("{}.output", &input[..input.len() - ".input".len()]));
-      if !output.exists() {
-        panic!("missing {}", output.display());
+      if output.exists() {
+        let stdout = fs::read_to_string(output).unwrap();
+        test = test.stdout(predicates::ord::eq(stdout.as_bytes()));
       }
-      let input = fs::read_to_string(self.base_dir.join(input)).unwrap();
-      let output = fs::read_to_string(output).unwrap();
-      Command::new(format!("./{}", prog))
-        .write_stdin(input)
-        .assert()
-        .success()
-        .stdout(predicates::ord::eq(output.as_bytes()));
+
+      let error = self
+        .base_dir
+        .join(format!("{}.error", &input[..input.len() - ".input".len()]));
+      if error.exists() {
+        let stderr = fs::read_to_string(error).unwrap();
+        test.stderr(predicates::ord::eq(stderr.as_bytes()));
+      }
       tested = true;
     }
     if !tested {

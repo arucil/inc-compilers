@@ -189,6 +189,11 @@ impl Uniq {
         range,
         ty,
       }),
+      ExpKind::Error(Error::DivByZero) => Ok(Exp {
+        kind: ExpKind::Error(Error::DivByZero),
+        range,
+        ty,
+      }),
     }
   }
 }

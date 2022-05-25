@@ -144,6 +144,12 @@ impl<'a> CodeGen<'a> {
           self.code.push(Instr::Call { label, arity: 2 });
           return;
         }
+        CTail::Error(CError::DivByZero) => {
+          let label = "rt_div_by_0_error".to_owned();
+          self.externs.insert(label.clone());
+          self.code.push(Instr::Call { label, arity: 0 });
+          return;
+        }
       }
     }
   }
@@ -475,6 +481,67 @@ impl<'a> CodeGen<'a> {
         self.code.push(Instr::Shr {
           src: target,
           count: Arg::Imm(5),
+        });
+      }
+      CPrim::Mul(atom1, atom2) => {
+        self.atom_instructions(Arg::Reg(Reg::Rax), atom1);
+        self.code.push(Instr::Xor {
+          src: Arg::Reg(Reg::Rdi),
+          dest: Arg::Reg(Reg::Rdi),
+        });
+        let arg2 = atom_to_arg(atom2);
+        self.code.push(Instr::IMul(arg2));
+        self.code.push(Instr::Mov {
+          src: Arg::Reg(Reg::Rax),
+          dest: target,
+        });
+      }
+      CPrim::Div(atom1, atom2) => {
+        self.atom_instructions(Arg::Reg(Reg::Rax), atom1);
+        self.code.push(Instr::Xor {
+          src: Arg::Reg(Reg::Rdi),
+          dest: Arg::Reg(Reg::Rdi),
+        });
+        let arg2 = atom_to_arg(atom2);
+        self.code.push(Instr::IDiv(arg2));
+        self.code.push(Instr::Mov {
+          src: Arg::Reg(Reg::Rax),
+          dest: target,
+        });
+      }
+      CPrim::Rem(atom1, atom2) => {
+        self.atom_instructions(Arg::Reg(Reg::Rax), atom1);
+        self.code.push(Instr::Xor {
+          src: Arg::Reg(Reg::Rdi),
+          dest: Arg::Reg(Reg::Rdi),
+        });
+        let arg2 = atom_to_arg(atom2);
+        self.code.push(Instr::IDiv(arg2));
+        self.code.push(Instr::Mov {
+          src: Arg::Reg(Reg::Rdx),
+          dest: target,
+        });
+      }
+      CPrim::StrAppend(atom1, atom2) => {
+        self.atom_instructions(Arg::Reg(Reg::Rdi), atom1);
+        self.atom_instructions(Arg::Reg(Reg::Rsi), atom2);
+        let label = "rt_append_string".to_owned();
+        self.externs.insert(label.clone());
+        self.code.push(Instr::Call { label, arity: 2 });
+        self.code.push(Instr::Mov {
+          src: Arg::Reg(Reg::Rax),
+          dest: target,
+        });
+      }
+      CPrim::StrLen(arg) => {
+        self.atom_instructions(Arg::Reg(Reg::R11), arg);
+        self.code.push(Instr::Mov {
+          src: Arg::Deref(Reg::R11, 0),
+          dest: target.clone(),
+        });
+        self.code.push(Instr::Shr {
+          src: target,
+          count: Arg::Imm(3),
         });
       }
     }

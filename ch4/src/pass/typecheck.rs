@@ -47,6 +47,8 @@ static PRIM_TYPES: Lazy<HashMap<&'static str, PrimType>> = Lazy::new(|| {
       PrimType::new_unary(Int, Int),
       PrimType::new_binary(Int, Int, Int),
     ]),
+    "*" => PrimType::new_binary(Int, Int, Int),
+    "/" => PrimType::new_binary(Int, Int, Int),
     "read" => PrimType::new_nullary(Int),
     "and" => PrimType::new_binary(Bool, Bool, Bool),
     "or" => PrimType::new_binary(Bool, Bool, Bool),
@@ -69,6 +71,8 @@ static PRIM_TYPES: Lazy<HashMap<&'static str, PrimType>> = Lazy::new(|| {
     "vector-ref" => PrimType::VecRef,
     "vector-set!" => PrimType::VecSet,
     "vector-length" => PrimType::VecLen,
+    "string-append" => PrimType::new_binary(Str, Str, Str),
+    "string-length" => PrimType::new_unary(Str, Int),
   }
 });
 

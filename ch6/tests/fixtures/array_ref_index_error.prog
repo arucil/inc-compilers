@@ -1,0 +1,2 @@
+(vector-ref (make-vector 1 "abc") (read))
+(void)
