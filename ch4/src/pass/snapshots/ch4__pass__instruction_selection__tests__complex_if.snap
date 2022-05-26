@@ -2,7 +2,7 @@
 source: ch4/src/pass/instruction_selection.rs
 expression: result.to_string_pretty()
 ---
-locals: {x.0: Int, y.1: Int, tmp.0: Int, tmp.1: Int}
+locals: {x.0: Int, y.1: Int, (tmp).0: Int, (tmp).1: Int}
 
 constants: {}
 
@@ -23,9 +23,9 @@ block9:
     jg block7
     jmp block6
 block4:
-    mov tmp.0, x.0
-    sub tmp.0, y.1
-    cmp tmp.0, 10
+    mov (tmp).0, x.0
+    sub (tmp).0, y.1
+    cmp (tmp).0, 10
     jl block0
     jmp block3
 block3:
@@ -43,9 +43,9 @@ block0:
     mov rax, -1
     jmp conclusion
 block2:
-    mov tmp.1, y.1
-    sub tmp.1, x.0
-    cmp tmp.1, 10
+    mov (tmp).1, y.1
+    sub (tmp).1, x.0
+    cmp (tmp).1, 10
     jl block0
     jmp block1
 block1:

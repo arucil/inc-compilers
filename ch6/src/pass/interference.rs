@@ -21,7 +21,7 @@ mod tests {
       pop rsi
       push x
       mov w, rbx
-      call rt_allocate, 2
+      call rt_allocate, 2, gc
       add w, x
       jmp conclusion
     "#,
@@ -58,7 +58,7 @@ mod tests {
       pop rsi
       push x
       mov w, rbx
-      call rt_allocate, 2
+      call rt_allocate, 2, gc
       add w, x
       jmp conclusion
     "#,

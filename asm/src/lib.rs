@@ -1,13 +1,13 @@
 #![feature(never_type)]
 
+use ast::Type;
+use id_arena::Arena;
 use indexmap::IndexMap;
 use num_derive::{FromPrimitive, ToPrimitive};
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::fmt::{self, Debug, Formatter, Write};
 use std::iter::IntoIterator;
-use ast::Type;
-use id_arena::Arena;
 
 #[derive(Debug, Clone)]
 pub struct Program<INFO = (), VAR = !> {
@@ -45,6 +45,7 @@ pub enum Instr<VAR = !> {
   Call {
     label: String,
     arity: usize,
+    gc: bool,
   },
   Ret,
   Push(Arg<VAR>),
@@ -496,11 +497,17 @@ pub fn parse_code<VAR: Clone>(
             Instr::Call {
               label: args[0].to_owned(),
               arity: 0,
+              gc: false,
             }
           } else {
             Instr::Call {
               label: args[0].to_owned(),
               arity: args[1].parse().unwrap(),
+              gc: if args.len() == 3 {
+                args[2] == "gc"
+              } else {
+                false
+              },
             }
           }
         }

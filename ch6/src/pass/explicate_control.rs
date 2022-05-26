@@ -8,6 +8,7 @@ mod tests {
   use insta::assert_snapshot;
 
   use crate::pass::array_bounds;
+use crate::pass::division;
 
   #[test]
   fn vector() {
@@ -71,6 +72,31 @@ mod tests {
     .unwrap();
     let prog = typecheck::typecheck(prog).unwrap();
     let prog = array_bounds::insert_bounds_check(prog);
+    let prog = shrink::shrink(prog);
+    let prog = uniquify::uniquify(prog);
+    let prog = remove_complex_operands::remove_complex_operands(prog);
+    let result = explicate_control::explicate_control(prog);
+    assert_snapshot!(result.to_string_pretty());
+  }
+
+  #[test]
+  fn gcd() {
+    let prog = ast::parse(
+      r#"
+(let ([a0 (read)] [b0 (read)] [a a0] [b b0])
+  (print (quotient a b))
+  (while (not (eq? b 0))
+    (let ([tmp b])
+      (set! b (remainder a b))
+      (set! a tmp)
+      (print "a=" a ", b=" b)))
+  (print "gcd=" a ", lcm=" (quotient (* a0 b0) a)))
+      "#,
+    )
+    .unwrap();
+    let prog = typecheck::typecheck(prog).unwrap();
+    let prog = array_bounds::insert_bounds_check(prog);
+    let prog = division::insert_division_check(prog);
     let prog = shrink::shrink(prog);
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);

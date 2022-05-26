@@ -133,7 +133,11 @@ impl<'a> CodeGen<'a> {
           self.atom_instructions(Arg::Reg(Reg::Rdi), len);
           let label = "rt_length_error".to_owned();
           self.externs.insert(label.clone());
-          self.code.push(Instr::Call { label, arity: 1 });
+          self.code.push(Instr::Call {
+            label,
+            arity: 1,
+            gc: false,
+          });
           return;
         }
         CTail::Error(CError::OutOfBounds { index, len }) => {
@@ -141,13 +145,21 @@ impl<'a> CodeGen<'a> {
           self.atom_instructions(Arg::Reg(Reg::Rsi), len);
           let label = "rt_out_of_bounds_error".to_owned();
           self.externs.insert(label.clone());
-          self.code.push(Instr::Call { label, arity: 2 });
+          self.code.push(Instr::Call {
+            label,
+            arity: 2,
+            gc: false,
+          });
           return;
         }
         CTail::Error(CError::DivByZero) => {
           let label = "rt_div_by_0_error".to_owned();
           self.externs.insert(label.clone());
-          self.code.push(Instr::Call { label, arity: 0 });
+          self.code.push(Instr::Call {
+            label,
+            arity: 0,
+            gc: false,
+          });
           return;
         }
       }
@@ -162,35 +174,59 @@ impl<'a> CodeGen<'a> {
         self.atom_instructions(Arg::Reg(Reg::Rdi), val);
         let label = "rt_print_int".to_owned();
         self.externs.insert(label.clone());
-        self.code.push(Instr::Call { label, arity: 1 });
+        self.code.push(Instr::Call {
+          label,
+          arity: 1,
+          gc: false,
+        });
       }
       CStmt::PrintBool(val) => {
         self.atom_instructions(Arg::Reg(Reg::Rdi), val);
         let label = "rt_print_bool".to_owned();
         self.externs.insert(label.clone());
-        self.code.push(Instr::Call { label, arity: 1 });
+        self.code.push(Instr::Call {
+          label,
+          arity: 1,
+          gc: false,
+        });
       }
       CStmt::PrintStr(val) => {
         self.atom_instructions(Arg::Reg(Reg::Rdi), val);
         if self.use_heap {
           let label = "rt_print_str".to_owned();
           self.externs.insert(label.clone());
-          self.code.push(Instr::Call { label, arity: 1 });
+          self.code.push(Instr::Call {
+            label,
+            arity: 1,
+            gc: false,
+          });
         } else {
           let label = "rt_print_str_const".to_owned();
           self.externs.insert(label.clone());
-          self.code.push(Instr::Call { label, arity: 1 });
+          self.code.push(Instr::Call {
+            label,
+            arity: 1,
+            gc: false,
+          });
         }
       }
       CStmt::NewLine => {
         let label = "rt_print_newline".to_owned();
         self.externs.insert(label.clone());
-        self.code.push(Instr::Call { label, arity: 0 })
+        self.code.push(Instr::Call {
+          label,
+          arity: 0,
+          gc: false,
+        })
       }
       CStmt::Read => {
         let label = "rt_read_int".to_owned();
         self.externs.insert(label.clone());
-        self.code.push(Instr::Call { label, arity: 0 })
+        self.code.push(Instr::Call {
+          label,
+          arity: 0,
+          gc: false,
+        })
       }
       CStmt::TupSet {
         tup,
@@ -246,7 +282,11 @@ impl<'a> CodeGen<'a> {
       CPrim::Read => {
         let label = "rt_read_int".to_owned();
         self.externs.insert(label.clone());
-        self.code.push(Instr::Call { label, arity: 0 });
+        self.code.push(Instr::Call {
+          label,
+          arity: 0,
+          gc: false,
+        });
         self.code.push(Instr::Mov {
           src: Arg::Reg(Reg::Rax),
           dest: target,
@@ -335,7 +375,11 @@ impl<'a> CodeGen<'a> {
         });
         let label = "rt_allocate".to_owned();
         self.externs.insert(label.clone());
-        self.code.push(Instr::Call { label, arity: 3 });
+        self.code.push(Instr::Call {
+          label,
+          arity: 3,
+          gc: true,
+        });
         self.code.push(Instr::Mov {
           src: Arg::Reg(Reg::Rax),
           dest: Arg::Reg(Reg::R11),
@@ -394,7 +438,11 @@ impl<'a> CodeGen<'a> {
         });
         let label = "rt_allocate".to_owned();
         self.externs.insert(label.clone());
-        self.code.push(Instr::Call { label, arity: 3 });
+        self.code.push(Instr::Call {
+          label,
+          arity: 3,
+          gc: true,
+        });
 
         match width {
           0 => {
@@ -415,7 +463,11 @@ impl<'a> CodeGen<'a> {
             });
             let label = "rt_fill_array".to_owned();
             self.externs.insert(label.clone());
-            self.code.push(Instr::Call { label, arity: 2 });
+            self.code.push(Instr::Call {
+              label,
+              arity: 2,
+              gc: false,
+            });
             self.code.push(Instr::Mov {
               src: Arg::Reg(Reg::Rax),
               dest: target,
@@ -499,8 +551,8 @@ impl<'a> CodeGen<'a> {
       CPrim::Div(atom1, atom2) => {
         self.atom_instructions(Arg::Reg(Reg::Rax), atom1);
         self.code.push(Instr::Xor {
-          src: Arg::Reg(Reg::Rdi),
-          dest: Arg::Reg(Reg::Rdi),
+          src: Arg::Reg(Reg::Rdx),
+          dest: Arg::Reg(Reg::Rdx),
         });
         let arg2 = atom_to_arg(atom2);
         self.code.push(Instr::IDiv(arg2));
@@ -512,8 +564,8 @@ impl<'a> CodeGen<'a> {
       CPrim::Rem(atom1, atom2) => {
         self.atom_instructions(Arg::Reg(Reg::Rax), atom1);
         self.code.push(Instr::Xor {
-          src: Arg::Reg(Reg::Rdi),
-          dest: Arg::Reg(Reg::Rdi),
+          src: Arg::Reg(Reg::Rdx),
+          dest: Arg::Reg(Reg::Rdx),
         });
         let arg2 = atom_to_arg(atom2);
         self.code.push(Instr::IDiv(arg2));
@@ -522,16 +574,8 @@ impl<'a> CodeGen<'a> {
           dest: target,
         });
       }
-      CPrim::StrAppend(atom1, atom2) => {
-        self.atom_instructions(Arg::Reg(Reg::Rdi), atom1);
-        self.atom_instructions(Arg::Reg(Reg::Rsi), atom2);
-        let label = "rt_append_string".to_owned();
-        self.externs.insert(label.clone());
-        self.code.push(Instr::Call { label, arity: 2 });
-        self.code.push(Instr::Mov {
-          src: Arg::Reg(Reg::Rax),
-          dest: target,
-        });
+      CPrim::AppendStr(atom1, atom2) => {
+        todo!()
       }
       CPrim::StrLen(arg) => {
         self.atom_instructions(Arg::Reg(Reg::R11), arg);
@@ -569,7 +613,30 @@ impl<'a> CodeGen<'a> {
         }
         if self.use_heap {
           self.code.push(Instr::Mov {
-            src: Arg::Imm(len as i64),
+            src: Arg::Imm((len as i64) << 3 | 0b011),
+            dest: Arg::Reg(Reg::Rdi),
+          });
+          self.code.push(Instr::Mov {
+            src: Arg::Imm((len as i64 + 7) & !7),
+            dest: Arg::Reg(Reg::Rsi),
+          });
+          self.code.push(Instr::Mov {
+            src: Arg::Reg(Reg::R15),
+            dest: Arg::Reg(Reg::Rdx),
+          });
+          let alloc_label = "rt_allocate".to_owned();
+          self.externs.insert(alloc_label.clone());
+          self.code.push(Instr::Call {
+            label: alloc_label,
+            arity: 3,
+            gc: true,
+          });
+          self.code.push(Instr::Mov {
+            src: Arg::Reg(Reg::Rax),
+            dest: Arg::Reg(Reg::Rdi),
+          });
+          self.code.push(Instr::Add {
+            src: Arg::Imm(8),
             dest: Arg::Reg(Reg::Rdi),
           });
           self.code.push(Instr::Mov {
@@ -577,12 +644,20 @@ impl<'a> CodeGen<'a> {
             dest: Arg::Reg(Reg::Rsi),
           });
           self.code.push(Instr::Mov {
-            src: Arg::Reg(Reg::R15),
+            src: Arg::Imm(len as i64),
             dest: Arg::Reg(Reg::Rdx),
           });
-          let label = "rt_new_string".to_owned();
-          self.externs.insert(label.clone());
-          self.code.push(Instr::Call { label, arity: 3 });
+          let alloc_label = "rt_memcpy".to_owned();
+          self.externs.insert(alloc_label.clone());
+          self.code.push(Instr::Call {
+            label: alloc_label,
+            arity: 3,
+            gc: false,
+          });
+          self.code.push(Instr::Sub {
+            src: Arg::Imm(8),
+            dest: Arg::Reg(Reg::Rax),
+          });
           self.code.push(Instr::Mov {
             src: Arg::Reg(Reg::Rax),
             dest: target,

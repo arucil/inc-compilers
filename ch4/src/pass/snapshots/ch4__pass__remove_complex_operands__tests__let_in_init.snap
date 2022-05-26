@@ -9,8 +9,9 @@ expression: result.to_string_pretty()
    (let
     [y.1 (- x.0)]
     (let
-     [tmp.0 (- y.1)]
+     [(tmp).0 (- y.1)]
      (let
-      [tmp.1 (+ x.0 tmp.0)]
-      (+ tmp.1 7)))))]
+      [(tmp).1
+       (+ x.0 (tmp).0)]
+      (+ (tmp).1 7)))))]
  (- a.2))

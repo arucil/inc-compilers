@@ -42,6 +42,7 @@ fn add_prologue(prog: &mut Program<Info>) {
     Call {
       label: label_init,
       arity: 2,
+      gc: false,
     },
     Mov {
       src: Arg::Reg(Rax),

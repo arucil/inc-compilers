@@ -129,6 +129,7 @@ fn mark_mutable_vars<TYPE>(
       range: exp.range,
       ty: exp.ty,
     },
+    ExpKind::Error(Error::DivByZero) => exp,
   }
 }
 
@@ -187,5 +188,6 @@ fn collect_set_vars<TYPE>(
       collect_set_vars(index, set_vars);
       collect_set_vars(len, set_vars);
     }
+    ExpKind::Error(Error::DivByZero) => {}
   }
 }

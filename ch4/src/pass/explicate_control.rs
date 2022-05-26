@@ -566,6 +566,21 @@ fn prim(state: &State, op: &str, mut args: Vec<Exp<IdxVar, Type>>) -> CPrim {
         CPrim::Sub(atom(arg1), atom(arg2))
       }
     }
+    "*" => {
+      let arg2 = args.pop().unwrap();
+      let arg1 = args.pop().unwrap();
+      CPrim::Mul(atom(arg1), atom(arg2))
+    }
+    "quotient" => {
+      let arg2 = args.pop().unwrap();
+      let arg1 = args.pop().unwrap();
+      CPrim::Div(atom(arg1), atom(arg2))
+    }
+    "remainder" => {
+      let arg2 = args.pop().unwrap();
+      let arg1 = args.pop().unwrap();
+      CPrim::Rem(atom(arg1), atom(arg2))
+    }
     "not" => {
       let arg = args.pop().unwrap();
       CPrim::Not(atom(arg))
@@ -622,6 +637,15 @@ fn prim(state: &State, op: &str, mut args: Vec<Exp<IdxVar, Type>>) -> CPrim {
         Type::Array(_) => CPrim::ArrLen(atom(arg)),
         _ => unreachable!(),
       }
+    }
+    "string-append" => {
+      let arg2 = args.pop().unwrap();
+      let arg1 = args.pop().unwrap();
+      CPrim::AppendStr(atom(arg1), atom(arg2))
+    }
+    "string-length" => {
+      let arg = args.pop().unwrap();
+      CPrim::StrLen(atom(arg))
     }
     _ => unreachable!("{}", op),
   }

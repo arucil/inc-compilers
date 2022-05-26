@@ -2,11 +2,11 @@
 source: ch4/src/pass/explicate_control.rs
 expression: result.to_string_pretty()
 ---
-locals: {x.0: Int, tmp.0: Int, tmp.1: Bool}
+locals: {x.0: Int, (tmp).0: Int, (tmp).1: Bool}
 
 start:
-    tmp.0 = (read)
-    if (>= tmp.0 3) goto block3 else goto block4
+    (tmp).0 = (read)
+    if (>= (tmp).0 3) goto block3 else goto block4
 block3:
     x.0 = 10
     goto block2
@@ -14,8 +14,8 @@ block4:
     x.0 = 77
     goto block2
 block2:
-    tmp.1 = (eq? x.0 10)
-    if (eq? tmp.1 #f) goto block1 else goto block0
+    (tmp).1 = (eq? x.0 10)
+    if (eq? (tmp).1 #f) goto block1 else goto block0
 block1:
     return 41
 block0:

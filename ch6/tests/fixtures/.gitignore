@@ -1,3 +1,7 @@
 *.asm
-./array
-./array_length_error
+/array
+/array_length_error
+/array_ref_index_error
+/array_set_index_error
+/gcd
+/string

@@ -34,3 +34,13 @@ fn array_ref_index_error() {
 fn array_set_index_error() {
   TestCli::new("ch6", "tests/fixtures").test("array_set_index_error");
 }
+
+#[test]
+fn gcd() {
+  TestCli::new("ch6", "tests/fixtures").test("gcd");
+}
+
+#[test]
+fn string() {
+  TestCli::new("ch6", "tests/fixtures").test("string");
+}

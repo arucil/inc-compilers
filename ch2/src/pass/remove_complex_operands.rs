@@ -232,7 +232,7 @@ fn assign_var<TYPE: Clone>(
   let range = exp.range;
   let ty = exp.ty.clone();
   let tmp = IdxVar {
-    name: "tmp".to_owned(),
+    name: "(tmp)".to_owned(),
     index: *counter,
   };
   *counter += 1;

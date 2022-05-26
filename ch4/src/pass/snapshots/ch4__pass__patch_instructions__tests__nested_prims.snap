@@ -2,7 +2,7 @@
 source: ch4/src/pass/patch_instructions.rs
 expression: result.to_string_pretty()
 ---
-locals: {x.0: Int, y.1: Int, tmp.0: Int, tmp.1: Int, tmp.2: Int, tmp.3: Int}
+locals: {x.0: Int, y.1: Int, (tmp).0: Int, (tmp).1: Int, (tmp).2: Int, (tmp).3: Int}
 used_callee_saved_regs: {rbx}
 stack_space: 0 bytes
 constants: {}

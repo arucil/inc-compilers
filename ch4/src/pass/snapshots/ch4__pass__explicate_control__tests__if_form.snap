@@ -2,16 +2,16 @@
 source: ch4/src/pass/explicate_control.rs
 expression: result.to_string_pretty()
 ---
-locals: {tmp.0: Int, x.0: Int, tmp.1: Int, tmp.2: Int}
+locals: {(tmp).0: Int, x.0: Int, (tmp).1: Int, (tmp).2: Int}
 
 start:
-    tmp.0 = (read)
-    if (> 3 tmp.0) goto block0 else goto block1
+    (tmp).0 = (read)
+    if (> 3 (tmp).0) goto block0 else goto block1
 block0:
     return (- 7 2)
 block1:
     x.0 = 3
-    tmp.1 = (read)
-    tmp.2 = (+ x.0 tmp.1)
-    return (- tmp.2)
+    (tmp).1 = (read)
+    (tmp).2 = (+ x.0 (tmp).1)
+    return (- (tmp).2)
 

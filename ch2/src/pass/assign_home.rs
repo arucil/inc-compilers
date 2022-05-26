@@ -69,7 +69,7 @@ fn assign_home_instr(
       let dest = assign_home_arg(dest, local_spaces);
       Instr::Add { src, dest }
     }
-    Instr::Call { label, arity } => Instr::Call { label, arity },
+    Instr::Call { label, arity, gc } => Instr::Call { label, arity, gc },
     Instr::Jmp(label) => Instr::Jmp(label),
     Instr::Mov { src, dest } => {
       let src = assign_home_arg(src, local_spaces);

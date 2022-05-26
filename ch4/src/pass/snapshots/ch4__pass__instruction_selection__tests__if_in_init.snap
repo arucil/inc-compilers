@@ -2,14 +2,14 @@
 source: ch4/src/pass/instruction_selection.rs
 expression: result.to_string_pretty()
 ---
-locals: {x.0: Int, tmp.0: Int, tmp.1: Bool}
+locals: {x.0: Int, (tmp).0: Int, (tmp).1: Bool}
 
 constants: {}
 
 start:
     call rt_read_int
-    mov tmp.0, rax
-    cmp tmp.0, 3
+    mov (tmp).0, rax
+    cmp (tmp).0, 3
     jge block3
     jmp block4
 block3:
@@ -21,8 +21,8 @@ block4:
 block2:
     cmp x.0, 10
     sete al
-    movzx tmp.1, al
-    cmp tmp.1, 0
+    movzx (tmp).1, al
+    cmp (tmp).1, 0
     je block1
     jmp block0
 block1:

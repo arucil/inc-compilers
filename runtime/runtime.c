@@ -10,14 +10,14 @@
   do                                                                       \
   {                                                                        \
     static const char *msg = __FILE__ ":" STR(__LINE__) ":" STR(MSG) "\n"; \
-    write(1, msg, sizeof(msg) - 1);                                        \
+    write(1, msg, strlen(msg));                                            \
     exit(1);                                                               \
   } while (0)
 #define RT_FATAL_CODE(MSG, CODE)                                      \
   do                                                                  \
   {                                                                   \
     static const char *msg = __FILE__ ":" STR(__LINE__) ":" STR(MSG); \
-    write(1, msg, sizeof(msg) - 1);                                   \
+    write(1, msg, strlen(msg));                                       \
     rt_print_int(CODE);                                               \
     rt_print_newline();                                               \
     exit(1);                                                          \
@@ -93,6 +93,16 @@ static void *mmap(uint64_t size)
 static int munmap(uint64_t *ptr, uint64_t size)
 {
   return (int)syscall5(11, (uint64_t)ptr, size, 0, 0, 0);
+}
+
+static int strlen(const char *p)
+{
+  int len = 0;
+  while (*p++)
+  {
+    len++;
+  }
+  return len;
 }
 
 // tag:
@@ -225,7 +235,9 @@ int64_t rt_read_int()
   }
   if (p == end)
   {
-    RT_FATAL("invalid integer");
+#define INVALID_INT "invalid integer"
+    write(2, INVALID_INT, sizeof(INVALID_INT) - 1);
+    exit(1);
   }
   int neg = 0;
   if (*p == '-')
@@ -244,7 +256,8 @@ int64_t rt_read_int()
   }
   if (p < end && *p)
   {
-    RT_FATAL("invalid integer");
+    write(2, INVALID_INT, sizeof(INVALID_INT) - 1);
+    exit(1);
   }
   return neg ? -n : n;
 }
@@ -400,12 +413,8 @@ void rt_collect(uint64_t *rootstack_ptr)
 static void extend_heap(uint64_t size, uint64_t *rootstack_ptr)
 {
   uint64_t old_heap_size = from_space_end - from_space_begin;
-  uint64_t old_total_size = from_space_ptr - from_space_begin;
-  uint64_t new_heap_size = old_total_size + size;
-  do
-  {
-    new_heap_size = new_heap_size * 7 / 5;
-  } while (new_heap_size - old_total_size < size);
+  uint64_t old_live_size = from_space_ptr - from_space_begin;
+  uint64_t new_heap_size = (old_live_size + size) * 7 / 5;
   int ret = munmap(to_space_begin, old_heap_size);
   if (ret)
   {
@@ -510,17 +519,17 @@ uint64_t rt_heap_size()
   return from_space_end - from_space_begin;
 }
 
-// static void print_hex(uint64_t n)
-// {
-//   static const char hex[] = "0123456789ABCDEF";
-//   char buf[17];
-//   for (uint64_t i = 0; i < 16; i++)
-//   {
-//     buf[15 - i] = hex[n >> (4 * i) & 15];
-//   }
-//   buf[16] = ' ';
-//   write(1, buf, 17);
-// }
+static void print_hex(uint64_t n)
+{
+  static const char hex[] = "0123456789ABCDEF";
+  char buf[17];
+  for (uint64_t i = 0; i < 16; i++)
+  {
+    buf[15 - i] = hex[n >> (4 * i) & 15];
+  }
+  buf[16] = ' ';
+  write(1, buf, 17);
+}
 
 // void check_invariants(uint64_t index, uint64_t *rootstack_ptr) {
 //   for (uint64_t *p = rootstack_begin; p < rootstack_ptr; p++) {
@@ -600,38 +609,41 @@ uint64_t rt_heap_size()
 //   }
 // }
 
-// void dump(uint64_t index, uint64_t *rootstack_ptr)
-// {
-//   rt_print_int(index);
-//   rt_print_newline();
-//   write(1, "rootstack: ", 11);
-//   for (uint64_t *p = rootstack_begin; p < rootstack_ptr; p++)
-//   {
-//     print_hex(*p);
-//   }
-//   rt_print_newline();
-//   write(1, "from space: \n", 13);
-//   uint64_t *q = from_space_begin;
-//   for (int j = 0; j < 10; j++)
-//   {
-//     print_hex((uint64_t)q);
-//     write(1, ": ", 2);
-//     for (int i = 0; i < 4; i++)
-//     {
-//       print_hex(*q);
-//       q++;
-//       if ((void *)q >= from_space_ptr)
-//       {
-//         break;
-//       }
-//     }
-//     rt_print_newline();
-//     if ((void *)q >= from_space_ptr)
-//     {
-//       break;
-//     }
-//   }
-// }
+void dump(uint64_t index, uint64_t *rootstack_ptr)
+{
+  rt_print_int(index);
+  rt_print_newline();
+  write(1, "rootstack: ", 11);
+  for (uint64_t *p = rootstack_begin; p < rootstack_ptr; p++)
+  {
+    print_hex(*p);
+  }
+  rt_print_newline();
+  write(1, "from space: \n", 13);
+  uint64_t *q = from_space_begin;
+  for (int j = 0; j < 10; j++)
+  {
+    print_hex((uint64_t)q);
+    write(1, ": ", 2);
+    for (int i = 0; i < 4; i++)
+    {
+      print_hex(*q);
+      q++;
+      if ((void *)q >= from_space_end)
+      {
+        break;
+      }
+    }
+    rt_print_newline();
+    if ((void *)q >= from_space_end)
+    {
+      break;
+    }
+  }
+  write(1, "from ptr: ", 10);
+  print_hex((uint64_t)from_space_ptr);
+  rt_print_newline();
+}
 
 // size must be multiple of 8, excluding the tag.
 void *rt_allocate(uint64_t tag, uint64_t size, uint64_t *rootstack_ptr)
@@ -651,44 +663,15 @@ void *rt_allocate(uint64_t tag, uint64_t size, uint64_t *rootstack_ptr)
   return ptr;
 }
 
-void *rt_new_string(uint64_t len, const char *chars, uint64_t *rootstack_ptr)
+void *rt_memcpy(void *dest, void *src, uint64_t len)
 {
-  uint64_t len_aligned = align8(len);
-  uint64_t *s = rt_allocate(MAKE_STRING_TAG(len), len_aligned, rootstack_ptr);
-  uint64_t *ptr = s + 1;
-  for (uint64_t i = 0; i < (len >> 3); i++)
+  void *dest0 = dest;
+  while (len > 0)
   {
-    ptr[i] = ((const uint64_t *)chars)[i];
+    *(char *)dest++ = *(const char *)src++;
+    len--;
   }
-  if (len < len_aligned)
-  {
-    char *end = (char *)ptr + (len & ~7);
-    chars += len & ~7;
-    switch (len & 7)
-    {
-    case 7:
-      end[6] = chars[6];
-      // fall through
-    case 6:
-      end[5] = chars[5];
-      // fall through
-    case 5:
-      end[4] = chars[4];
-      // fall through
-    case 4:
-      end[3] = chars[3];
-      // fall through
-    case 3:
-      end[2] = chars[2];
-      // fall through
-    case 2:
-      end[1] = chars[1];
-      // fall through
-    case 1:
-      end[0] = chars[0];
-    }
-  }
-  return s;
+  return dest0;
 }
 
 void *rt_fill_array(uint64_t *ptr, uint64_t init)
@@ -698,6 +681,16 @@ void *rt_fill_array(uint64_t *ptr, uint64_t init)
     ptr[i] = init;
   }
   return ptr;
+}
+
+void *rt_append_string(void *dest, void *s1, void *s2)
+{
+  uint64_t len1 = STRING_LEN(*(uint64_t *)s1);
+  rt_memcpy((uint64_t *)dest + 1, (uint64_t *)s1 + 1, len1);
+  rt_memcpy((char *)((uint64_t *)dest + 1) + len1,
+            (uint64_t *)s2 + 1,
+            STRING_LEN(*(uint64_t *)s2));
+  return dest;
 }
 
 __attribute__((noreturn)) void rt_length_error(int64_t len)
@@ -727,8 +720,4 @@ __attribute__((noreturn)) void rt_div_by_0_error()
   write(2, DIV_BY_0, sizeof(DIV_BY_0) - 1);
   print_newline(2);
   exit(1);
-}
-
-uint64_t *rt_append_string(uint64_t *s1, uint64_t *s2)
-{
 }

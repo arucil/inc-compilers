@@ -150,7 +150,7 @@ pub fn gen_assign_instr_registers<'a>(
         src: assign(src),
         dest: assign(dest),
       },
-      Instr::Call { label, arity } => Instr::Call { label, arity },
+      Instr::Call { label, arity, gc } => Instr::Call { label, arity, gc },
       Instr::Jmp(label) => Instr::Jmp(label),
       Instr::Mov { src, dest } => Instr::Mov {
         src: assign(src),

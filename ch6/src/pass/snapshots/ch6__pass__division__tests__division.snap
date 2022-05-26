@@ -1,0 +1,28 @@
+---
+source: ch6/src/pass/division.rs
+expression: result.to_string_pretty()
+---
+(let
+ ["x" 3]
+ (print
+  (let
+   ["(division-divisor-tmp)"
+    (let
+     ["(division-divisor-tmp)"
+      "x"]
+     (if
+      (eq?
+       "(division-divisor-tmp)"
+       0)
+      (div-by-zero)
+      (remainder
+       30
+       "(division-divisor-tmp)")))]
+   (if
+    (eq?
+     "(division-divisor-tmp)"
+     0)
+    (div-by-zero)
+    (quotient
+     17
+     "(division-divisor-tmp)")))))

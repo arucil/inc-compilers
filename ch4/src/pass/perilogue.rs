@@ -47,11 +47,13 @@ fn add_epilogue(prog: &mut Program<Info>) {
     },
     Call {
       label: label1,
-      arity: 0,
+      arity: 1,
+      gc: false,
     },
     Call {
       label: label2,
       arity: 0,
+      gc: false,
     },
   ];
   for &reg in prog.info.used_callee_saved_regs.iter().rev() {

@@ -128,6 +128,11 @@ impl<'a> AnalysisState<'a> {
         self.add_arg(before, src);
         self.add_arg(before, count);
       }
+      Instr::IMul(arg) | Instr::IDiv(arg) => {
+        before.remove_reg(Reg::Rax);
+        before.remove_reg(Reg::Rdx);
+        self.add_arg(before, arg);
+      }
     }
   }
 

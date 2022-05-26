@@ -117,7 +117,7 @@ fn run_nasm<P: AsRef<Path>>(file: P) {
     .success();
 }
 
-fn run_gcc<P: AsRef<Path>>(file: P) {
+pub fn run_gcc<P: AsRef<Path>>(file: P) {
   let input = file.as_ref();
   let mut output = input.to_owned();
   output.set_extension("o");
@@ -128,7 +128,8 @@ fn run_gcc<P: AsRef<Path>>(file: P) {
     .arg(output)
     .arg("-Wall")
     .arg("-Werror")
-    .arg("-fno-builtin-exit")
+    .arg("-fno-builtin")
+    .arg("-fno-stack-protector")
     .arg("-O2")
     .assert()
     .success();

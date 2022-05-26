@@ -100,7 +100,7 @@ pub enum CPrim {
     fields_before: Vec<Type>,
   },
   TupLen(CAtom),
-  StrAppend(CAtom, CAtom),
+  AppendStr(CAtom, CAtom),
   StrLen(CAtom),
 }
 
@@ -118,8 +118,8 @@ pub enum CAtom {
   Int(i64),
   Var(IdxVar),
   Bool(bool),
-  Str(String),
   Void,
+  Str(String),
 }
 
 impl<INFO: Debug> CProgram<INFO> {
@@ -163,7 +163,7 @@ impl Debug for CTail {
         Self::Error(CError::OutOfBounds { index, len }) => {
           return write!(f, "    out-of-bounds-error {:?} {:?}", index, len)
         }
-        Self::Error(CError::DivByZero ) => {
+        Self::Error(CError::DivByZero) => {
           return write!(f, "    div-by-zero-error")
         }
         Self::Goto(label) => return write!(f, "    goto {:?}", label),
@@ -242,10 +242,10 @@ impl Debug for CPrim {
         write!(f, "(* {:?} {:?})", arg1, arg2)
       }
       Self::Div(arg1, arg2) => {
-        write!(f, "(/ {:?} {:?})", arg1, arg2)
+        write!(f, "(qoutient {:?} {:?})", arg1, arg2)
       }
       Self::Rem(arg1, arg2) => {
-        write!(f, "(% {:?} {:?})", arg1, arg2)
+        write!(f, "(remainder {:?} {:?})", arg1, arg2)
       }
       Self::Neg(arg) => {
         write!(f, "(- {:?})", arg)
@@ -281,8 +281,8 @@ impl Debug for CPrim {
       Self::TupLen(arg) => {
         write!(f, "(vector-length {:?})", arg)
       }
-      Self::StrAppend(arg1, arg2) => {
-        write!(f, "(string-append {:?} {:?})", arg1, arg2)
+      Self::AppendStr(arg1, arg2) => {
+        write!(f, "(append-string {:?} {:?})", arg1, arg2)
       }
       Self::StrLen(arg) => {
         write!(f, "(string-length {:?})", arg)
@@ -310,8 +310,8 @@ impl Debug for CAtom {
       Self::Var(n) => write!(f, "{:?}", n),
       Self::Bool(true) => write!(f, "#t"),
       Self::Bool(false) => write!(f, "#f"),
-      Self::Str(s) => write!(f, "{:?}", s),
       Self::Void => write!(f, "#<void>"),
+      Self::Str(s) => write!(f, "{:?}", s),
     }
   }
 }

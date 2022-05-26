@@ -101,11 +101,11 @@ where
           add(dest_loc);
         }
       }
-      Instr::Call { label, .. } => {
+      Instr::Call { gc, .. } => {
         for reg in Reg::caller_saved_regs() {
           add(reg.into());
         }
-        if label == "rt_allocate" {
+        if *gc {
           for after_loc in live_after {
             for reg in Reg::all_regs() {
               let write_loc = reg.into();
@@ -150,6 +150,10 @@ where
         {
           add(dest_loc);
         }
+      }
+      Instr::IMul(_) | Instr::IDiv(_) => {
+        add(Reg::Rax.into());
+        add(Reg::Rdx.into());
       }
     }
   }

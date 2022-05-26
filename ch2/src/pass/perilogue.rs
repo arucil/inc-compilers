@@ -51,10 +51,12 @@ fn add_epilogue(prog: &mut Program<Info>) {
       Call {
         label: label1,
         arity: 0,
+        gc: false,
       },
       Call {
         label: label2,
         arity: 0,
+        gc: false,
       },
       Mov {
         src: Arg::Imm(60),
