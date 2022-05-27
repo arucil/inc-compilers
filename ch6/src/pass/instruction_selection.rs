@@ -1,13 +1,13 @@
 #[cfg(test)]
 mod tests {
+  use crate::pass::array_bounds;
   use ch2::pass::remove_complex_operands;
   use ch4::pass::explicate_control;
   use ch4::pass::instruction_selection;
+  use ch4::pass::shrink;
   use ch4::pass::uniquify;
   use ch5::pass::typecheck;
-  use ch4::pass::shrink;
   use insta::assert_snapshot;
-  use crate::pass::array_bounds;
 
   #[test]
   fn vector() {
@@ -76,5 +76,4 @@ mod tests {
     let result = instruction_selection::select_instruction(prog, true);
     assert_snapshot!(result.to_string_pretty());
   }
-
 }

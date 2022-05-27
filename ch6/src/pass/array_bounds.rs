@@ -306,7 +306,7 @@ fn exp_insert(
       ),
       ..exp
     },
-    ExpKind::Error(_) => unreachable!()
+    ExpKind::Error(_) => unreachable!(),
   }
 }
 

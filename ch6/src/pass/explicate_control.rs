@@ -8,7 +8,7 @@ mod tests {
   use insta::assert_snapshot;
 
   use crate::pass::array_bounds;
-use crate::pass::division;
+  use crate::pass::division;
 
   #[test]
   fn vector() {
