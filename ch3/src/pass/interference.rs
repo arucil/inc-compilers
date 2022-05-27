@@ -109,10 +109,10 @@ where
           for after_loc in live_after {
             for reg in Reg::all_regs() {
               let write_loc = reg.into();
-              let write_loc_node = graph.insert_node(write_loc);
               if after_loc != write_loc {
                 if let Some(var) = after_loc.to_arg_var(self.var_store) {
                   if (self.var_is_ref)(&var) {
+                    let write_loc_node = graph.insert_node(write_loc);
                     let after_loc_node = graph.insert_node(after_loc);
                     graph.add_edge(write_loc_node, after_loc_node);
                   }

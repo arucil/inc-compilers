@@ -199,7 +199,7 @@ fn explicate_tail(state: &mut State, exp: Exp<IdxVar, Type>) -> CTail {
     | ExpKind::Void
     | ExpKind::Get(_) => CTail::Return(CExp::Atom(atom(exp))),
     ExpKind::Prim {
-      op: (_, "vector-set!"),
+      op: (_, "vector-set!" | "copy-string!"),
       ..
     } => {
       explicate_exp_effect(state, exp, CTail::Return(CExp::Atom(CAtom::Void)))
@@ -288,7 +288,7 @@ fn explicate_assign(
     }
     ExpKind::Void => cont,
     ExpKind::Prim {
-      op: (_, "vector-set!"),
+      op: (_, "vector-set!" | "copy-string!"),
       ..
     } => explicate_exp_effect(state, init, cont),
     // TODO this should be removed in chapter 9
@@ -497,6 +497,22 @@ fn explicate_exp_effect(
         _ => unreachable!(),
       }
     }
+    ExpKind::Prim {
+      op: (_, "copy-string!"),
+      mut args,
+    } => {
+      let src = args.pop().unwrap();
+      let offset = args.pop().unwrap();
+      let dest = args.pop().unwrap();
+      CTail::Seq(
+        CStmt::CopyStr {
+          dest: atom(dest),
+          src: atom(src),
+          offset: atom(offset),
+        },
+        box cont,
+      )
+    }
     ExpKind::Prim { op: _, args } => {
       explicate_effect(state, args.into_iter(), cont)
     }
@@ -638,10 +654,9 @@ fn prim(state: &State, op: &str, mut args: Vec<Exp<IdxVar, Type>>) -> CPrim {
         _ => unreachable!(),
       }
     }
-    "string-append" => {
-      let arg2 = args.pop().unwrap();
-      let arg1 = args.pop().unwrap();
-      CPrim::AppendStr(atom(arg1), atom(arg2))
+    "alloc-string" => {
+      let arg = args.pop().unwrap();
+      CPrim::AllocStr(atom(arg))
     }
     "string-length" => {
       let arg = args.pop().unwrap();

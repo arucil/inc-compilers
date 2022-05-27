@@ -145,7 +145,7 @@ pub fn gen_assign_instr_registers<'a>(
       Arg::Label(l) => Arg::Label(l),
     };
 
-    let instr = match instr {
+    match instr {
       Instr::Add { src, dest } => Instr::Add {
         src: assign(src),
         dest: assign(dest),
@@ -183,8 +183,7 @@ pub fn gen_assign_instr_registers<'a>(
         dest: assign(dest),
       },
       _ => unreachable!("{:?}", instr),
-    };
-    instr
+    }
   }
 }
 

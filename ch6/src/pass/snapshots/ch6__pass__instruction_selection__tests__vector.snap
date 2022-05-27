@@ -14,17 +14,9 @@ start:
     mov r11, rax
     mov (tmp).1, r11
     mov rdi, 3
-    shl rdi, 3
-    or rdi, 3
-    mov rsi, 8
-    mov rdx, r15
-    call rt_allocate
-    mov rdi, rax
-    add rdi, 8
     mov rsi, const_1
-    mov rdx, 3
-    call rt_memcpy
-    sub rax, 8
+    mov rdx, r15
+    call rt_new_string
     mov (tmp).2, rax
     mov rdi, 6177
     mov rsi, 32

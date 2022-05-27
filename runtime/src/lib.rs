@@ -12,9 +12,13 @@ extern "C" {
     rootstack_ptr: *const u64,
   ) -> *const c_void;
   fn rt_collect(rootstack_ptr: *const u64);
+  fn rt_new_string(
+    len: u64,
+    chars: *const u8,
+    rootstack_ptr: *const u64,
+  ) -> *const c_void;
   fn rt_from_space() -> *const c_void;
   fn rt_heap_size() -> u64;
-  fn rt_memcpy(dest: *mut c_void, src: *const c_void, len: u64);
 }
 
 #[test]
@@ -24,16 +28,6 @@ fn initialize() {
     rt_initialize(65536, 64);
     assert_eq!(rt_heap_size(), 64);
   }
-}
-
-unsafe fn rt_new_string(
-  len: u64,
-  chars: *const u8,
-  rootstack_ptr: *const u64,
-) -> *const c_void {
-  let s = rt_allocate(len << 3 | 0b011, (len + 7) & !7, rootstack_ptr);
-  rt_memcpy((s as *mut u64).add(1) as *mut c_void, chars as _, len);
-  s
 }
 
 #[test]

@@ -331,8 +331,16 @@ void rt_collect(uint64_t *rootstack_ptr)
     if (!*p)
       continue;
     uint64_t *old_objp = (uint64_t *)*p;
-    *p = (uint64_t)freep;
-    COPY_OBJECT;
+    uint64_t old_tag = *old_objp;
+    if (VISITED(old_tag))
+    {
+      *p = old_tag; // forward pointer
+    }
+    else
+    {
+      *p = (uint64_t)freep;
+      COPY_OBJECT;
+    }
   }
 
   while (scanp < freep)
@@ -663,15 +671,49 @@ void *rt_allocate(uint64_t tag, uint64_t size, uint64_t *rootstack_ptr)
   return ptr;
 }
 
-void *rt_memcpy(void *dest, void *src, uint64_t len)
-{
-  void *dest0 = dest;
-  while (len > 0)
-  {
-    *(char *)dest++ = *(const char *)src++;
-    len--;
+#define copy_chars(len, destp, srcp)         \
+  for (uint64_t i = len >> 3; i > 0; i--)    \
+  {                                          \
+    *(uint64_t *)destp = *(uint64_t *)srcp;  \
+    destp = (char *)((uint64_t *)destp + 1); \
+    srcp = (void *)((uint64_t *)srcp + 1);   \
+  }                                          \
+  switch (len & 7)                           \
+  {                                          \
+  case 7:                                    \
+    destp[6] = ((const char *)srcp)[6];      \
+    /* fall through */                       \
+  case 6:                                    \
+    destp[5] = ((const char *)srcp)[5];      \
+    /* fall through */                       \
+  case 5:                                    \
+    destp[4] = ((const char *)srcp)[4];      \
+    /* fall through */                       \
+  case 4:                                    \
+    destp[3] = ((const char *)srcp)[3];      \
+    /* fall through */                       \
+  case 3:                                    \
+    destp[2] = ((const char *)srcp)[2];      \
+    /* fall through */                       \
+  case 2:                                    \
+    destp[1] = ((const char *)srcp)[1];      \
+    /* fall through */                       \
+  case 1:                                    \
+    destp[0] = ((const char *)srcp)[0];      \
   }
-  return dest0;
+
+void *rt_new_string(uint64_t len, const char *chars, uint64_t *rootstack_ptr)
+{
+  uint64_t len_aligned = align8(len);
+  uint64_t *s = rt_allocate(MAKE_STRING_TAG(len), len_aligned, rootstack_ptr);
+  char *ptr = (char *)(s + 1);
+  copy_chars(len, ptr, chars);
+  return s;
+}
+
+void *rt_alloc_string(uint64_t len, uint64_t *rootstack_ptr)
+{
+  return rt_allocate(MAKE_STRING_TAG(len), align8(len), rootstack_ptr);
 }
 
 void *rt_fill_array(uint64_t *ptr, uint64_t init)
@@ -683,14 +725,16 @@ void *rt_fill_array(uint64_t *ptr, uint64_t init)
   return ptr;
 }
 
-void *rt_append_string(void *dest, void *s1, void *s2)
+void rt_copy_string(void *dest, void *src, uint64_t offset)
 {
-  uint64_t len1 = STRING_LEN(*(uint64_t *)s1);
-  rt_memcpy((uint64_t *)dest + 1, (uint64_t *)s1 + 1, len1);
-  rt_memcpy((char *)((uint64_t *)dest + 1) + len1,
-            (uint64_t *)s2 + 1,
-            STRING_LEN(*(uint64_t *)s2));
-  return dest;
+  uint64_t len1 = STRING_LEN(*(uint64_t *)src);
+  const char *p = (const char *)((uint64_t *)src + 1);
+  char *q = (char *)((uint64_t *)dest + 1) + offset;
+  while (len1 > 0)
+  {
+    *q++ = *p++;
+    len1--;
+  }
 }
 
 __attribute__((noreturn)) void rt_length_error(int64_t len)

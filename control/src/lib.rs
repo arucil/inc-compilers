@@ -65,6 +65,11 @@ pub enum CStmt {
     fields_before: Vec<Type>,
     val: CAtom,
   },
+  CopyStr {
+    dest: CAtom,
+    src: CAtom,
+    offset: CAtom,
+  },
 }
 
 #[derive(Clone)]
@@ -100,7 +105,7 @@ pub enum CPrim {
     fields_before: Vec<Type>,
   },
   TupLen(CAtom),
-  AppendStr(CAtom, CAtom),
+  AllocStr(CAtom),
   StrLen(CAtom),
 }
 
@@ -216,6 +221,9 @@ impl Debug for CStmt {
       Self::ArrSet { vec, index, val } => {
         write!(f, "vector-set! {:?} {:?} {:?}", vec, index, val)
       }
+      Self::CopyStr { dest, src, offset } => {
+        write!(f, "copy-string! {:?} {:?} {:?}", dest, offset, src)
+      }
     }
   }
 }
@@ -281,8 +289,8 @@ impl Debug for CPrim {
       Self::TupLen(arg) => {
         write!(f, "(vector-length {:?})", arg)
       }
-      Self::AppendStr(arg1, arg2) => {
-        write!(f, "(append-string {:?} {:?})", arg1, arg2)
+      Self::AllocStr(arg) => {
+        write!(f, "(alloc-string {:?})", arg)
       }
       Self::StrLen(arg) => {
         write!(f, "(string-length {:?})", arg)

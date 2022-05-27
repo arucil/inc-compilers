@@ -3,7 +3,7 @@
 use id_arena::{Arena, Id};
 use indexmap::IndexMap;
 use pretty::*;
-use std::fmt::{self, Debug, Formatter};
+use std::fmt::{self, Debug, Display, Formatter};
 use std::iter;
 use support::Range;
 
@@ -127,13 +127,19 @@ impl IdxVar {
   }
 }
 
-impl Debug for IdxVar {
+impl Display for IdxVar {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     write!(f, "{}.{}", self.name, self.index)
   }
 }
 
-impl<VAR: Debug, TYPE: Debug> Program<VAR, TYPE> {
+impl Debug for IdxVar {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    Display::fmt(self, f)
+  }
+}
+
+impl<VAR: Display, TYPE: Debug> Program<VAR, TYPE> {
   pub fn to_string_pretty(&self) -> String {
     let doc = self.to_doc();
     let mut buf = String::new();
@@ -146,14 +152,12 @@ impl<VAR: Debug, TYPE: Debug> Program<VAR, TYPE> {
   }
 }
 
-impl<VAR: Debug, TYPE: Debug> Exp<VAR, TYPE> {
+impl<VAR: Display, TYPE: Debug> Exp<VAR, TYPE> {
   fn to_doc(&self) -> RcDoc {
     match &self.kind {
       ExpKind::Int(n) => RcDoc::text(format!("{}", n)),
       ExpKind::Str(s) => RcDoc::text(format!("{:?}", s)),
-      ExpKind::Var(var) | ExpKind::Get(var) => {
-        RcDoc::text(format!("{:?}", var))
-      }
+      ExpKind::Var(var) | ExpKind::Get(var) => RcDoc::text(format!("{}", var)),
       ExpKind::Prim { op, args } => RcDoc::text("(")
         .append(
           RcDoc::intersperse(
@@ -183,7 +187,7 @@ impl<VAR: Debug, TYPE: Debug> Exp<VAR, TYPE> {
             .append(
               RcDoc::text("[")
                 .append(
-                  RcDoc::text(format!("{:?}", var.1))
+                  RcDoc::text(format!("{}", var.1))
                     .append(Doc::line())
                     .append(init.to_doc())
                     .nest(1)
@@ -215,7 +219,7 @@ impl<VAR: Debug, TYPE: Debug> Exp<VAR, TYPE> {
         .append(
           RcDoc::text("set!")
             .append(Doc::line())
-            .append(RcDoc::text(format!("{:?}", var.1)))
+            .append(RcDoc::text(format!("{}", var.1)))
             .append(Doc::line())
             .append(exp.to_doc())
             .nest(1)

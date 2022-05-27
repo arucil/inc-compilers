@@ -491,8 +491,10 @@ pub fn parse_code<VAR: Clone>(
           }
         }
         "call" => {
-          let args =
-            ops[1].split(',').map(|arg| arg.trim()).collect::<Vec<_>>();
+          let args = ops[1]
+            .splitn(3, ',')
+            .map(|arg| arg.trim())
+            .collect::<Vec<_>>();
           if args.len() == 1 {
             Instr::Call {
               label: args[0].to_owned(),
@@ -504,7 +506,8 @@ pub fn parse_code<VAR: Clone>(
               label: args[0].to_owned(),
               arity: args[1].parse().unwrap(),
               gc: if args.len() == 3 {
-                args[2] == "gc"
+                assert_eq!(args[2], "gc");
+                true
               } else {
                 false
               },

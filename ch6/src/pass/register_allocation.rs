@@ -3,10 +3,10 @@ use ast::{IdxVar, Type};
 use ch3::location_set::{Var, VarStore};
 use ch3::pass::register_allocation::{Color, RegisterAlloc};
 use ch4::pass::interference::Info as OldInfo;
+use id_arena::Arena;
 use indexmap::{IndexMap, IndexSet};
 use std::collections::HashMap;
 use std::fmt::{self, Debug, Formatter};
-use id_arena::Arena;
 
 pub struct Info {
   pub locals: IndexMap<IdxVar, Type>,

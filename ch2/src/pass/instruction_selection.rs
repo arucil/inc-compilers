@@ -267,6 +267,18 @@ impl<'a> CodeGen<'a> {
           dest: Arg::Deref(Reg::R11, 0),
         });
       }
+      CStmt::CopyStr { dest, src, offset } => {
+        self.atom_instructions(Arg::Reg(Reg::Rdi), dest);
+        self.atom_instructions(Arg::Reg(Reg::Rsi), src);
+        self.atom_instructions(Arg::Reg(Reg::Rdx), offset);
+        let label = "rt_copy_string".to_owned();
+        self.externs.insert(label.clone());
+        self.code.push(Instr::Call {
+          label,
+          arity: 3,
+          gc: false,
+        })
+      }
     }
   }
 
@@ -574,8 +586,23 @@ impl<'a> CodeGen<'a> {
           dest: target,
         });
       }
-      CPrim::AppendStr(atom1, atom2) => {
-        todo!()
+      CPrim::AllocStr(len) => {
+        self.atom_instructions(Arg::Reg(Reg::Rdi), len);
+        self.code.push(Instr::Mov {
+          src: Arg::Reg(Reg::R15),
+          dest: Arg::Reg(Reg::Rsi),
+        });
+        let label = "rt_alloc_string".to_owned();
+        self.externs.insert(label.clone());
+        self.code.push(Instr::Call {
+          label,
+          arity: 2,
+          gc: true,
+        });
+        self.code.push(Instr::Mov {
+          src: Arg::Reg(Reg::Rax),
+          dest: target,
+        });
       }
       CPrim::StrLen(arg) => {
         self.atom_instructions(Arg::Reg(Reg::R11), arg);
@@ -613,30 +640,7 @@ impl<'a> CodeGen<'a> {
         }
         if self.use_heap {
           self.code.push(Instr::Mov {
-            src: Arg::Imm((len as i64) << 3 | 0b011),
-            dest: Arg::Reg(Reg::Rdi),
-          });
-          self.code.push(Instr::Mov {
-            src: Arg::Imm((len as i64 + 7) & !7),
-            dest: Arg::Reg(Reg::Rsi),
-          });
-          self.code.push(Instr::Mov {
-            src: Arg::Reg(Reg::R15),
-            dest: Arg::Reg(Reg::Rdx),
-          });
-          let alloc_label = "rt_allocate".to_owned();
-          self.externs.insert(alloc_label.clone());
-          self.code.push(Instr::Call {
-            label: alloc_label,
-            arity: 3,
-            gc: true,
-          });
-          self.code.push(Instr::Mov {
-            src: Arg::Reg(Reg::Rax),
-            dest: Arg::Reg(Reg::Rdi),
-          });
-          self.code.push(Instr::Add {
-            src: Arg::Imm(8),
+            src: Arg::Imm(len as i64),
             dest: Arg::Reg(Reg::Rdi),
           });
           self.code.push(Instr::Mov {
@@ -644,19 +648,15 @@ impl<'a> CodeGen<'a> {
             dest: Arg::Reg(Reg::Rsi),
           });
           self.code.push(Instr::Mov {
-            src: Arg::Imm(len as i64),
+            src: Arg::Reg(Reg::R15),
             dest: Arg::Reg(Reg::Rdx),
           });
-          let alloc_label = "rt_memcpy".to_owned();
-          self.externs.insert(alloc_label.clone());
+          let label = "rt_new_string".to_owned();
+          self.externs.insert(label.clone());
           self.code.push(Instr::Call {
-            label: alloc_label,
+            label,
             arity: 3,
-            gc: false,
-          });
-          self.code.push(Instr::Sub {
-            src: Arg::Imm(8),
-            dest: Arg::Reg(Reg::Rax),
+            gc: true,
           });
           self.code.push(Instr::Mov {
             src: Arg::Reg(Reg::Rax),
