@@ -5,5 +5,5 @@
     (set! x (string-append x y))
     (set! i (+ i 1)))
   (print (string-length x))
-  (print (string-append x (string-append " " (string-append "" x))))
+  (print (string-append x (string-append (string-append " " (string-append "" x)) "")))
   (print i))

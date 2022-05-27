@@ -293,35 +293,45 @@ void *rt_initialize(uint64_t rootstack_size, uint64_t heap_size)
 void rt_collect(uint64_t *rootstack_ptr)
 {
 
-#define COPY_OBJECT                         \
-  do                                        \
-  {                                         \
-    uint64_t tag = *old_objp;               \
-    *old_objp++ = (uint64_t)freep;          \
-    *freep++ = tag;                         \
-    uint64_t type = TYPE(tag);              \
-    uint64_t len;                           \
-    switch (type)                           \
-    {                                       \
-    case TYPE_TUPLE:                        \
-      len = TUPLE_NUM_FIELDS(tag);          \
-      break;                                \
-    case TYPE_STRING:                       \
-      len = align8(STRING_LEN(tag)) >> 3;   \
-      break;                                \
-    case TYPE_ARRAY:                        \
-      if (ARRAY_IS_UNIT(tag))               \
-        len = 0;                            \
-      else                                  \
-        len = ARRAY_LEN(tag);               \
-      break;                                \
-    default:                                \
-      RT_FATAL_CODE("invalid type ", type); \
-    }                                       \
-    for (uint64_t i = 0; i < len; i++)      \
-    {                                       \
-      *freep++ = *old_objp++;               \
-    }                                       \
+#define INSPECT_OBJECT(scanp)                 \
+  do                                          \
+  {                                           \
+    uint64_t *old_objp = (uint64_t *)*scanp;  \
+    uint64_t old_tag = *old_objp;             \
+    if (VISITED(old_tag))                     \
+    {                                         \
+      *scanp = old_tag; /* forward pointer */ \
+    }                                         \
+    else                                      \
+    {                                         \
+      *scanp = (uint64_t)freep;               \
+      uint64_t tag = *old_objp;               \
+      *old_objp++ = (uint64_t)freep;          \
+      *freep++ = tag;                         \
+      uint64_t type = TYPE(tag);              \
+      uint64_t len;                           \
+      switch (type)                           \
+      {                                       \
+      case TYPE_TUPLE:                        \
+        len = TUPLE_NUM_FIELDS(tag);          \
+        break;                                \
+      case TYPE_STRING:                       \
+        len = align8(STRING_LEN(tag)) >> 3;   \
+        break;                                \
+      case TYPE_ARRAY:                        \
+        if (ARRAY_IS_UNIT(tag))               \
+          len = 0;                            \
+        else                                  \
+          len = ARRAY_LEN(tag);               \
+        break;                                \
+      default:                                \
+        RT_FATAL_CODE("invalid type ", type); \
+      }                                       \
+      for (uint64_t i = 0; i < len; i++)      \
+      {                                       \
+        *freep++ = *old_objp++;               \
+      }                                       \
+    }                                         \
   } while (0)
 
   uint64_t *scanp = to_space_begin;
@@ -330,17 +340,7 @@ void rt_collect(uint64_t *rootstack_ptr)
   {
     if (!*p)
       continue;
-    uint64_t *old_objp = (uint64_t *)*p;
-    uint64_t old_tag = *old_objp;
-    if (VISITED(old_tag))
-    {
-      *p = old_tag; // forward pointer
-    }
-    else
-    {
-      *p = (uint64_t)freep;
-      COPY_OBJECT;
-    }
+    INSPECT_OBJECT(p);
   }
 
   while (scanp < freep)
@@ -356,17 +356,7 @@ void rt_collect(uint64_t *rootstack_ptr)
       {
         if (ptr_mask & 1)
         {
-          uint64_t *old_objp = (uint64_t *)*scanp;
-          uint64_t old_tag = *old_objp;
-          if (VISITED(old_tag))
-          {
-            *scanp = old_tag; // forward pointer
-          }
-          else
-          {
-            *scanp = (uint64_t)freep;
-            COPY_OBJECT;
-          }
+          INSPECT_OBJECT(scanp);
         }
         ptr_mask >>= 1;
         scanp++;
@@ -386,17 +376,7 @@ void rt_collect(uint64_t *rootstack_ptr)
       {
         for (uint64_t n = ARRAY_LEN(tag); n > 0; n--)
         {
-          uint64_t *old_objp = (uint64_t *)*scanp;
-          uint64_t old_tag = *old_objp;
-          if (VISITED(old_tag))
-          {
-            *scanp = old_tag; // forward pointer
-          }
-          else
-          {
-            *scanp = (uint64_t)freep;
-            COPY_OBJECT;
-          }
+          INSPECT_OBJECT(scanp);
           scanp++;
         }
       }
