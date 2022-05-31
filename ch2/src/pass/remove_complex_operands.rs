@@ -52,15 +52,26 @@ fn mon_exp<TYPE: Clone>(
       },
       counter,
     ),
-    ExpKind::Call { name, args } => mon_prim(
-      args,
-      |args| Exp {
-        kind: ExpKind::Call { name, args },
-        range,
-        ty,
-      },
-      counter,
-    ),
+    ExpKind::Apply {
+      func,
+      mut args,
+      r#struct,
+    } => {
+      args.insert(0, *func);
+      mon_prim(
+        args,
+        |mut args| Exp {
+          kind: ExpKind::Apply {
+            func: box args.remove(0),
+            args,
+            r#struct,
+          },
+          range,
+          ty,
+        },
+        counter,
+      )
+    }
     // ch4
     ExpKind::If { cond, conseq, alt } => Exp {
       kind: ExpKind::If {
@@ -186,13 +197,22 @@ fn atom_exp<TYPE: Clone>(
       };
       assign_var(exp, tmps, counter)
     }
-    ExpKind::Call { name, args } => {
+    ExpKind::Apply {
+      func,
+      args,
+      r#struct,
+    } => {
+      let func = atom_exp(*func, tmps, counter);
       let args = args
         .into_iter()
         .map(|arg| atom_exp(arg, tmps, counter))
         .collect();
       let exp = Exp {
-        kind: ExpKind::Call { name, args },
+        kind: ExpKind::Apply {
+          func: box func,
+          args,
+          r#struct,
+        },
         range: exp.range,
         ty: exp.ty,
       };

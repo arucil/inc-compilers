@@ -1,5 +1,10 @@
-(define-struct int (value Int))
-(define-struct bool-int (v1 Bool) (v2 Int))
+(define-type int
+  (struct
+    [value Int]))
+(define-type bool-int
+  (struct
+    [v1 Bool]
+    [v2 Int]))
 (let ([v1 (bool-int #t 42)]
       [v2 (vector 3 v1)]
       [v9 (vector "abcabcabcabcabcabcabc" 6)]

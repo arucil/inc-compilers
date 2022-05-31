@@ -256,10 +256,15 @@ fn exp_insert(
       },
       ..exp
     },
-    ExpKind::Call { name, args } => Exp {
-      kind: ExpKind::Call {
-        name,
+    ExpKind::Apply {
+      func,
+      args,
+      r#struct,
+    } => Exp {
+      kind: ExpKind::Apply {
+        func: box exp_insert(*func, types),
         args: args.into_iter().map(|exp| exp_insert(exp, types)).collect(),
+        r#struct,
       },
       ..exp
     },

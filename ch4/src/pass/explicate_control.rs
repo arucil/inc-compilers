@@ -109,7 +109,12 @@ fn collect_exp_locals(
         collect_exp_locals(arg, locals);
       }
     }
-    ExpKind::Call { name: _, args } => {
+    ExpKind::Apply {
+      func,
+      args,
+      r#struct: _,
+    } => {
+      collect_exp_locals(&*func, locals);
       for arg in args {
         collect_exp_locals(arg, locals);
       }
@@ -226,7 +231,7 @@ fn explicate_tail(state: &mut State, exp: Exp<IdxVar, Type>) -> CTail {
         CTail::Return(CExp::Prim(prim(state, op, args)))
       }
     }
-    ExpKind::Call { .. } => todo!(),
+    ExpKind::Apply { .. } => todo!(),
     ExpKind::Let { var, init, body } => {
       let cont = explicate_tail(state, *body);
       explicate_assign(state, var.1, *init, cont)
@@ -325,7 +330,7 @@ fn explicate_assign(
         CTail::Seq(assign, box cont)
       }
     }
-    ExpKind::Call { .. } => todo!(),
+    ExpKind::Apply { .. } => todo!(),
     ExpKind::Let {
       var: (_, var1),
       init: init1,
@@ -399,7 +404,7 @@ fn explicate_pred(
         alt,
       }
     }
-    ExpKind::Call { .. } => todo!(),
+    ExpKind::Apply { .. } => todo!(),
     ExpKind::If {
       cond: cond1,
       conseq: conseq1,
@@ -516,7 +521,7 @@ fn explicate_exp_effect(
     ExpKind::Prim { op: _, args } => {
       explicate_effect(state, args.into_iter(), cont)
     }
-    ExpKind::Call { .. } => todo!(),
+    ExpKind::Apply { .. } => todo!(),
     ExpKind::Let { var, init, body } => {
       let body = explicate_exp_effect(state, *body, cont);
       explicate_assign(state, var.1, *init, body)

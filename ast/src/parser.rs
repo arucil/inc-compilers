@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use crate::{Exp, ExpKind, Program, StructDef, TypeDef};
+use crate::{Exp, ExpKind, Program, TypeDef};
 use indexmap::IndexMap;
 use support::{CompileError, Range};
 
@@ -213,27 +213,38 @@ impl<'a> Parser<'a> {
 }
 
 fn build_prog(input: &str, cst: Vec<Cst>) -> Result<Program> {
-  let mut defs = IndexMap::new();
+  let mut type_defs = IndexMap::new();
+  let mut func_defs = IndexMap::new();
   let mut iter = cst.into_iter().peekable();
   while let Some(Cst::List(xs, _)) = iter.peek() {
     if let Some(&Cst::Symbol(op_range)) = xs.first() {
       let op = &input[op_range.start..op_range.end];
-      if op == "define-struct" {
-        if let Some(Cst::List(xs, range)) = iter.next() {
-          let (name, st) = build_struct_def(input, xs, range)?;
-          defs.insert(name, st);
-        } else {
-          unreachable!()
+      match op {
+        "define-type" => {
+          if let Some(Cst::List(xs, range)) = iter.next() {
+            let (name, def) = build_type_def(input, xs, range)?;
+            type_defs.insert(name, def);
+          } else {
+            unreachable!()
+          }
         }
-      } else {
-        break;
+        "define" => {
+          if let Some(Cst::List(xs, range)) = iter.next() {
+            let (name, def) = build_func_def(input, xs, range)?;
+            func_defs.insert(name, def);
+          } else {
+            unreachable!()
+          }
+        }
+        _ => break,
       }
     } else {
       break;
     }
   }
   Ok(Program {
-    defs,
+    type_defs,
+    func_defs,
     body: iter.map(|c| build_exp(input, c)).collect::<Result<_>>()?,
     types: Default::default(),
   })
@@ -245,13 +256,13 @@ fn build_exp(input: &str, cst: Cst) -> Result<Exp> {
       if let Some(&Cst::Symbol(sym_range)) = xs.first() {
         let op = &input[sym_range.start..sym_range.end];
         match op {
-          "let" => build_let(input, xs, range),
-          "if" => build_if(input, xs, range),
-          "begin" => build_begin(input, xs, range),
-          "set!" => build_set(input, xs, range),
-          "while" => build_while(input, xs, range),
-          "print" => build_print(input, xs, range),
-          "void" => build_void(input, xs, range),
+          "let" => return build_let(input, xs, range),
+          "if" => return build_if(input, xs, range),
+          "begin" => return build_begin(input, xs, range),
+          "set!" => return build_set(input, xs, range),
+          "while" => return build_while(input, xs, range),
+          "print" => return build_print(input, xs, range),
+          "void" => return build_void(input, xs, range),
           _ => {
             const OPERATORS: &[&str] = &[
               "read",
@@ -283,32 +294,28 @@ fn build_exp(input: &str, cst: Cst) -> Result<Exp> {
                 .skip(1)
                 .map(|c| build_exp(input, c))
                 .collect::<Result<_>>()?;
-              Ok(Exp {
+              return Ok(Exp {
                 kind: ExpKind::Prim { op, args },
                 range,
                 ty: (),
-              })
-            } else {
-              let name = (sym_range, op.to_owned());
-              let args = xs
-                .into_iter()
-                .skip(1)
-                .map(|c| build_exp(input, c))
-                .collect::<Result<_>>()?;
-              Ok(Exp {
-                kind: ExpKind::Call { name, args },
-                range,
-                ty: (),
-              })
+              });
             }
           }
         }
-      } else {
-        Err(CompileError {
-          range,
-          message: "unrecognized form".to_owned(),
-        })
       }
+      let mut xs = xs
+        .into_iter()
+        .map(|c| build_exp(input, c))
+        .collect::<Result<Vec<_>>>()?;
+      Ok(Exp {
+        kind: ExpKind::Apply {
+          func: box xs.remove(0),
+          args: xs,
+          r#struct: None,
+        },
+        range,
+        ty: (),
+      })
     }
     Cst::Symbol(range) => Ok(Exp {
       kind: ExpKind::Var(input[range.start..range.end].to_owned()),
@@ -357,53 +364,122 @@ fn build_exp(input: &str, cst: Cst) -> Result<Exp> {
   }
 }
 
-fn build_struct_def(
+fn build_type_def(
   input: &str,
-  xs: Vec<Cst>,
+  mut xs: Vec<Cst>,
   range: Range,
-) -> Result<(String, StructDef)> {
-  if let Some(Cst::Symbol(sym_range)) = xs.get(1) {
-    let name = input[sym_range.start..sym_range.end].to_owned();
-    let mut fields = IndexMap::new();
-    for field_def in xs.into_iter().skip(2) {
-      if let Cst::List(xs, field_range) = field_def {
-        if let [Cst::Symbol(name_range), Cst::Symbol(type_range)] =
-          xs.as_slice()
-        {
-          let name = input[name_range.start..name_range.end].to_owned();
-          let ty = match &input[type_range.start..type_range.end] {
-            "Bool" => TypeDef::Bool,
-            "Int" => TypeDef::Int,
-            "Str" => TypeDef::Str,
-            "Void" => TypeDef::Void,
-            name => TypeDef::Alias(*type_range, name.to_owned()),
-          };
-          if fields.insert(name, ty).is_some() {
-            return Err(CompileError {
-              range: *name_range,
-              message: "duplicate field".to_owned(),
-            });
+) -> Result<(String, TypeDef)> {
+  fn make_type_def(input: &str, def: Cst) -> Result<TypeDef> {
+    match def {
+      Cst::Symbol(sym_range) => match &input[sym_range.start..sym_range.end] {
+        "Bool" => Ok(TypeDef::Bool),
+        "Int" => Ok(TypeDef::Int),
+        "Str" => Ok(TypeDef::Str),
+        "Void" => Ok(TypeDef::Void),
+        name => Ok(TypeDef::Alias(sym_range, name.to_owned())),
+      },
+      Cst::List(mut xs, range) => {
+        if let Some(Cst::Symbol(sym_range)) = xs.first() {
+          let sym = &input[sym_range.start..sym_range.end];
+          match sym {
+            "struct" => {
+              let mut fields = IndexMap::new();
+              for field_def in xs.into_iter().skip(1) {
+                if let Cst::List(mut xs, field_range) = field_def {
+                  if xs.len() == 2 {
+                    let type_def = xs.pop().unwrap();
+                    if let Cst::Symbol(name_range) = xs[0] {
+                      let name =
+                        input[name_range.start..name_range.end].to_owned();
+                      let ty = make_type_def(input, type_def)?;
+                      if fields.insert(name, ty).is_some() {
+                        return Err(CompileError {
+                          range: name_range,
+                          message: "duplicate field".to_owned(),
+                        });
+                      }
+                    } else {
+                      return Err(CompileError {
+                        range: field_range,
+                        message: "invalid field definition".to_owned(),
+                      });
+                    }
+                  } else {
+                    return Err(CompileError {
+                      range: field_range,
+                      message: "invalid field definition".to_owned(),
+                    });
+                  }
+                } else {
+                  return Err(CompileError {
+                    range: field_def.range(),
+                    message: "invalid field definition".to_owned(),
+                  });
+                }
+              }
+              return Ok(TypeDef::Struct(fields));
+            }
+            "array-of" => {
+              if xs.len() == 2 {
+                let ty = make_type_def(input, xs.pop().unwrap())?;
+                return Ok(TypeDef::Array(box ty));
+              } else {
+                return Err(CompileError {
+                  range,
+                  message: "invalid array definition".to_owned(),
+                });
+              }
+            }
+            _ => {}
           }
-        } else {
-          return Err(CompileError {
-            range: field_range,
-            message: "invalid field definition".to_owned(),
-          });
         }
-      } else {
-        return Err(CompileError {
-          range: field_def.range(),
-          message: "invalid field definition".to_owned(),
-        });
+        if xs.len() >= 2
+          && matches!(xs[xs.len() - 2], Cst::Symbol(range) if
+          matches!(&input[range.start..range.end], "->"))
+        {
+          let ret = make_type_def(input, xs.pop().unwrap())?;
+          xs.pop().unwrap();
+          let params = xs
+            .into_iter()
+            .map(|x| make_type_def(input, x))
+            .collect::<Result<_>>()?;
+          Ok(TypeDef::Func(params, box ret))
+        } else {
+          Ok(TypeDef::Tuple(
+            xs.into_iter()
+              .map(|x| make_type_def(input, x))
+              .collect::<Result<_>>()?,
+          ))
+        }
       }
+      _ => Err(CompileError {
+        range: def.range(),
+        message: format!("invalid type def: {:?}", def),
+      }),
     }
-    Ok((name, StructDef(fields)))
+  }
+
+  if xs.len() == 3 {
+    let def = xs.pop().unwrap();
+    if let Cst::Symbol(sym_range) = xs[1] {
+      let name = input[sym_range.start..sym_range.end].to_owned();
+      let ty = make_type_def(input, def)?;
+      Ok((name, ty))
+    } else {
+      Err(CompileError {
+        range,
+        message: "invalid define-type form".to_owned(),
+      })
+    }
   } else {
     Err(CompileError {
       range,
-      message: "invalid define-struct form".to_owned(),
+      message: "invalid define-type form".to_owned(),
     })
   }
+}
+
+fn build_func_def(input: &str, mut xs: Vec<Cst>, range: Range) -> Result<(String, FuncDef)> {
 }
 
 fn build_let(input: &str, mut xs: Vec<Cst>, range: Range) -> Result<Exp> {

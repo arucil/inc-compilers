@@ -2,7 +2,7 @@
 source: ch6/src/pass/explicate_control.rs
 expression: result.to_string_pretty()
 ---
-locals: {y.1: Alias(Id { idx: 1 }), (tmp).1: Alias(Id { idx: 0 }), (tmp).2: Str, (tmp).3: Bool, (tmp).4: Bool, (tmp).5: Int, (tmp).6: Alias(Id { idx: 0 })}
+locals: {y.1: Alias(Id { idx: 1 }), (tmp).1: Alias(Id { idx: 0 }), (tmp).2: Str, (tmp).3: Bool, (tmp).4: Bool, (tmp).5: Alias(Id { idx: 0 })}
 types: 0 => Tuple([Void]), 1 => Tuple([Int, Bool, Void, Alias(Id { idx: 0 }), Str])
 
 start:
@@ -12,8 +12,7 @@ start:
     (tmp).3 = (vector-ref y.1 [Int])
     (tmp).4 = (not (tmp).3)
     vector-set! y.1 [Int] (tmp).4
-    (tmp).5 = 5
-    vector-set! y.1 [] (tmp).5
-    (tmp).6 = (vector-ref y.1 [Int, Bool, Void])
+    vector-set! y.1 [] 5
+    (tmp).5 = (vector-ref y.1 [Int, Bool, Void])
     return #<void>
 

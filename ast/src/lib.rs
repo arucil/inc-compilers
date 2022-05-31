@@ -13,13 +13,11 @@ pub use parser::{parse, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Program<VAR = String, TYPE = ()> {
-  pub defs: IndexMap<String, StructDef>,
+  pub type_defs: IndexMap<String, TypeDef>,
+  pub func_defs: IndexMap<String, FuncDef<VAR, TYPE>>,
   pub body: Vec<Exp<VAR, TYPE>>,
   pub types: Arena<Type>,
 }
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StructDef(pub IndexMap<String, TypeDef>);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TypeDef {
@@ -28,6 +26,17 @@ pub enum TypeDef {
   Int,
   Str,
   Alias(Range, String),
+  Tuple(Vec<TypeDef>),
+  Array(Box<TypeDef>),
+  Struct(IndexMap<String, TypeDef>),
+  Func(Vec<TypeDef>, Box<TypeDef>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FuncDef<VAR, TYPE> {
+  pub params: Vec<(String, TypeDef)>,
+  pub ret: TypeDef,
+  pub body: Exp<VAR, TYPE>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,9 +53,10 @@ pub enum ExpKind<VAR, TYPE> {
     op: (Range, &'static str),
     args: Vec<Exp<VAR, TYPE>>,
   },
-  Call {
-    name: (Range, String),
+  Apply {
+    func: Box<Exp<VAR, TYPE>>,
     args: Vec<Exp<VAR, TYPE>>,
+    r#struct: Option<StructApp>,
   },
   Var(VAR),
   Str(String),
@@ -83,6 +93,13 @@ pub enum ExpKind<VAR, TYPE> {
   Error(Error<VAR, TYPE>),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StructApp {
+  Ctor,
+  Getter(u32),
+  Setter(u32),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error<VAR, TYPE> {
   Length(Box<Exp<VAR, TYPE>>),
@@ -101,6 +118,8 @@ pub enum Type {
   Tuple(Vec<Type>),
   Array(Box<Type>),
   Alias(TypeId),
+  Struct(IndexMap<String, Type>),
+  Func { params: Vec<Type>, ret: Box<Type> },
   Void,
 }
 
@@ -169,10 +188,14 @@ impl<VAR: Display, TYPE: Debug> Exp<VAR, TYPE> {
           .group(),
         )
         .append(RcDoc::text(")")),
-      ExpKind::Call { name, args } => RcDoc::text("(")
+      ExpKind::Apply {
+        func,
+        args,
+        r#struct: _,
+      } => RcDoc::text("(")
         .append(
           RcDoc::intersperse(
-            iter::once(RcDoc::text(&name.1))
+            iter::once(func.to_doc())
               .chain(args.iter().map(|arg| arg.to_doc())),
             Doc::line(),
           )

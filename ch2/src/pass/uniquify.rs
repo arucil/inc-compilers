@@ -67,13 +67,18 @@ impl Uniq {
         range,
         ty,
       }),
-      ExpKind::Call { name, args } => Ok(Exp {
-        kind: ExpKind::Call {
-          name,
+      ExpKind::Apply {
+        func,
+        args,
+        r#struct,
+      } => Ok(Exp {
+        kind: ExpKind::Apply {
+          func: box self.uniquify_exp(*func)?,
           args: args
             .into_iter()
             .map(|exp| self.uniquify_exp(exp))
             .collect::<Result<_, _>>()?,
+          r#struct,
         },
         range,
         ty,

@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
   use crate::pass::array_bounds;
+  use crate::pass::r#struct;
   use ch2::pass::remove_complex_operands;
   use ch4::pass::explicate_control;
   use ch4::pass::instruction_selection;
@@ -35,7 +36,7 @@ mod tests {
   fn empty_struct() {
     let prog = ast::parse(
       r#"
-(define-struct foo)
+(define-type foo (struct))
 (let ([x (foo)])
   (void))
       "#,
@@ -43,6 +44,7 @@ mod tests {
     .unwrap();
     let prog = typecheck::typecheck(prog).unwrap();
     let prog = array_bounds::insert_bounds_check(prog);
+    let prog = r#struct::desugar_struct(prog);
     let prog = shrink::shrink(prog);
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);

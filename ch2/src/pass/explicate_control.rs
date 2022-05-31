@@ -114,7 +114,12 @@ fn collect_exp_locals<TYPE>(
         collect_exp_locals(arg, locals);
       }
     }
-    ExpKind::Call { name: _, args } => {
+    ExpKind::Apply {
+      func,
+      args,
+      r#struct: _,
+    } => {
+      collect_exp_locals(&*func, locals);
       for arg in args {
         collect_exp_locals(arg, locals);
       }

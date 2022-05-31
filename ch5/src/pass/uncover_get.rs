@@ -75,13 +75,18 @@ fn mark_mutable_vars<TYPE>(
       range: exp.range,
       ty: exp.ty,
     },
-    ExpKind::Call { name, args } => Exp {
-      kind: ExpKind::Call {
-        name,
+    ExpKind::Apply {
+      func,
+      args,
+      r#struct,
+    } => Exp {
+      kind: ExpKind::Apply {
+        func: box mark_mutable_vars(*func, set_vars),
         args: args
           .into_iter()
           .map(|exp| mark_mutable_vars(exp, set_vars))
           .collect(),
+        r#struct,
       },
       range: exp.range,
       ty: exp.ty,
@@ -163,7 +168,12 @@ fn collect_set_vars<TYPE>(
         collect_set_vars(exp, set_vars);
       }
     }
-    ExpKind::Call { args, .. } => {
+    ExpKind::Apply {
+      func,
+      args,
+      r#struct: _,
+    } => {
+      collect_set_vars(&*func, set_vars);
       for exp in args {
         collect_set_vars(exp, set_vars);
       }

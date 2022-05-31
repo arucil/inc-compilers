@@ -1,4 +1,4 @@
-use ast::{Exp, ExpKind, Program, StructDef, Type, TypeDef};
+use ast::{Exp, ExpKind, Program, StructApp, Type, TypeDef, TypeId};
 use id_arena::Arena;
 use indexmap::IndexMap;
 use maplit::hashmap;
@@ -78,7 +78,7 @@ static PRIM_TYPES: Lazy<HashMap<&'static str, PrimType>> = Lazy::new(|| {
 });
 
 pub fn typecheck(prog: Program) -> Result<Program<String, Type>> {
-  let mut checker = TypeChecker::new(&prog.defs)?;
+  let mut checker = TypeChecker::new(prog.defs)?;
   let body = prog
     .body
     .into_iter()
@@ -95,7 +95,7 @@ pub fn typecheck(prog: Program) -> Result<Program<String, Type>> {
     })
     .collect::<Result<_>>()?;
   Ok(Program {
-    defs: prog.defs,
+    defs: IndexMap::new(),
     body,
     types: checker.types,
   })
@@ -104,89 +104,99 @@ pub fn typecheck(prog: Program) -> Result<Program<String, Type>> {
 #[derive(Debug, Clone)]
 pub struct TypeChecker {
   env: HashMap<String, Type>,
-  funcs: HashMap<String, FuncType>,
+  builtin_funcs: HashMap<String, (StructApp, Vec<Type>, Type)>,
   pub types: Arena<Type>,
 }
 
-#[derive(Debug, Clone)]
-struct FuncType {
-  args: Vec<Type>,
-  ret: RetType,
-}
-
-#[derive(Debug, Clone)]
-enum RetType {
-  Constructor(Type),
-  Selector { index: usize, set: bool, ret: Type },
-}
-
 impl TypeChecker {
-  pub fn new(defs: &IndexMap<String, StructDef>) -> Result<Self> {
+  pub fn new(defs: IndexMap<String, TypeDef>) -> Result<Self> {
+    fn resolve_type_def(
+      type_ids: &HashMap<String, TypeId>,
+      def: TypeDef,
+    ) -> Result<Type> {
+      match def {
+        TypeDef::Void => Ok(Type::Void),
+        TypeDef::Bool => Ok(Type::Bool),
+        TypeDef::Int => Ok(Type::Int),
+        TypeDef::Str => Ok(Type::Str),
+        TypeDef::Alias(range, alias) => {
+          if let Some(id) = type_ids.get(&alias) {
+            Ok(Type::Alias(*id))
+          } else {
+            Err(CompileError {
+              range,
+              message: format!("type {} not found", alias),
+            })
+          }
+        }
+        TypeDef::Tuple(tys) => Ok(Type::Tuple(
+          tys
+            .into_iter()
+            .map(|ty| resolve_type_def(type_ids, ty))
+            .collect::<Result<_>>()?,
+        )),
+        TypeDef::Struct(fields) => Ok(Type::Struct(
+          fields
+            .into_iter()
+            .map(|(name, ty)| Ok((name, resolve_type_def(type_ids, ty)?)))
+            .collect::<Result<_>>()?,
+        )),
+        TypeDef::Array(ty) => {
+          Ok(Type::Array(box resolve_type_def(type_ids, *ty)?))
+        }
+        TypeDef::Func(params, ret) => Ok(Type::Func {
+          params: params
+            .into_iter()
+            .map(|p| resolve_type_def(type_ids, p))
+            .collect::<Result<_>>()?,
+          ret: box resolve_type_def(type_ids, *ret)?,
+        }),
+      }
+    }
+
+    let mut builtin_funcs = HashMap::new();
     let mut types = Arena::new();
-    let mut funcs = HashMap::new();
     let mut type_ids = HashMap::new();
     for name in defs.keys() {
-      type_ids.insert(name, types.alloc(Type::Void));
+      type_ids.insert(name.clone(), types.alloc(Type::Void));
     }
-    for (name, StructDef(fields)) in defs {
-      let id = type_ids[name];
-      let fields = fields
-        .iter()
-        .enumerate()
-        .map(|(index, (field_name, def))| {
-          let ty = match def {
-            TypeDef::Void => Type::Void,
-            TypeDef::Bool => Type::Bool,
-            TypeDef::Int => Type::Int,
-            TypeDef::Str => Type::Str,
-            TypeDef::Alias(range, alias) => {
-              if let Some(id) = type_ids.get(alias) {
-                Type::Alias(*id)
-              } else {
-                return Err(CompileError {
-                  range: *range,
-                  message: format!("type {} not found", alias),
-                });
-              }
-            }
-          };
-          funcs.insert(
+    for (name, def) in defs {
+      let id = type_ids[&name];
+      let ty = resolve_type_def(&type_ids, def)?;
+
+      if let Type::Struct(fields) = &ty {
+        builtin_funcs.insert(
+          name.clone(),
+          (
+            StructApp::Ctor,
+            fields.values().cloned().collect(),
+            Type::Alias(id),
+          ),
+        );
+        for (i, (field_name, field_ty)) in fields.iter().enumerate() {
+          builtin_funcs.insert(
             format!("{}-{}", name, field_name),
-            FuncType {
-              args: vec![Type::Alias(id)],
-              ret: RetType::Selector {
-                index,
-                set: false,
-                ret: ty.clone(),
-              },
-            },
+            (
+              StructApp::Getter(i as u32),
+              vec![Type::Alias(id)],
+              field_ty.clone(),
+            ),
           );
-          funcs.insert(
+          builtin_funcs.insert(
             format!("set-{}-{}!", name, field_name),
-            FuncType {
-              args: vec![Type::Alias(id), ty.clone()],
-              ret: RetType::Selector {
-                index,
-                set: true,
-                ret: Type::Void,
-              },
-            },
+            (
+              StructApp::Setter(i as u32),
+              vec![Type::Alias(id), field_ty.clone()],
+              Type::Void,
+            ),
           );
-          Ok(ty)
-        })
-        .collect::<Result<Vec<Type>>>()?;
-      funcs.insert(
-        name.clone(),
-        FuncType {
-          args: fields.clone(),
-          ret: RetType::Constructor(Type::Alias(id)),
-        },
-      );
-      *types.get_mut(id).unwrap() = Type::Tuple(fields);
+        }
+      }
+      *types.get_mut(id).unwrap() = ty;
     }
     Ok(Self {
       env: HashMap::new(),
-      funcs,
+      builtin_funcs,
       types,
     })
   }
@@ -267,62 +277,56 @@ impl TypeChecker {
           ty,
         })
       }
-      ExpKind::Call { name, args } => {
-        let mut args = args
+      ExpKind::Apply {
+        func,
+        args,
+        r#struct: _,
+      } => {
+        let args = args
           .into_iter()
           .map(|arg| self.typecheck_exp(arg))
           .collect::<Result<Vec<_>>>()?;
-        let FuncType { args: arg_tys, ret } =
-          self.funcs.get(&name.1).ok_or_else(|| CompileError {
-            range: name.0,
-            message: format!("function {} not found", name.1),
-          })?;
-        if args.len() != arg_tys.len() {
-          return Err(CompileError {
-            range: exp.range,
-            message: format!("arity mismatch for {}", name.1),
-          });
+        if let ExpKind::Var(name) = &func.kind {
+          if !self.env.contains_key(name) {
+            if let Some((app, params, ret)) = self.builtin_funcs.get(name) {
+              self.typecheck_args(range, params, &args)?;
+              return Ok(Exp {
+                kind: ExpKind::Apply {
+                  func: box Exp {
+                    kind: ExpKind::Var(name.clone()),
+                    range: func.range,
+                    ty: Type::Func {
+                      params: params.clone(),
+                      ret: box ret.clone(),
+                    },
+                  },
+                  args,
+                  r#struct: Some(*app),
+                },
+                range,
+                ty: ret.clone(),
+              });
+            }
+          }
         }
-        if !args.iter().zip(arg_tys).all(|(x, y)| x.ty == *y) {
-          return Err(CompileError {
-            range,
-            message: format!("type mismatch for {}", name.1),
-          });
-        }
-        match ret {
-          RetType::Constructor(ty) => Ok(Exp {
-            kind: ExpKind::Prim {
-              op: (name.0, "vector"),
+        let func = self.typecheck_exp(*func)?;
+        if let Type::Func { params, ret } = &func.ty {
+          self.typecheck_args(range, params, &args)?;
+          let ret = (**ret).clone();
+          Ok(Exp {
+            kind: ExpKind::Apply {
+              func: box func,
               args,
+              r#struct: None,
             },
             range,
-            ty: ty.clone(),
-          }),
-          RetType::Selector { index, set, ret } => {
-            args.insert(
-              1,
-              Exp {
-                kind: ExpKind::Int(*index as i64),
-                range: name.0,
-                ty: Type::Int,
-              },
-            );
-            Ok(Exp {
-              kind: if *set {
-                ExpKind::Prim {
-                  op: (name.0, "vector-set!"),
-                  args,
-                }
-              } else {
-                ExpKind::Prim {
-                  op: (name.0, "vector-ref"),
-                  args,
-                }
-              },
-              range,
-              ty: ret.clone(),
-            })
-          }
+            ty: ret,
+          })
+        } else {
+          Err(CompileError {
+            range: func.range,
+            message: format!("expected function, found {:?}", func.ty),
+          })
         }
       }
       ExpKind::Let { var, init, body } => {
@@ -479,7 +483,7 @@ impl TypeChecker {
         } else {
           Err(CompileError {
             range,
-            message: "type mismatch".to_owned(),
+            message: format!("type mismatch for {}", op),
           })
         }
       }
@@ -544,13 +548,13 @@ impl TypeChecker {
             Type::Alias(_) => unreachable!(),
             _ => Err(CompileError {
               range,
-              message: "type mismatch".to_owned(),
+              message: "type mismatch for vector-length".to_owned(),
             }),
           }
         } else {
           Err(CompileError {
             range,
-            message: "arity mismatch".to_owned(),
+            message: "arity mismatch for vector-length".to_owned(),
           })
         }
       }
@@ -609,19 +613,22 @@ impl TypeChecker {
                   } else {
                     Err(CompileError {
                       range,
-                      message: "type mismatch".to_owned(),
+                      message: "type mismatch for vector-set!".to_owned(),
                     })
                   }
                 } else {
                   Err(CompileError {
                     range,
-                    message: "tuple index out of range".to_owned(),
+                    message: "tuple index out of range for vector-set!"
+                      .to_owned(),
                   })
                 }
               } else {
                 Err(CompileError {
                   range,
-                  message: "expected int literal".to_owned(),
+                  message:
+                    "expected int literal for 2nd argument of vector-set!"
+                      .to_owned(),
                 })
               }
             }
@@ -645,17 +652,44 @@ impl TypeChecker {
             }
             _ => Err(CompileError {
               range,
-              message: "type mismatch".to_owned(),
+              message: "type mismatch for vector-set!".to_owned(),
             }),
           }
         } else {
           Err(CompileError {
             range,
-            message: "arity mismatch".to_owned(),
+            message: "arity mismatch for vector-set!".to_owned(),
           })
         }
       }
     }
+  }
+
+  fn typecheck_args(
+    &self,
+    range: Range,
+    params: &[Type],
+    args: &[Exp<String, Type>],
+  ) -> Result<()> {
+    if params.len() != args.len() {
+      return Err(CompileError {
+        range,
+        message: format!(
+          "expected {} argument(s), found {}",
+          params.len(),
+          args.len()
+        ),
+      });
+    }
+    for ((i, param), arg) in params.iter().enumerate().zip(args) {
+      if self.resolve_type(param) != self.resolve_type(&arg.ty) {
+        return Err(CompileError {
+          range,
+          message: format!("type mismatch for argument {}", i + 1),
+        });
+      }
+    }
+    Ok(())
   }
 }
 
@@ -777,7 +811,7 @@ mod tests {
       result,
       Err(CompileError {
         range: Range { start: 0, end: 14 },
-        message: "type mismatch".to_owned(),
+        message: "type mismatch for +".to_owned(),
       })
     );
   }

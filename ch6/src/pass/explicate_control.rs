@@ -9,6 +9,7 @@ mod tests {
 
   use crate::pass::array_bounds;
   use crate::pass::division;
+  use crate::pass::r#struct;
 
   #[test]
   fn vector() {
@@ -35,18 +36,28 @@ mod tests {
   fn r#struct() {
     let prog = ast::parse(
       r#"
-(define-struct my-void (x Void))
-(define-struct my-comp (x Int) (y Bool) (z Void) (u my-void) (v Str))
-(let ([x (void)] [y (my-comp 1 #f (void) (my-void (set! x x)) "abc")])
+(define-type my-void
+  (struct
+    [x Void]))
+(define-type my-comp
+  (struct
+    [x Int]
+    [y Bool]
+    [z Void]
+    [u my-void]
+    [v Str]))
+(let ([x (void)]
+      [y (my-comp 1 #f (void) (my-void (set! x x)) "abc")])
   (set! x (set-my-comp-y! y (not (my-comp-y y))))
   (set! x (my-comp-z y))
-  (set-my-comp-x! y (vector-length y))
+  (set-my-comp-x! y 5) ;(vector-length y))
   (set-my-comp-z! y (my-void-x (my-comp-u y))))
       "#,
     )
     .unwrap();
     let prog = typecheck::typecheck(prog).unwrap();
     let prog = array_bounds::insert_bounds_check(prog);
+    let prog = r#struct::desugar_struct(prog);
     let prog = shrink::shrink(prog);
     let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);

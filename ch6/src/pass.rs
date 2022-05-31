@@ -6,4 +6,5 @@ mod interference;
 pub mod perilogue;
 pub mod register_allocation;
 pub mod string;
+pub mod r#struct;
 mod typecheck;

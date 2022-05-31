@@ -80,10 +80,15 @@ fn exp_insert(exp: Exp<String, Type>) -> Exp<String, Type> {
       },
       ..exp
     },
-    ExpKind::Call { name, args } => Exp {
-      kind: ExpKind::Call {
-        name,
+    ExpKind::Apply {
+      func,
+      args,
+      r#struct,
+    } => Exp {
+      kind: ExpKind::Apply {
+        func: box exp_insert(*func),
         args: args.into_iter().map(exp_insert).collect(),
+        r#struct,
       },
       ..exp
     },
