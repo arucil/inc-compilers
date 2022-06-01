@@ -96,7 +96,7 @@ impl<'a> CodeGen<'a> {
       match tail {
         CTail::Return(exp) => {
           self.exp_instructions(Arg::Reg(Reg::Rax), exp);
-          self.code.push(Instr::Jmp(Label::Conclusion));
+          self.code.push(Instr::JmpLabel(Label::Conclusion));
           return;
         }
         CTail::Seq(stmt, new_tail) => {
@@ -105,7 +105,7 @@ impl<'a> CodeGen<'a> {
         }
         // ch4
         CTail::Goto(label) => {
-          self.code.push(Instr::Jmp(label));
+          self.code.push(Instr::JmpLabel(label));
           return;
         }
         CTail::If {
@@ -125,7 +125,7 @@ impl<'a> CodeGen<'a> {
             cmp: cmp.into(),
             label: conseq,
           });
-          self.code.push(Instr::Jmp(alt));
+          self.code.push(Instr::JmpLabel(alt));
           return;
         }
         // ch6
@@ -254,7 +254,7 @@ impl<'a> CodeGen<'a> {
           dest: Arg::Reg(Reg::R11),
         });
         self.code.push(Instr::Shl {
-          src: Arg::Reg(Reg::R11),
+          dest: Arg::Reg(Reg::R11),
           count: Arg::Imm(3),
         });
         self.code.push(Instr::Add {
@@ -426,7 +426,7 @@ impl<'a> CodeGen<'a> {
               dest: Arg::Reg(Reg::Rsi),
             });
             self.code.push(Instr::Shl {
-              src: Arg::Reg(Reg::Rsi),
+              dest: Arg::Reg(Reg::Rsi),
               count: Arg::Imm(3),
             });
           }
@@ -439,7 +439,7 @@ impl<'a> CodeGen<'a> {
           dest: Arg::Reg(Reg::Rdi),
         });
         self.code.push(Instr::Shl {
-          src: Arg::Reg(Reg::Rdi),
+          dest: Arg::Reg(Reg::Rdi),
           count: Arg::Imm(5),
         });
         self.code.push(Instr::Or {
@@ -511,7 +511,7 @@ impl<'a> CodeGen<'a> {
           dest: Arg::Reg(Reg::R11),
         });
         self.code.push(Instr::Shl {
-          src: Arg::Reg(Reg::R11),
+          dest: Arg::Reg(Reg::R11),
           count: Arg::Imm(3),
         });
         self.code.push(Instr::Add {
@@ -530,7 +530,7 @@ impl<'a> CodeGen<'a> {
           dest: target.clone(),
         });
         self.code.push(Instr::Shr {
-          src: target.clone(),
+          dest: target.clone(),
           count: Arg::Imm(3),
         });
         self.code.push(Instr::And {
@@ -545,7 +545,7 @@ impl<'a> CodeGen<'a> {
           dest: target.clone(),
         });
         self.code.push(Instr::Shr {
-          src: target,
+          dest: target,
           count: Arg::Imm(5),
         });
       }
@@ -613,7 +613,7 @@ impl<'a> CodeGen<'a> {
           dest: target.clone(),
         });
         self.code.push(Instr::Shr {
-          src: target,
+          dest: target,
           count: Arg::Imm(3),
         });
       }
@@ -720,7 +720,7 @@ mod tests {
     let prog =
       parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#)
         .unwrap();
-    let prog = uniquify::uniquify(prog).unwrap();
+    let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let prog = explicate_control::explicate_control(prog);
     let result = select_instruction::<_, Info>(prog, false);

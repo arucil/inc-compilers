@@ -35,7 +35,7 @@ pub fn analyze_liveness(
 
   for node in nodes.values() {
     let last = blocks[&graph[*node]].code.last().unwrap().clone();
-    if let Instr::Jmp(label) = last {
+    if let Instr::JmpLabel(label) = last {
       if let Some(&node1) = nodes.get(&label) {
         graph.add_edge(node1, *node, ());
       }

@@ -1,10 +1,9 @@
-use super::register_allocation::Info;
-use asm::{Arg, Block, Instr, Label, Program};
+use asm::{Arg, Instr, Label, Program, Block};
+use ch4::pass::register_allocation::Info;
 
-pub fn add_perilogue(mut prog: Program<Info>) -> Program<Info> {
-  add_prologue(&mut prog);
-  add_epilogue(&mut prog);
-  prog
+pub fn add_perilogue(prog: &mut Program<Info>) {
+  add_prologue(prog);
+  add_epilogue(prog);
 }
 
 fn add_prologue(prog: &mut Program<Info>) {
@@ -36,29 +35,13 @@ fn add_prologue(prog: &mut Program<Info>) {
 fn add_epilogue(prog: &mut Program<Info>) {
   use asm::Reg::*;
   use Instr::*;
-  let label1 = "rt_print_int".to_owned();
-  let label2 = "rt_print_newline".to_owned();
-  prog.externs.insert(label1.clone());
-  prog.externs.insert(label2.clone());
-  let mut code = vec![
-    Mov {
-      src: Arg::Reg(Rax),
-      dest: Arg::Reg(Rdi),
-    },
-    Call {
-      label: label1,
-      arity: 1,
-      gc: false,
-    },
-    Call {
-      label: label2,
-      arity: 0,
-      gc: false,
-    },
-  ];
-  for &reg in prog.info.used_callee_saved_regs.iter().rev() {
-    code.push(Pop(Arg::Reg(reg)));
-  }
+  let mut code: Vec<Instr> = prog
+    .info
+    .used_callee_saved_regs
+    .iter()
+    .rev()
+    .map(|&reg| Pop(Arg::Reg(reg)))
+    .collect();
   code.extend_from_slice(&[
     Mov {
       src: Arg::Reg(Rbp),

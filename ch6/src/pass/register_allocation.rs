@@ -139,7 +139,8 @@ pub fn gen_assign_instr_registers<'a>(
         dest: assign(dest),
       },
       Instr::Call { label, arity, gc } => Instr::Call { label, arity, gc },
-      Instr::Jmp(label) => Instr::Jmp(label),
+      Instr::JmpLabel(label) => Instr::JmpLabel(label),
+      Instr::Jmp(arg) => Instr::Jmp(assign(arg)),
       Instr::Mov { src, dest } => Instr::Mov {
         src: assign(src),
         dest: assign(dest),
@@ -178,12 +179,12 @@ pub fn gen_assign_instr_registers<'a>(
         src: assign(src),
         dest: assign(dest),
       },
-      Instr::Shl { src, count } => Instr::Shl {
-        src: assign(src),
+      Instr::Shl { dest, count } => Instr::Shl {
+        dest: assign(dest),
         count: assign(count),
       },
-      Instr::Shr { src, count } => Instr::Shr {
-        src: assign(src),
+      Instr::Shr { dest, count } => Instr::Shr {
+        dest: assign(dest),
         count: assign(count),
       },
       Instr::IMul(arg) => Instr::IMul(assign(arg)),

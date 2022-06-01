@@ -149,6 +149,7 @@ fn collect_exp_locals(
       collect_exp_locals(len, locals);
     }
     ExpKind::Error(Error::DivByZero) => {}
+    ExpKind::FunRef { .. } => {}
   }
 }
 
@@ -252,6 +253,7 @@ fn explicate_tail(state: &mut State, exp: Exp<IdxVar, Type>) -> CTail {
       explicate_exp_effect(state, exp, CTail::Return(CExp::Atom(CAtom::Void)))
     }
     ExpKind::Error(err) => explicate_error(err),
+    ExpKind::FunRef { .. } => todo!(),
   }
 }
 
@@ -354,6 +356,7 @@ fn explicate_assign(
     | ExpKind::NewLine
     | ExpKind::Set { .. } => explicate_exp_effect(state, init, cont),
     ExpKind::Error(err) => explicate_error(err),
+    ExpKind::FunRef { .. } => todo!(),
   }
 }
 
@@ -431,6 +434,7 @@ fn explicate_pred(
       unreachable!()
     }
     ExpKind::Error(err) => explicate_error(err),
+    ExpKind::FunRef { .. } => todo!(),
   }
 }
 
@@ -555,6 +559,7 @@ fn explicate_exp_effect(
       },
     ),
     ExpKind::Error(err) => explicate_error(err),
+    ExpKind::FunRef { .. } => todo!(),
   }
 }
 

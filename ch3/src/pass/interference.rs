@@ -144,9 +144,10 @@ where
       | Instr::Ret
       | Instr::Syscall
       | Instr::Jmp(_)
+      | Instr::JmpLabel(_)
       | Instr::JumpIf { .. } => {}
-      Instr::Shl { src, .. } | Instr::Shr { src, .. } => {
-        if let Some(dest_loc) = Location::from_arg(src.clone(), self.var_store)
+      Instr::Shl { dest, .. } | Instr::Shr { dest, .. } => {
+        if let Some(dest_loc) = Location::from_arg(dest.clone(), self.var_store)
         {
           add(dest_loc);
         }

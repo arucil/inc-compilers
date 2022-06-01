@@ -112,9 +112,10 @@ impl<'a> AnalysisState<'a> {
       Instr::JumpIf { label, .. } => {
         *before |= &label_live[label];
       }
-      Instr::Jmp(label) => {
+      Instr::JmpLabel(label) => {
         *before = label_live[label].clone();
       }
+      Instr::Jmp(_) => todo!(),
       Instr::Call { arity, .. } => {
         assert!(*arity <= 6);
         for reg in Reg::caller_saved_regs() {
@@ -124,8 +125,8 @@ impl<'a> AnalysisState<'a> {
           before.add_reg(reg);
         }
       }
-      Instr::Shl { src, count } | Instr::Shr { src, count } => {
-        self.add_arg(before, src);
+      Instr::Shl { dest, count } | Instr::Shr { dest, count } => {
+        self.add_arg(before, dest);
         self.add_arg(before, count);
       }
       Instr::IMul(arg) | Instr::IDiv(arg) => {

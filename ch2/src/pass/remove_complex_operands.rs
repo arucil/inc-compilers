@@ -1,4 +1,4 @@
-use ast::{Error, Exp, ExpKind, IdxVar, Program};
+use ast::{Error, Exp, ExpKind, FuncDef, IdxVar, Program};
 use support::Range;
 
 pub fn remove_complex_operands<TYPE: Clone>(
@@ -6,6 +6,19 @@ pub fn remove_complex_operands<TYPE: Clone>(
 ) -> Program<IdxVar, TYPE> {
   let mut counter = 0;
   Program {
+    func_defs: prog
+      .func_defs
+      .into_iter()
+      .map(|(name, fun)| {
+        (
+          name,
+          FuncDef {
+            body: mon_exp(fun.body, &mut counter),
+            ..fun
+          },
+        )
+      })
+      .collect(),
     body: prog
       .body
       .into_iter()
@@ -144,6 +157,8 @@ fn mon_exp<TYPE: Clone>(
       counter,
     ),
     ExpKind::Error(Error::DivByZero) => exp,
+    // ch7
+    ExpKind::FunRef { .. } => exp,
   }
 }
 
@@ -241,6 +256,11 @@ fn atom_exp<TYPE: Clone>(
       let exp = mon_exp(exp, counter);
       assign_var(exp, tmps, counter)
     }
+    // ch7
+    ExpKind::FunRef { .. } => {
+      let exp = mon_exp(exp, counter);
+      assign_var(exp, tmps, counter)
+    }
   }
 }
 
@@ -280,7 +300,7 @@ mod tests {
     let prog =
       parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (- y (- 2))))"#)
         .unwrap();
-    let prog = uniquify::uniquify(prog).unwrap();
+    let prog = uniquify::uniquify(prog);
     let result = remove_complex_operands(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -288,7 +308,7 @@ mod tests {
   #[test]
   fn init_with_var() {
     let prog = parse(r#"(let ([a 42]) (let ([b a]) b))"#).unwrap();
-    let prog = uniquify::uniquify(prog).unwrap();
+    let prog = uniquify::uniquify(prog);
     let result = remove_complex_operands(prog);
     assert_snapshot!(result.to_string_pretty());
   }
@@ -310,7 +330,7 @@ mod tests {
       "#,
     )
     .unwrap();
-    let prog = uniquify::uniquify(prog).unwrap();
+    let prog = uniquify::uniquify(prog);
     let result = remove_complex_operands(prog);
     assert_snapshot!(result.to_string_pretty());
   }

@@ -4,10 +4,15 @@ use ch2::pass::uniquify::Uniq;
 pub fn uniquify<TYPE>(prog: Program<String, TYPE>) -> Program<IdxVar, TYPE> {
   let mut uniq = Uniq::new();
   Program {
+    func_defs: prog
+      .func_defs
+      .into_iter()
+      .map(|(name, fun)| (name, uniq.uniquify_func(fun)))
+      .collect(),
     body: prog
       .body
       .into_iter()
-      .map(|exp| uniq.uniquify_exp(exp).unwrap())
+      .map(|exp| uniq.uniquify_exp(exp))
       .collect(),
     ..prog
   }

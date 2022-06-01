@@ -1,7 +1,8 @@
 use std::cmp::Ordering;
 
-use crate::{Exp, ExpKind, Program, TypeDef};
+use crate::{Exp, ExpKind, FuncDef, Program, Type, TypeAlias};
 use indexmap::IndexMap;
+use std::collections::HashSet;
 use support::{CompileError, Range};
 
 pub type Result<T> = std::result::Result<T, CompileError>;
@@ -223,7 +224,12 @@ fn build_prog(input: &str, cst: Vec<Cst>) -> Result<Program> {
         "define-type" => {
           if let Some(Cst::List(xs, range)) = iter.next() {
             let (name, def) = build_type_def(input, xs, range)?;
-            type_defs.insert(name, def);
+            if type_defs.insert(name.clone(), def).is_some() {
+              return Err(CompileError {
+                range,
+                message: format!("duplicate type {}", name),
+              });
+            }
           } else {
             unreachable!()
           }
@@ -231,7 +237,12 @@ fn build_prog(input: &str, cst: Vec<Cst>) -> Result<Program> {
         "define" => {
           if let Some(Cst::List(xs, range)) = iter.next() {
             let (name, def) = build_func_def(input, xs, range)?;
-            func_defs.insert(name, def);
+            if func_defs.insert(name.clone(), def).is_some() {
+              return Err(CompileError {
+                range,
+                message: format!("duplicate function {}", name),
+              });
+            }
           } else {
             unreachable!()
           }
@@ -364,44 +375,33 @@ fn build_exp(input: &str, cst: Cst) -> Result<Exp> {
   }
 }
 
-fn build_type_def(
-  input: &str,
-  mut xs: Vec<Cst>,
-  range: Range,
-) -> Result<(String, TypeDef)> {
-  fn make_type_def(input: &str, def: Cst) -> Result<TypeDef> {
-    match def {
-      Cst::Symbol(sym_range) => match &input[sym_range.start..sym_range.end] {
-        "Bool" => Ok(TypeDef::Bool),
-        "Int" => Ok(TypeDef::Int),
-        "Str" => Ok(TypeDef::Str),
-        "Void" => Ok(TypeDef::Void),
-        name => Ok(TypeDef::Alias(sym_range, name.to_owned())),
-      },
-      Cst::List(mut xs, range) => {
-        if let Some(Cst::Symbol(sym_range)) = xs.first() {
-          let sym = &input[sym_range.start..sym_range.end];
-          match sym {
-            "struct" => {
-              let mut fields = IndexMap::new();
-              for field_def in xs.into_iter().skip(1) {
-                if let Cst::List(mut xs, field_range) = field_def {
-                  if xs.len() == 2 {
-                    let type_def = xs.pop().unwrap();
-                    if let Cst::Symbol(name_range) = xs[0] {
-                      let name =
-                        input[name_range.start..name_range.end].to_owned();
-                      let ty = make_type_def(input, type_def)?;
-                      if fields.insert(name, ty).is_some() {
-                        return Err(CompileError {
-                          range: name_range,
-                          message: "duplicate field".to_owned(),
-                        });
-                      }
-                    } else {
+fn make_type_def(input: &str, def: Cst) -> Result<Type> {
+  match def {
+    Cst::Symbol(sym_range) => match &input[sym_range.start..sym_range.end] {
+      "Bool" => Ok(Type::Bool),
+      "Int" => Ok(Type::Int),
+      "Str" => Ok(Type::Str),
+      "Void" => Ok(Type::Void),
+      name => Ok(Type::Alias(TypeAlias::Pending(sym_range, name.to_owned()))),
+    },
+    Cst::List(mut xs, range) => {
+      if let Some(Cst::Symbol(sym_range)) = xs.first() {
+        let sym = &input[sym_range.start..sym_range.end];
+        match sym {
+          "struct" => {
+            let mut fields = IndexMap::new();
+            for field_def in xs.into_iter().skip(1) {
+              if let Cst::List(mut xs, field_range) = field_def {
+                if xs.len() == 2 {
+                  let type_def = xs.pop().unwrap();
+                  if let Cst::Symbol(name_range) = xs[0] {
+                    let name =
+                      input[name_range.start..name_range.end].to_owned();
+                    let ty = make_type_def(input, type_def)?;
+                    if fields.insert(name, ty).is_some() {
                       return Err(CompileError {
-                        range: field_range,
-                        message: "invalid field definition".to_owned(),
+                        range: name_range,
+                        message: "duplicate field".to_owned(),
                       });
                     }
                   } else {
@@ -412,65 +412,78 @@ fn build_type_def(
                   }
                 } else {
                   return Err(CompileError {
-                    range: field_def.range(),
+                    range: field_range,
                     message: "invalid field definition".to_owned(),
                   });
                 }
-              }
-              return Ok(TypeDef::Struct(fields));
-            }
-            "array-of" => {
-              if xs.len() == 2 {
-                let ty = make_type_def(input, xs.pop().unwrap())?;
-                return Ok(TypeDef::Array(box ty));
               } else {
                 return Err(CompileError {
-                  range,
-                  message: "invalid array definition".to_owned(),
+                  range: field_def.range(),
+                  message: "invalid field definition".to_owned(),
                 });
               }
             }
-            _ => {}
+            return Ok(Type::Struct(fields));
           }
-        }
-        if xs.len() >= 2
-          && matches!(xs[xs.len() - 2], Cst::Symbol(range) if
-          matches!(&input[range.start..range.end], "->"))
-        {
-          let ret = make_type_def(input, xs.pop().unwrap())?;
-          xs.pop().unwrap();
-          let params = xs
-            .into_iter()
-            .map(|x| make_type_def(input, x))
-            .collect::<Result<_>>()?;
-          Ok(TypeDef::Func(params, box ret))
-        } else {
-          Ok(TypeDef::Tuple(
-            xs.into_iter()
-              .map(|x| make_type_def(input, x))
-              .collect::<Result<_>>()?,
-          ))
+          "array-of" => {
+            if xs.len() == 2 {
+              let ty = make_type_def(input, xs.pop().unwrap())?;
+              return Ok(Type::Array(box ty));
+            } else {
+              return Err(CompileError {
+                range,
+                message: "invalid array definition".to_owned(),
+              });
+            }
+          }
+          _ => {}
         }
       }
-      _ => Err(CompileError {
-        range: def.range(),
-        message: format!("invalid type def: {:?}", def),
-      }),
+      if xs.len() >= 2
+        && matches!(xs[xs.len() - 2], Cst::Symbol(range) if
+          matches!(&input[range.start..range.end], "->"))
+      {
+        let ret = make_type_def(input, xs.pop().unwrap())?;
+        xs.pop().unwrap();
+        let params = xs
+          .into_iter()
+          .map(|x| make_type_def(input, x))
+          .collect::<Result<_>>()?;
+        Ok(Type::Func {
+          params,
+          ret: box ret,
+        })
+      } else {
+        Ok(Type::Tuple(
+          xs.into_iter()
+            .map(|x| make_type_def(input, x))
+            .collect::<Result<_>>()?,
+        ))
+      }
     }
+    _ => Err(CompileError {
+      range: def.range(),
+      message: format!("invalid type def: {:?}", def),
+    }),
   }
+}
 
-  if xs.len() == 3 {
-    let def = xs.pop().unwrap();
-    if let Cst::Symbol(sym_range) = xs[1] {
-      let name = input[sym_range.start..sym_range.end].to_owned();
-      let ty = make_type_def(input, def)?;
-      Ok((name, ty))
-    } else {
-      Err(CompileError {
-        range,
-        message: "invalid define-type form".to_owned(),
-      })
-    }
+fn build_type_def(
+  input: &str,
+  mut xs: Vec<Cst>,
+  range: Range,
+) -> Result<(String, Type)> {
+  if xs.len() != 3 {
+    return Err(CompileError {
+      range,
+      message: "invalid define-type form".to_owned(),
+    });
+  }
+  let def = xs.pop().unwrap();
+  if let Cst::Symbol(sym_range) = xs[1] {
+    let name = input[sym_range.start..sym_range.end].to_owned();
+    let ty = make_type_def(input, def)?;
+    Ok((name, ty))
   } else {
     Err(CompileError {
       range,
@@ -479,48 +492,140 @@ fn build_type_def(
   }
 }
 
-fn build_func_def(input: &str, mut xs: Vec<Cst>, range: Range) -> Result<(String, FuncDef)> {
+fn build_func_def(
+  input: &str,
+  mut xs: Vec<Cst>,
+  range: Range,
+) -> Result<(String, FuncDef)> {
+  if xs.len() < 5 {
+    return Err(CompileError {
+      range,
+      message: "invalid function definition".to_owned(),
+    });
+  }
+  let body = if xs.len() == 5 {
+    build_exp(input, xs.pop().unwrap())?
+  } else {
+    build_iter_begin(input, xs.drain(4..))?
+  };
+  let ret = make_type_def(input, xs.pop().unwrap())?;
+  if let Cst::Symbol(sym_range) = xs.pop().unwrap() {
+    if &input[sym_range.start..sym_range.end] != ":" {
+      return Err(CompileError {
+        range,
+        message: "invalid function definition".to_owned(),
+      });
+    }
+  } else {
+    return Err(CompileError {
+      range,
+      message: "invalid function definition".to_owned(),
+    });
+  }
+  if let Cst::List(mut names, _) = xs.pop().unwrap() {
+    if names.is_empty() {
+      return Err(CompileError {
+        range,
+        message: "invalid function definition".to_owned(),
+      });
+    }
+    let mut param_names = HashSet::new();
+    let mut params = vec![];
+    for param_def in names.drain(1..) {
+      if let Cst::List(mut xs, param_range) = param_def {
+        if xs.len() != 2 {
+          return Err(CompileError {
+            range: param_range,
+            message: "invalid parameter definition".to_owned(),
+          });
+        }
+        let ty = make_type_def(input, xs.pop().unwrap())?;
+        if let Cst::Symbol(sym_range) = xs.pop().unwrap() {
+          let name = &input[sym_range.start..sym_range.end];
+          if !param_names.insert(name) {
+            return Err(CompileError {
+              range: sym_range,
+              message: format!("duplicate parameter {}", name),
+            });
+          }
+          params.push((name.to_owned(), ty));
+        } else {
+          return Err(CompileError {
+            range: param_range,
+            message: "invalid parameter definition".to_owned(),
+          });
+        }
+      } else {
+        return Err(CompileError {
+          range: param_def.range(),
+          message: "invalid parameter definition".to_owned(),
+        });
+      }
+    }
+    if let Cst::Symbol(sym_range) = names.pop().unwrap() {
+      let name = input[sym_range.start..sym_range.end].to_owned();
+      Ok((
+        name,
+        FuncDef {
+          params,
+          ret,
+          body,
+          range,
+        },
+      ))
+    } else {
+      Err(CompileError {
+        range,
+        message: "invalid function definition".to_owned(),
+      })
+    }
+  } else {
+    Err(CompileError {
+      range,
+      message: "invalid function definition".to_owned(),
+    })
+  }
 }
 
 fn build_let(input: &str, mut xs: Vec<Cst>, range: Range) -> Result<Exp> {
-  if xs.len() >= 3 {
-    let body = if xs.len() == 3 {
-      build_exp(input, xs.pop().unwrap())?
-    } else {
-      let last = build_exp(input, xs.pop().unwrap())?;
-      let seq: Vec<_> = xs
-        .drain(2..)
-        .map(|exp| build_exp(input, exp))
-        .collect::<Result<_>>()?;
-      let seq_range = Range {
-        start: seq[0].range.start,
-        end: seq.last().unwrap().range.end,
-      };
-      Exp {
-        kind: ExpKind::Begin {
-          seq,
-          last: box last,
-        },
-        range: seq_range,
-        ty: (),
-      }
+  if xs.len() < 3 {
+    return Err(CompileError {
+      range,
+      message: "invalid let form".to_owned(),
+    });
+  }
+
+  let body = if xs.len() == 3 {
+    build_exp(input, xs.pop().unwrap())?
+  } else {
+    let last = build_exp(input, xs.pop().unwrap())?;
+    let seq: Vec<_> = xs
+      .drain(2..)
+      .map(|exp| build_exp(input, exp))
+      .collect::<Result<_>>()?;
+    let seq_range = Range {
+      start: seq[0].range.start,
+      end: seq.last().unwrap().range.end,
     };
-    let inits = if let Cst::List(vars, _) = xs.pop().unwrap() {
-      vars
-        .into_iter()
-        .map(|c| -> Result<((Range, String), Exp)> {
-          if let Cst::List(mut xs, _) = c {
-            if xs.len() == 2 {
-              let init = build_exp(input, xs.pop().unwrap())?;
-              if let Cst::Symbol(sym_range) = xs.pop().unwrap() {
-                let var = input[sym_range.start..sym_range.end].to_owned();
-                Ok(((sym_range, var), init))
-              } else {
-                Err(CompileError {
-                  range,
-                  message: "invalid let form".to_owned(),
-                })
-              }
+    Exp {
+      kind: ExpKind::Begin {
+        seq,
+        last: box last,
+      },
+      range: seq_range,
+      ty: (),
+    }
+  };
+  let inits = if let Cst::List(vars, _) = xs.pop().unwrap() {
+    vars
+      .into_iter()
+      .map(|c| -> Result<((Range, String), Exp)> {
+        if let Cst::List(mut xs, _) = c {
+          if xs.len() == 2 {
+            let init = build_exp(input, xs.pop().unwrap())?;
+            if let Cst::Symbol(sym_range) = xs.pop().unwrap() {
+              let var = input[sym_range.start..sym_range.end].to_owned();
+              Ok(((sym_range, var), init))
             } else {
               Err(CompileError {
                 range,
@@ -533,69 +638,80 @@ fn build_let(input: &str, mut xs: Vec<Cst>, range: Range) -> Result<Exp> {
               message: "invalid let form".to_owned(),
             })
           }
-        })
-        .collect::<Result<Vec<_>>>()?
-    } else {
-      return Err(CompileError {
-        range,
-        message: "invalid let form".to_owned(),
-      });
-    };
-    Ok(inits.into_iter().rev().fold(body, |body, (var, init)| Exp {
-      kind: ExpKind::Let {
-        var,
-        init: box init,
-        body: box body,
-      },
-      range,
-      ty: (),
-    }))
+        } else {
+          Err(CompileError {
+            range,
+            message: "invalid let form".to_owned(),
+          })
+        }
+      })
+      .collect::<Result<Vec<_>>>()?
   } else {
-    Err(CompileError {
+    return Err(CompileError {
       range,
       message: "invalid let form".to_owned(),
-    })
-  }
+    });
+  };
+  Ok(inits.into_iter().rev().fold(body, |body, (var, init)| Exp {
+    kind: ExpKind::Let {
+      var,
+      init: box init,
+      body: box body,
+    },
+    range,
+    ty: (),
+  }))
 }
 
 fn build_if(input: &str, mut xs: Vec<Cst>, range: Range) -> Result<Exp> {
-  if xs.len() == 4 {
-    let alt = build_exp(input, xs.pop().unwrap())?;
-    let conseq = build_exp(input, xs.pop().unwrap())?;
-    let cond = build_exp(input, xs.pop().unwrap())?;
-    Ok(Exp {
-      kind: ExpKind::If {
-        cond: box cond,
-        conseq: box conseq,
-        alt: box alt,
-      },
-      range,
-      ty: (),
-    })
-  } else {
-    Err(CompileError {
+  if xs.len() != 4 {
+    return Err(CompileError {
       range,
       message: "invalid if form".to_owned(),
-    })
+    });
   }
+  let alt = build_exp(input, xs.pop().unwrap())?;
+  let conseq = build_exp(input, xs.pop().unwrap())?;
+  let cond = build_exp(input, xs.pop().unwrap())?;
+  Ok(Exp {
+    kind: ExpKind::If {
+      cond: box cond,
+      conseq: box conseq,
+      alt: box alt,
+    },
+    range,
+    ty: (),
+  })
 }
 
-fn build_begin(input: &str, mut xs: Vec<Cst>, range: Range) -> Result<Exp> {
+fn build_iter_begin<I>(input: &str, xs: I) -> Result<Exp>
+where
+  I: Iterator<Item = Cst>,
+{
+  let mut seq = xs
+    .into_iter()
+    .map(|exp| build_exp(input, exp))
+    .collect::<Result<Vec<_>>>()?;
+  let range = Range {
+    start: seq[0].range.start,
+    end: seq.last().unwrap().range.end,
+  };
+  let last = seq.pop().unwrap();
+  Ok(Exp {
+    kind: ExpKind::Begin {
+      seq,
+      last: box last,
+    },
+    range,
+    ty: (),
+  })
+}
+
+fn build_begin(input: &str, xs: Vec<Cst>, range: Range) -> Result<Exp> {
   if xs.len() > 1 {
-    let last = build_exp(input, xs.pop().unwrap())?;
-    let seq = xs
-      .into_iter()
-      .skip(1)
-      .map(|exp| build_exp(input, exp))
-      .collect::<Result<_>>()?;
-    Ok(Exp {
-      kind: ExpKind::Begin {
-        seq,
-        last: box last,
-      },
-      range,
-      ty: (),
-    })
+    let mut begin = build_iter_begin(input, xs.into_iter().skip(1))?;
+    begin.range = range;
+    Ok(begin)
   } else {
     Err(CompileError {
       range,
@@ -646,27 +762,12 @@ fn build_while(input: &str, mut xs: Vec<Cst>, range: Range) -> Result<Exp> {
       })
     }
     Ordering::Greater => {
-      let last = build_exp(input, xs.pop().unwrap())?;
-      let seq: Vec<_> = xs
-        .drain(2..)
-        .map(|exp| build_exp(input, exp))
-        .collect::<Result<_>>()?;
-      let seq_range = Range {
-        start: seq[0].range.start,
-        end: seq.last().unwrap().range.end,
-      };
+      let body = build_iter_begin(input, xs.drain(2..))?;
       let cond = build_exp(input, xs.pop().unwrap())?;
       Ok(Exp {
         kind: ExpKind::While {
           cond: box cond,
-          body: box Exp {
-            kind: ExpKind::Begin {
-              seq,
-              last: box last,
-            },
-            range: seq_range,
-            ty: (),
-          },
+          body: box body,
         },
         range,
         ty: (),

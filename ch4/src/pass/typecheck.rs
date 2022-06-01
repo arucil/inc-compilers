@@ -1,4 +1,4 @@
-use ast::{Exp, ExpKind, Program, StructApp, Type, TypeDef, TypeId};
+use ast::{Exp, ExpKind, FuncDef, Program, StructApp, Type, TypeAlias, TypeId};
 use id_arena::Arena;
 use indexmap::IndexMap;
 use maplit::hashmap;
@@ -78,7 +78,12 @@ static PRIM_TYPES: Lazy<HashMap<&'static str, PrimType>> = Lazy::new(|| {
 });
 
 pub fn typecheck(prog: Program) -> Result<Program<String, Type>> {
-  let mut checker = TypeChecker::new(prog.defs)?;
+  let mut func_defs = prog.func_defs;
+  let mut checker = TypeChecker::new(prog.type_defs, &mut func_defs)?;
+  let func_defs = func_defs
+    .into_iter()
+    .map(|(name, func)| checker.typecheck_func(name, func))
+    .collect::<Result<_>>()?;
   let body = prog
     .body
     .into_iter()
@@ -95,7 +100,8 @@ pub fn typecheck(prog: Program) -> Result<Program<String, Type>> {
     })
     .collect::<Result<_>>()?;
   Ok(Program {
-    defs: IndexMap::new(),
+    func_defs,
+    type_defs: IndexMap::new(),
     body,
     types: checker.types,
   })
@@ -103,66 +109,71 @@ pub fn typecheck(prog: Program) -> Result<Program<String, Type>> {
 
 #[derive(Debug, Clone)]
 pub struct TypeChecker {
-  env: HashMap<String, Type>,
+  env: HashMap<String, VarType>,
   builtin_funcs: HashMap<String, (StructApp, Vec<Type>, Type)>,
   pub types: Arena<Type>,
 }
 
+#[derive(Debug, Clone)]
+struct VarType {
+  ty: Type,
+  global_fun: bool,
+}
+
 impl TypeChecker {
-  pub fn new(defs: IndexMap<String, TypeDef>) -> Result<Self> {
+  pub fn new(
+    type_defs: IndexMap<String, Type>,
+    func_defs: &mut IndexMap<String, FuncDef>,
+  ) -> Result<Self> {
     fn resolve_type_def(
       type_ids: &HashMap<String, TypeId>,
-      def: TypeDef,
-    ) -> Result<Type> {
+      def: &mut Type,
+    ) -> Result<()> {
       match def {
-        TypeDef::Void => Ok(Type::Void),
-        TypeDef::Bool => Ok(Type::Bool),
-        TypeDef::Int => Ok(Type::Int),
-        TypeDef::Str => Ok(Type::Str),
-        TypeDef::Alias(range, alias) => {
-          if let Some(id) = type_ids.get(&alias) {
-            Ok(Type::Alias(*id))
+        Type::Void | Type::Bool | Type::Int | Type::Str => Ok(()),
+        Type::Alias(TypeAlias::Pending(range, alias)) => {
+          if let Some(id) = type_ids.get(alias) {
+            *def = Type::Alias(TypeAlias::Resolved(*id));
+            Ok(())
           } else {
             Err(CompileError {
-              range,
+              range: *range,
               message: format!("type {} not found", alias),
             })
           }
         }
-        TypeDef::Tuple(tys) => Ok(Type::Tuple(
-          tys
-            .into_iter()
-            .map(|ty| resolve_type_def(type_ids, ty))
-            .collect::<Result<_>>()?,
-        )),
-        TypeDef::Struct(fields) => Ok(Type::Struct(
-          fields
-            .into_iter()
-            .map(|(name, ty)| Ok((name, resolve_type_def(type_ids, ty)?)))
-            .collect::<Result<_>>()?,
-        )),
-        TypeDef::Array(ty) => {
-          Ok(Type::Array(box resolve_type_def(type_ids, *ty)?))
+        Type::Alias(TypeAlias::Resolved(_)) => Ok(()),
+        Type::Tuple(tys) => {
+          for ty in tys {
+            resolve_type_def(type_ids, ty)?;
+          }
+          Ok(())
         }
-        TypeDef::Func(params, ret) => Ok(Type::Func {
-          params: params
-            .into_iter()
-            .map(|p| resolve_type_def(type_ids, p))
-            .collect::<Result<_>>()?,
-          ret: box resolve_type_def(type_ids, *ret)?,
-        }),
+        Type::Struct(fields) => {
+          for (_, ty) in fields {
+            resolve_type_def(type_ids, ty)?;
+          }
+          Ok(())
+        }
+        Type::Array(ty) => resolve_type_def(type_ids, ty),
+        Type::Func { params, ret } => {
+          for ty in params {
+            resolve_type_def(type_ids, ty)?;
+          }
+          resolve_type_def(type_ids, ret)
+        }
       }
     }
 
     let mut builtin_funcs = HashMap::new();
     let mut types = Arena::new();
     let mut type_ids = HashMap::new();
-    for name in defs.keys() {
+    for name in type_defs.keys() {
       type_ids.insert(name.clone(), types.alloc(Type::Void));
     }
-    for (name, def) in defs {
+    for (name, mut ty) in type_defs {
       let id = type_ids[&name];
-      let ty = resolve_type_def(&type_ids, def)?;
+      resolve_type_def(&type_ids, &mut ty)?;
 
       if let Type::Struct(fields) = &ty {
         builtin_funcs.insert(
@@ -170,7 +181,7 @@ impl TypeChecker {
           (
             StructApp::Ctor,
             fields.values().cloned().collect(),
-            Type::Alias(id),
+            Type::Alias(TypeAlias::Resolved(id)),
           ),
         );
         for (i, (field_name, field_ty)) in fields.iter().enumerate() {
@@ -178,7 +189,7 @@ impl TypeChecker {
             format!("{}-{}", name, field_name),
             (
               StructApp::Getter(i as u32),
-              vec![Type::Alias(id)],
+              vec![Type::Alias(TypeAlias::Resolved(id))],
               field_ty.clone(),
             ),
           );
@@ -186,7 +197,7 @@ impl TypeChecker {
             format!("set-{}-{}!", name, field_name),
             (
               StructApp::Setter(i as u32),
-              vec![Type::Alias(id), field_ty.clone()],
+              vec![Type::Alias(TypeAlias::Resolved(id)), field_ty.clone()],
               Type::Void,
             ),
           );
@@ -194,15 +205,73 @@ impl TypeChecker {
       }
       *types.get_mut(id).unwrap() = ty;
     }
+
+    let mut env = HashMap::new();
+    for (name, func) in func_defs {
+      for (_, ty) in &mut func.params {
+        resolve_type_def(&type_ids, ty)?;
+      }
+      resolve_type_def(&type_ids, &mut func.ret)?;
+      env.insert(
+        name.clone(),
+        VarType {
+          ty: Type::Func {
+            params: func.params.iter().map(|(_, t)| t.clone()).collect(),
+            ret: box func.ret.clone(),
+          },
+          global_fun: true,
+        },
+      );
+    }
+
     Ok(Self {
-      env: HashMap::new(),
+      env,
       builtin_funcs,
       types,
     })
   }
 
+  pub fn typecheck_func(
+    &mut self,
+    name: String,
+    func: FuncDef,
+  ) -> Result<(String, FuncDef<String, Type>)> {
+    let mut old_values = vec![];
+    for (param, ty) in &func.params {
+      old_values.push((
+        param,
+        self.env.insert(
+          param.clone(),
+          VarType {
+            ty: ty.clone(),
+            global_fun: false,
+          },
+        ),
+      ));
+    }
+    let body = self.typecheck_exp(func.body)?;
+    for (param, ty) in old_values {
+      if let Some(ty) = ty {
+        self.env.insert(param.clone(), ty);
+      } else {
+        self.env.remove(param);
+      }
+    }
+    let actual_ret = self.resolve_type(&body.ty);
+    let expected_ret = self.resolve_type(&func.ret);
+    if actual_ret != expected_ret {
+      return Err(CompileError {
+        range: func.range,
+        message: format!(
+          "expected return type {:?}, found {:?}",
+          expected_ret, actual_ret
+        ),
+      });
+    }
+    Ok((name, FuncDef { body, ..func }))
+  }
+
   pub fn typecheck(&mut self, exp: Exp) -> Result<Exp<String, Type>> {
-    self.env.clear();
     self.typecheck_exp(exp)
   }
 
@@ -234,7 +303,19 @@ impl TypeChecker {
         ty: Type::Void,
       }),
       ExpKind::Var(var) => {
-        if let Some(ty) = self.env.get(&var) {
+        if let Some(VarType { ty, global_fun }) = self.env.get(&var) {
+          if *global_fun {
+            if let Type::Func { params, .. } = &ty {
+              return Ok(Exp {
+                kind: ExpKind::FunRef {
+                  name: var,
+                  arity: params.len(),
+                },
+                range,
+                ty: ty.clone(),
+              });
+            }
+          }
           Ok(Exp {
             kind: ExpKind::Var(var),
             range,
@@ -248,7 +329,7 @@ impl TypeChecker {
         }
       }
       ExpKind::Get(var) => {
-        if let Some(ty) = self.env.get(&var) {
+        if let Some(VarType { ty, .. }) = self.env.get(&var) {
           Ok(Exp {
             kind: ExpKind::Get(var),
             range,
@@ -331,7 +412,13 @@ impl TypeChecker {
       }
       ExpKind::Let { var, init, body } => {
         let init = self.typecheck_exp(*init)?;
-        let old_var_ty = self.env.insert(var.1.clone(), init.ty.clone());
+        let old_var_ty = self.env.insert(
+          var.1.clone(),
+          VarType {
+            ty: init.ty.clone(),
+            global_fun: false,
+          },
+        );
         let body = self.typecheck_exp(*body)?;
         if let Some(old_var_ty) = old_var_ty {
           self.env.insert(var.1.clone(), old_var_ty);
@@ -376,8 +463,14 @@ impl TypeChecker {
       }
       ExpKind::Set { ref var, exp } => {
         let exp = self.typecheck_exp(*exp)?;
-        if let Some(ty) = self.env.get(&var.1) {
-          if ty != &exp.ty {
+        if let Some(VarType { ty, global_fun }) = self.env.get(&var.1) {
+          if *global_fun {
+            return Err(CompileError {
+              range,
+              message: format!("global function {} is immutable", var.1),
+            });
+          }
+          if self.resolve_type(ty) != self.resolve_type(&exp.ty) {
             return Err(CompileError {
               range,
               message: format!("type mismatch, {:?} != {:?}", ty, exp.ty),
@@ -460,6 +553,7 @@ impl TypeChecker {
         ty: Type::Void,
       }),
       ExpKind::Error(_) => unreachable!(),
+      ExpKind::FunRef { .. } => unreachable!(),
     }
   }
 

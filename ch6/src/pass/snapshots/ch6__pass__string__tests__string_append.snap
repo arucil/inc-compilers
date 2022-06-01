@@ -6,55 +6,48 @@ expression: result.to_string_pretty()
  [x "\n"]
  (print
   (let
-   [(string-append-tmp-1)
-    "abc"]
+   [(append-tmp-1) "abc"]
    (let
-    [(string-append-tmp-2)
+    [(append-tmp-2)
      (let
-      [(string-append-tmp-1)
-       "+"]
+      [(append-tmp-1) "+"]
       (let
-       [(string-append-tmp-2)
-        x]
+       [(append-tmp-2) x]
        (let
-        [(string-append-len-1)
-         (string-length
-          (string-append-tmp-1))]
+        [(append-len-1)
+         (string-length (append-tmp-1))]
         (let
-         [(string-append-tmp-3)
+         [(append-tmp-3)
           (alloc-string
            (+
-            (string-append-len-1)
-            (string-length
-             (string-append-tmp-2))))]
+            (append-len-1)
+            (string-length (append-tmp-2))))]
          (begin
-         (copy-string!
-           (string-append-tmp-3)
-           0
-           (string-append-tmp-1))
           (copy-string!
-           (string-append-tmp-3)
-           (string-append-len-1)
-           (string-append-tmp-2))
-          (string-append-tmp-3))))))]
+           (append-tmp-3)
+           0
+           (append-tmp-1))
+          (copy-string!
+           (append-tmp-3)
+           (append-len-1)
+           (append-tmp-2))
+          (append-tmp-3))))))]
     (let
-     [(string-append-len-1)
-      (string-length
-       (string-append-tmp-1))]
+     [(append-len-1)
+      (string-length (append-tmp-1))]
      (let
-      [(string-append-tmp-3)
+      [(append-tmp-3)
        (alloc-string
         (+
-         (string-append-len-1)
-         (string-length
-          (string-append-tmp-2))))]
+         (append-len-1)
+         (string-length (append-tmp-2))))]
       (begin
-      (copy-string!
-        (string-append-tmp-3)
-        0
-        (string-append-tmp-1))
        (copy-string!
-        (string-append-tmp-3)
-        (string-append-len-1)
-        (string-append-tmp-2))
-       (string-append-tmp-3))))))))
+        (append-tmp-3)
+        0
+        (append-tmp-1))
+       (copy-string!
+        (append-tmp-3)
+        (append-len-1)
+        (append-tmp-2))
+       (append-tmp-3))))))))

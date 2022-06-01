@@ -1,9 +1,22 @@
-use ast::{Error, Exp, ExpKind, Program, Type};
+use ast::{Error, Exp, ExpKind, Program, Type, FuncDef};
 
 pub fn expose_string_concat(
   prog: Program<String, Type>,
 ) -> Program<String, Type> {
   Program {
+    func_defs: prog
+      .func_defs
+      .into_iter()
+      .map(|(name, func)| {
+        (
+          name,
+          FuncDef {
+            body: exp_insert(func.body),
+            ..func
+          },
+        )
+      })
+      .collect(),
     body: prog.body.into_iter().map(exp_insert).collect(),
     ..prog
   }
@@ -34,25 +47,25 @@ fn exp_insert(exp: Exp<String, Type>) -> Exp<String, Type> {
       let range = exp.range;
       let arg2 = exp_insert(args.pop().unwrap());
       let arg1 = exp_insert(args.pop().unwrap());
-      let tmp1 = "(string-append-tmp-1)".to_owned();
+      let tmp1 = "(append-tmp-1)".to_owned();
       let arg1_var = Exp {
         kind: ExpKind::Var(tmp1.clone()),
         range: exp.range,
         ty: Type::Int,
       };
-      let tmp2 = "(string-append-tmp-2)".to_owned();
+      let tmp2 = "(append-tmp-2)".to_owned();
       let arg2_var = Exp {
         kind: ExpKind::Var(tmp2.clone()),
         range: exp.range,
         ty: Type::Int,
       };
-      let len1 = "(string-append-len-1)".to_owned();
+      let len1 = "(append-len-1)".to_owned();
       let len1_var = Exp {
         kind: ExpKind::Var(len1.clone()),
         range: exp.range,
         ty: Type::Int,
       };
-      let tmp3 = "(string-append-tmp-3)".to_owned();
+      let tmp3 = "(append-tmp-3)".to_owned();
       let result_var = Exp {
         kind: ExpKind::Var(tmp3.clone()),
         range: exp.range,
@@ -221,6 +234,7 @@ fn exp_insert(exp: Exp<String, Type>) -> Exp<String, Type> {
       ..exp
     },
     ExpKind::Error(Error::DivByZero) => exp,
+    ExpKind::FunRef { .. } => exp,
   }
 }
 

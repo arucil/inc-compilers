@@ -1,0 +1,79 @@
+---
+source: ch6/src/pass/explicate_control.rs
+assertion_line: 90
+expression: result.to_string_pretty()
+---
+locals: {x.0: Array(Bool), y.1: Array(Int), z.2: Array(Array(Bool)), t.3: Array(Void), (tmp).0: Int, (tmp).1: Int, (tmp).2: Int, (tmp).3: Int, (bounds-tmp-index).5: Int, (tmp).4: Int, (tmp).5: Int, (tmp).6: Int, (tmp).7: Int, (tmp).8: Int}
+
+start:
+    if (>= 3 0) goto block24 else goto block25
+block24:
+    x.0 = (make-vector 3 #t : Bool)
+    goto block23
+block25:
+    length-error 3
+block23:
+    if (>= 0 0) goto block21 else goto block22
+block21:
+    y.1 = (make-vector 0 2 : Int)
+    goto block20
+block22:
+    length-error 0
+block20:
+    if (>= 2 0) goto block18 else goto block19
+block18:
+    z.2 = (make-vector 2 x.0 : Array(Bool))
+    goto block17
+block19:
+    length-error 2
+block17:
+    if (>= 10 0) goto block15 else goto block16
+block15:
+    t.3 = (make-vector 10 #<void> : Void)
+    goto block14
+block16:
+    length-error 10
+block14:
+    if (>= 1 0) goto block13 else goto block12
+block13:
+    (tmp).0 = (vector-length x.0)
+    if (< 1 (tmp).0) goto block11 else goto block12
+block12:
+    (tmp).1 = (vector-length x.0)
+    out-of-bounds-error 1 (tmp).1
+block11:
+    vector-set! x.0 1 #f
+    goto block10
+block10:
+    if (>= 3 0) goto block9 else goto block8
+block9:
+    (tmp).2 = (vector-length t.3)
+    if (< 3 (tmp).2) goto block7 else goto block8
+block8:
+    (tmp).3 = (vector-length t.3)
+    out-of-bounds-error 3 (tmp).3
+block7:
+    if (>= 0 0) goto block6 else goto block5
+block6:
+    (tmp).4 = (vector-length y.1)
+    if (< 0 (tmp).4) goto block4 else goto block5
+block5:
+    (tmp).5 = (vector-length y.1)
+    out-of-bounds-error 0 (tmp).5
+block4:
+    (bounds-tmp-index).5 = (vector-ref y.1 0)
+    goto block3
+block3:
+    if (>= (bounds-tmp-index).5 0) goto block2 else goto block1
+block2:
+    (tmp).6 = (vector-length t.3)
+    if (< (bounds-tmp-index).5 (tmp).6) goto block0 else goto block1
+block1:
+    (tmp).7 = (vector-length t.3)
+    out-of-bounds-error (bounds-tmp-index).5 (tmp).7
+block0:
+    (tmp).8 = (vector-length t.3)
+    print-int (tmp).8
+    newline
+    return #<void>
+

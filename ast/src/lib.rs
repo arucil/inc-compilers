@@ -13,30 +13,18 @@ pub use parser::{parse, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Program<VAR = String, TYPE = ()> {
-  pub type_defs: IndexMap<String, TypeDef>,
+  pub type_defs: IndexMap<String, Type>,
   pub func_defs: IndexMap<String, FuncDef<VAR, TYPE>>,
   pub body: Vec<Exp<VAR, TYPE>>,
   pub types: Arena<Type>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TypeDef {
-  Void,
-  Bool,
-  Int,
-  Str,
-  Alias(Range, String),
-  Tuple(Vec<TypeDef>),
-  Array(Box<TypeDef>),
-  Struct(IndexMap<String, TypeDef>),
-  Func(Vec<TypeDef>, Box<TypeDef>),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FuncDef<VAR, TYPE> {
-  pub params: Vec<(String, TypeDef)>,
-  pub ret: TypeDef,
+pub struct FuncDef<VAR = String, TYPE = ()> {
+  pub params: Vec<(VAR, Type)>,
+  pub ret: Type,
   pub body: Exp<VAR, TYPE>,
+  pub range: Range,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -76,6 +64,10 @@ pub enum ExpKind<VAR, TYPE> {
     exp: Box<Exp<VAR, TYPE>>,
   },
   Get(VAR),
+  FunRef {
+    name: String,
+    arity: usize,
+  },
   Begin {
     seq: Vec<Exp<VAR, TYPE>>,
     last: Box<Exp<VAR, TYPE>>,
@@ -112,15 +104,21 @@ pub enum Error<VAR, TYPE> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
+  Void,
   Int,
   Bool,
   Str,
   Tuple(Vec<Type>),
   Array(Box<Type>),
-  Alias(TypeId),
+  Alias(TypeAlias),
   Struct(IndexMap<String, Type>),
   Func { params: Vec<Type>, ret: Box<Type> },
-  Void,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TypeAlias {
+  Pending(Range, String),
+  Resolved(TypeId),
 }
 
 pub type TypeId = Id<Type>;
@@ -162,12 +160,55 @@ impl<VAR: Display, TYPE: Debug> Program<VAR, TYPE> {
   pub fn to_string_pretty(&self) -> String {
     let doc = self.to_doc();
     let mut buf = String::new();
-    doc.render_fmt(30, &mut buf).unwrap();
+    doc.render_fmt(50, &mut buf).unwrap();
     buf
   }
 
   fn to_doc(&self) -> RcDoc {
-    RcDoc::intersperse(self.body.iter().map(|exp| exp.to_doc()), Doc::line())
+    RcDoc::intersperse(
+      self
+        .func_defs
+        .iter()
+        .map(|(name, def)| def.to_doc(name))
+        .chain(self.body.iter().map(|exp| exp.to_doc())),
+      Doc::line(),
+    )
+  }
+}
+
+impl<VAR: Display, TYPE: Debug> FuncDef<VAR, TYPE> {
+  fn to_doc<'a>(&'a self, name: &str) -> RcDoc<'a> {
+    RcDoc::text("(")
+      .append(RcDoc::text("define"))
+      .append(Doc::line())
+      .append(
+        RcDoc::text("(")
+          .append(RcDoc::text(name.to_owned()))
+          .append(Doc::line())
+          .append(RcDoc::intersperse(
+            self.params.iter().map(|(name, ty)| {
+              RcDoc::text("[")
+                .append(RcDoc::text(name.to_string()))
+                .append(Doc::line())
+                .append(ty.to_doc())
+                .append(RcDoc::text("]"))
+                .group()
+            }),
+            Doc::line(),
+          ))
+          .append(RcDoc::text(")"))
+          .group(),
+      )
+      .group()
+      .append(Doc::space())
+      .append(RcDoc::text(":"))
+      .append(Doc::space())
+      .append(self.ret.to_doc())
+      .group()
+      .append(Doc::line())
+      .append(self.body.to_doc())
+      .nest(1)
+      .append(RcDoc::text(")"))
   }
 }
 
@@ -176,7 +217,10 @@ impl<VAR: Display, TYPE: Debug> Exp<VAR, TYPE> {
     match &self.kind {
       ExpKind::Int(n) => RcDoc::text(format!("{}", n)),
       ExpKind::Str(s) => RcDoc::text(format!("{:?}", s)),
-      ExpKind::Var(var) | ExpKind::Get(var) => RcDoc::text(format!("{}", var)),
+      ExpKind::Var(var) => RcDoc::text(format!("{}", var)),
+      ExpKind::Get(var) => RcDoc::text("{")
+        .append(RcDoc::text(format!("{}", var)))
+        .append(RcDoc::text("}")),
       ExpKind::Prim { op, args } => RcDoc::text("(")
         .append(
           RcDoc::intersperse(
@@ -220,8 +264,7 @@ impl<VAR: Display, TYPE: Debug> Exp<VAR, TYPE> {
             )
             .append(Doc::line())
             .append(body.to_doc())
-            .nest(1)
-            .group(),
+            .nest(1),
         )
         .append(RcDoc::text(")")),
       ExpKind::Bool(true) => RcDoc::text("#t"),
@@ -233,9 +276,10 @@ impl<VAR: Display, TYPE: Debug> Exp<VAR, TYPE> {
             .append(cond.to_doc())
             .group()
             .append(Doc::line())
-            .append(conseq.to_doc().append(Doc::line()).append(alt.to_doc()))
-            .nest(1)
-            .group(),
+            .append(conseq.to_doc())
+            .append(Doc::line())
+            .append(alt.to_doc())
+            .nest(1),
         )
         .append(RcDoc::text(")")),
       ExpKind::Set { var, exp } => RcDoc::text("(")
@@ -251,17 +295,16 @@ impl<VAR: Display, TYPE: Debug> Exp<VAR, TYPE> {
         .append(RcDoc::text(")")),
       ExpKind::Begin { seq, last } => RcDoc::text("(")
         .append(
-          RcDoc::text("begin").append(Doc::line()).append(
-            RcDoc::intersperse(
+          RcDoc::text("begin")
+            .append(Doc::line())
+            .append(RcDoc::intersperse(
               seq
                 .iter()
                 .chain(std::iter::once(&**last))
                 .map(|exp| exp.to_doc()),
               Doc::line(),
-            )
-            .nest(1)
-            .group(),
-          ),
+            ))
+            .nest(1),
         )
         .append(RcDoc::text(")")),
       ExpKind::While { cond, body } => RcDoc::text("(")
@@ -310,6 +353,41 @@ impl<VAR: Display, TYPE: Debug> Exp<VAR, TYPE> {
         )
         .append(RcDoc::text(")")),
       ExpKind::Error(Error::DivByZero) => RcDoc::text("(div-by-zero)"),
+      ExpKind::FunRef { name, arity } => RcDoc::text("{")
+        .append(
+          RcDoc::text("fun-ref")
+            .append(Doc::line())
+            .append(RcDoc::text(name))
+            .append(Doc::line())
+            .append(RcDoc::text(format!("{}", arity)))
+            .nest(1)
+            .group(),
+        )
+        .append(RcDoc::text("}")),
+    }
+  }
+}
+
+impl<VAR, TYPE> ExpKind<VAR, TYPE> {
+  pub fn is_atomic(&self) -> bool {
+    match self {
+      Self::Int(_) => true,
+      Self::Prim { .. } => false,
+      Self::Apply { .. } => false,
+      Self::Var(_) => true,
+      Self::Str(_) => true,
+      Self::Let { .. } => false,
+      Self::Bool(_) => true,
+      Self::If { .. } => false,
+      Self::Set { .. } => false,
+      Self::Get(_) => false,
+      Self::FunRef { .. } => true,
+      Self::Begin { .. } => false,
+      Self::While { .. } => false,
+      Self::Void => true,
+      Self::Print(..) => false,
+      Self::NewLine => false,
+      Self::Error(_) => false,
     }
   }
 }
@@ -320,15 +398,68 @@ impl Type {
       Self::Tuple(_) => true,
       Self::Array(_) => true,
       Self::Str => true,
-      Self::Alias(id) => types[*id].is_ref(types),
+      Self::Alias(TypeAlias::Resolved(id)) => types[*id].is_ref(types),
+      Self::Alias(TypeAlias::Pending(..)) => unreachable!(),
       _ => false,
     }
   }
 
   pub fn resolved(&self, types: &Arena<Type>) -> Self {
     match self {
-      Self::Alias(id) => types[*id].resolved(types),
+      Self::Alias(TypeAlias::Resolved(id)) => types[*id].resolved(types),
+      Self::Alias(TypeAlias::Pending(..)) => unreachable!(),
       _ => self.clone(),
+    }
+  }
+
+  fn to_doc(&self) -> RcDoc {
+    match self {
+      Self::Void => RcDoc::text("Void"),
+      Self::Int => RcDoc::text("Int"),
+      Self::Bool => RcDoc::text("Str"),
+      Self::Str => RcDoc::text("Str"),
+      Self::Tuple(tys) => RcDoc::text("(")
+        .append(RcDoc::intersperse(
+          tys.iter().map(|ty| ty.to_doc()),
+          Doc::line(),
+        ))
+        .nest(1)
+        .append(RcDoc::text(")")),
+      Self::Array(ty) => RcDoc::text("(")
+        .append("array-of")
+        .append(Doc::line())
+        .append(ty.to_doc())
+        .nest(1)
+        .append(RcDoc::text(")")),
+      Self::Alias(TypeAlias::Pending(_, alias)) => RcDoc::text(alias),
+      Self::Alias(TypeAlias::Resolved(id)) => RcDoc::text(format!("{:?}", id)),
+      Self::Struct(fields) => RcDoc::text("(")
+        .append(RcDoc::text("struct"))
+        .append(Doc::line())
+        .append(RcDoc::intersperse(
+          fields.iter().map(|(name, ty)| {
+            RcDoc::text("[")
+              .append(RcDoc::text(name))
+              .append(Doc::line())
+              .append(ty.to_doc())
+              .append(RcDoc::text("]"))
+          }),
+          Doc::line(),
+        ))
+        .nest(1)
+        .append(RcDoc::text(")")),
+      Self::Func { params, ret } => RcDoc::text("(")
+        .append(RcDoc::intersperse(
+          params.iter().map(|ty| ty.to_doc()),
+          Doc::line(),
+        ))
+        .append(Doc::line())
+        .group()
+        .append(RcDoc::text("->"))
+        .append(Doc::line())
+        .append(ret.to_doc())
+        .nest(1)
+        .append(RcDoc::text(")")),
     }
   }
 }

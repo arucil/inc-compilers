@@ -5,7 +5,7 @@ pub fn merge_blocks<INFO>(prog: Program<INFO>) -> Program<INFO> {
   let mut refs = IndexMap::<Label, usize>::new();
   let mut blocks = IndexMap::<Label, Block>::new();
   for (label, block) in prog.blocks {
-    if let Instr::Jmp(label) = block.code.last().unwrap() {
+    if let Instr::JmpLabel(label) = block.code.last().unwrap() {
       *refs.entry(*label).or_default() += 1;
       if block.code.len() > 1 {
         if let Instr::JumpIf { label, .. } = &block.code[block.code.len() - 2] {
@@ -24,7 +24,7 @@ pub fn merge_blocks<INFO>(prog: Program<INFO>) -> Program<INFO> {
     } else {
       continue;
     };
-    while let Instr::Jmp(next_label) = block.code.last().unwrap() {
+    while let Instr::JmpLabel(next_label) = block.code.last().unwrap() {
       if block.code.len() > 1 {
         if let Instr::JumpIf { label, .. } = &block.code[block.code.len() - 2] {
           worklist.push(*label);

@@ -1,0 +1,18 @@
+---
+source: ch6/src/pass/division.rs
+assertion_line: 211
+expression: result.to_string_pretty()
+---
+(let
+ [x 3]
+ (print
+  (let
+   [(divisor-tmp)
+    (let
+     [(dividend-tmp) (- x)]
+     (if (eq? x 0)
+      (div-by-zero)
+      (remainder (dividend-tmp) x)))]
+   (if (eq? (divisor-tmp) 0)
+    (div-by-zero)
+    (quotient 17 (divisor-tmp))))))

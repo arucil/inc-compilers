@@ -148,6 +148,7 @@ fn collect_exp_locals<TYPE>(
       }
     }
     ExpKind::NewLine => {}
+    ExpKind::FunRef { .. } => {}
     ExpKind::Error(_) => unreachable!(),
   }
 }
@@ -170,7 +171,7 @@ mod tests {
         "#,
     )
     .unwrap();
-    let prog = uniquify::uniquify(prog).unwrap();
+    let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());
@@ -182,7 +183,7 @@ mod tests {
       r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#,
     )
     .unwrap();
-    let prog = uniquify::uniquify(prog).unwrap();
+    let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let result = explicate_control(prog);
     assert_snapshot!(result.to_string_pretty());

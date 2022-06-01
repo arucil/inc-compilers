@@ -1,15 +1,36 @@
-use ast::{Error, Exp, ExpKind, Program, Type};
+use ast::{Error, Exp, ExpKind, FuncDef, Program, Type, IdxVar};
 
+/// (remainder e1 e2) / (quotient e1 e2)
+///
+/// =>
+///
+/// (let ([x e1] [y e2])
+///   (if (eq? y 0)
+///     (div-by-zero)
+///     (remainder/qoutient x y)))
 pub fn insert_division_check(
-  prog: Program<String, Type>,
-) -> Program<String, Type> {
+  prog: Program<IdxVar, Type>,
+) -> Program<IdxVar, Type> {
   Program {
+    func_defs: prog
+      .func_defs
+      .into_iter()
+      .map(|(name, func)| {
+        (
+          name,
+          FuncDef {
+            body: exp_insert(func.body),
+            ..func
+          },
+        )
+      })
+      .collect(),
     body: prog.body.into_iter().map(exp_insert).collect(),
     ..prog
   }
 }
 
-fn exp_insert(exp: Exp<String, Type>) -> Exp<String, Type> {
+fn exp_insert(exp: Exp<IdxVar, Type>) -> Exp<IdxVar, Type> {
   match exp.kind {
     ExpKind::Int(_)
     | ExpKind::Var(_)
@@ -24,46 +45,57 @@ fn exp_insert(exp: Exp<String, Type>) -> Exp<String, Type> {
     } => {
       let arg2 = exp_insert(args.pop().unwrap());
       let arg1 = exp_insert(args.pop().unwrap());
-      let tmp = "(division-divisor-tmp)".to_owned();
-      let arg2_var = Exp {
-        kind: ExpKind::Var(tmp.clone()),
-        range: exp.range,
-        ty: Type::Int,
-      };
-      Exp {
-        kind: ExpKind::Let {
-          var: (arg2.range, tmp),
-          init: box arg2,
-          body: box Exp {
-            kind: ExpKind::If {
-              cond: box Exp {
-                kind: ExpKind::Prim {
-                  op: (exp.range, "eq?"),
-                  args: vec![
-                    arg2_var.clone(),
-                    Exp {
-                      kind: ExpKind::Int(0),
-                      range: exp.range,
-                      ty: Type::Int,
-                    },
-                  ],
+      let mut vars = vec![];
+      let arg1_var;
+      if arg1.kind.is_atomic() {
+        arg1_var = arg1;
+      } else {
+        let tmp1 = "(dividend-tmp)".to_owned();
+        arg1_var = Exp {
+          kind: ExpKind::Var(tmp1.clone()),
+          range: arg1.range,
+          ty: Type::Int,
+        };
+        vars.push(((arg1.range, tmp1), box arg1));
+      }
+      let arg2_var;
+      if arg2.kind.is_atomic() {
+        arg2_var = arg2;
+      } else {
+        let tmp2 = "(divisor-tmp)".to_owned();
+        arg2_var = Exp {
+          kind: ExpKind::Var(tmp2.clone()),
+          range: arg2.range,
+          ty: Type::Int,
+        };
+        vars.push(((arg2.range, tmp2), box arg2));
+      }
+      let body = Exp {
+        kind: ExpKind::If {
+          cond: box Exp {
+            kind: ExpKind::Prim {
+              op: (exp.range, "eq?"),
+              args: vec![
+                arg2_var.clone(),
+                Exp {
+                  kind: ExpKind::Int(0),
+                  range: exp.range,
+                  ty: Type::Int,
                 },
-                range: exp.range,
-                ty: Type::Bool,
-              },
-              conseq: box Exp {
-                kind: ExpKind::Error(Error::DivByZero),
-                range: exp.range,
-                ty: Type::Int,
-              },
-              alt: box Exp {
-                kind: ExpKind::Prim {
-                  op,
-                  args: vec![arg1, arg2_var],
-                },
-                range: exp.range,
-                ty: Type::Int,
-              },
+              ],
+            },
+            range: exp.range,
+            ty: Type::Bool,
+          },
+          conseq: box Exp {
+            kind: ExpKind::Error(Error::DivByZero),
+            range: exp.range,
+            ty: Type::Int,
+          },
+          alt: box Exp {
+            kind: ExpKind::Prim {
+              op,
+              args: vec![arg1_var, arg2_var],
             },
             range: exp.range,
             ty: Type::Int,
@@ -71,7 +103,16 @@ fn exp_insert(exp: Exp<String, Type>) -> Exp<String, Type> {
         },
         range: exp.range,
         ty: Type::Int,
-      }
+      };
+      vars.into_iter().rfold(body, |body, (var, init)| Exp {
+        kind: ExpKind::Let {
+          var,
+          init,
+          body: box body,
+        },
+        range: exp.range,
+        ty: Type::Int,
+      })
     }
     ExpKind::Prim { op, args } => Exp {
       kind: ExpKind::Prim {
@@ -145,6 +186,7 @@ fn exp_insert(exp: Exp<String, Type>) -> Exp<String, Type> {
       ..exp
     },
     ExpKind::Error(Error::DivByZero) => unreachable!(),
+    ExpKind::FunRef { .. } => exp,
   }
 }
 
@@ -160,7 +202,7 @@ mod tests {
     let prog = parse(
       r#"
 (let ([x 3])
-  (print (quotient 17 (remainder 30 x))))
+  (print (quotient 17 (remainder (- x) x))))
       "#,
     )
     .unwrap();

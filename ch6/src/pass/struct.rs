@@ -1,9 +1,22 @@
-use ast::{Error, Exp, ExpKind, Program, StructApp, Type};
+use ast::{Error, Exp, ExpKind, FuncDef, Program, StructApp, Type};
 use id_arena::Arena;
 
 pub fn desugar_struct(
   mut prog: Program<String, Type>,
 ) -> Program<String, Type> {
+  let func_defs = prog
+    .func_defs
+    .into_iter()
+    .map(|(name, func)| {
+      (
+        name,
+        FuncDef {
+          body: exp_desugar(func.body, &prog.types),
+          ..func
+        },
+      )
+    })
+    .collect();
   let body = prog
     .body
     .into_iter()
@@ -14,7 +27,11 @@ pub fn desugar_struct(
       *ty = Type::Tuple(fields.into_values().collect())
     }
   }
-  Program { body, ..prog }
+  Program {
+    func_defs,
+    body,
+    ..prog
+  }
 }
 
 /// (my-struct-field x) => (vector-ref x K)
@@ -164,5 +181,6 @@ fn exp_desugar(
       ..exp
     },
     ExpKind::Error(Error::DivByZero) => exp,
+    ExpKind::FunRef { .. } => exp,
   }
 }

@@ -70,7 +70,10 @@ fn assign_home_instr(
       Instr::Add { src, dest }
     }
     Instr::Call { label, arity, gc } => Instr::Call { label, arity, gc },
-    Instr::Jmp(label) => Instr::Jmp(label),
+    Instr::Jmp(arg) => {
+      let arg = assign_home_arg(arg, local_spaces);
+      Instr::Jmp(arg)
+    },
     Instr::Mov { src, dest } => {
       let src = assign_home_arg(src, local_spaces);
       let dest = assign_home_arg(dest, local_spaces);
@@ -80,6 +83,7 @@ fn assign_home_instr(
     Instr::Pop(dest) => Instr::Pop(assign_home_arg(dest, local_spaces)),
     Instr::Push(src) => Instr::Push(assign_home_arg(src, local_spaces)),
     Instr::Ret => Instr::Ret,
+    Instr::JmpLabel(label) => Instr::JmpLabel(label),
     instr => unimplemented!("{:?}", instr),
   }
 }
@@ -110,7 +114,7 @@ mod tests {
     let prog =
       parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#)
         .unwrap();
-    let prog = uniquify::uniquify(prog).unwrap();
+    let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let prog = explicate_control::explicate_control(prog);
     let prog = instruction_selection::select_instruction(prog, false);

@@ -61,7 +61,7 @@ fn sort_blocks(
 
   for node in nodes.values() {
     let last = graph[*node].1.code.last().unwrap().clone();
-    if let Instr::Jmp(label) = last {
+    if let Instr::JmpLabel(label) = last {
       if let Some(&node1) = nodes.get(&label) {
         graph.add_edge(*node, node1, ());
       }

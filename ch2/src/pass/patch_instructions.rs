@@ -146,7 +146,7 @@ mod tests {
     let prog =
       parse(r#"(let ([x (read)] [y (+ 2 3)]) (+ (- (read)) (+ y (- 2))))"#)
         .unwrap();
-    let prog = uniquify::uniquify(prog).unwrap();
+    let prog = uniquify::uniquify(prog);
     let prog = remove_complex_operands::remove_complex_operands(prog);
     let prog = explicate_control::explicate_control(prog);
     let prog = instruction_selection::select_instruction(prog, false);

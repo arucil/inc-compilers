@@ -1,0 +1,25 @@
+---
+source: ch7/src/pass/remove_complex_operands.rs
+expression: result.to_string_pretty()
+---
+(define (foo [f.0 (Int -> Int)]) : Void
+ (begin
+  (f.0 1)
+  (void)))
+(define (bar [x.1 Int]) : Int
+ (let
+  [(tmp).0 {fun-ref bar 1}]
+  (let
+   [(tmp).1 ((tmp).0 x.1)]
+   (+ (tmp).1 1))))
+(let
+ [x.2 {fun-ref bar 1}]
+ (begin
+  (let
+   [(tmp).2 {fun-ref foo 1}]
+   (let
+    [(tmp).3 {fun-ref bar 1}]
+    ((tmp).2 (tmp).3)))
+  (let
+   [(tmp).4 {fun-ref foo 1}]
+   ((tmp).4 x.2))))

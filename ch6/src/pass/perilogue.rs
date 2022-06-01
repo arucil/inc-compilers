@@ -60,7 +60,7 @@ fn add_prologue(prog: &mut Program<Info>) {
       src: Arg::Imm(prog.info.rootstack_space as i64),
       dest: Arg::Reg(R15),
     },
-    Jmp(Label::Start),
+    JmpLabel(Label::Start),
   ]);
   let block = Block { global: true, code };
   prog.blocks.push((Label::EntryPoint, block));

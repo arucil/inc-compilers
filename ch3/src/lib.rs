@@ -17,7 +17,7 @@ pub fn compile(
   use Reg::*;
   let prog = ast::parse(input)?;
   let prog = ch2::pass::partial_evaluation::partial_evaluate(prog);
-  let prog = ch2::pass::uniquify::uniquify(prog)?;
+  let prog = ch2::pass::uniquify::uniquify(prog);
   let prog = ch2::pass::remove_complex_operands::remove_complex_operands(prog);
   let prog = ch2::pass::explicate_control::explicate_control(prog);
   let prog = ch2::pass::instruction_selection::select_instruction(prog, false);

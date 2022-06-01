@@ -50,7 +50,8 @@ pub enum Instr<VAR = !> {
   Ret,
   Push(Arg<VAR>),
   Pop(Arg<VAR>),
-  Jmp(Label),
+  Jmp(Arg<VAR>),
+  JmpLabel(Label),
   Syscall,
   Xor {
     src: Arg<VAR>,
@@ -74,11 +75,11 @@ pub enum Instr<VAR = !> {
   },
   /// `count` must be byte.
   Shr {
-    src: Arg<VAR>,
+    dest: Arg<VAR>,
     count: Arg<VAR>,
   },
   Shl {
-    src: Arg<VAR>,
+    dest: Arg<VAR>,
     count: Arg<VAR>,
   },
   And {
@@ -241,7 +242,8 @@ impl<VAR: Debug> Debug for Instr<VAR> {
       Self::IDiv(src) => write!(f, "idiv {:?}", src),
       Self::Mov { src, dest } => write!(f, "mov {:?}, {:?}", dest, src),
       Self::Call { label, .. } => write!(f, "call {}", label),
-      Self::Jmp(label) => write!(f, "jmp {:?}", label),
+      Self::Jmp(arg) => write!(f, "jmp {:?}", arg),
+      Self::JmpLabel(label) => write!(f, "jmp {:?}", label),
       Self::Neg(dest) => write!(f, "neg {:?}", dest),
       Self::Pop(dest) => write!(f, "pop {:?}", dest),
       Self::Push(src) => write!(f, "push {:?}", src),
@@ -253,8 +255,8 @@ impl<VAR: Debug> Debug for Instr<VAR> {
       Self::Movzx { src, dest } => write!(f, "movzx {:?}, {:?}", dest, src),
       Self::SetIf { cmp, dest } => write!(f, "set{:?} {:?}", cmp, dest),
       Self::JumpIf { cmp, label } => write!(f, "j{:?} {:?}", cmp, label),
-      Self::Shr { src, count } => write!(f, "shr {:?}, {:?}", src, count),
-      Self::Shl { src, count } => write!(f, "shl {:?}, {:?}", src, count),
+      Self::Shr { dest, count } => write!(f, "shr {:?}, {:?}", dest, count),
+      Self::Shl { dest, count } => write!(f, "shl {:?}, {:?}", dest, count),
       Self::And { src, dest } => write!(f, "and {:?}, {:?}", dest, src),
       Self::Or { src, dest } => write!(f, "or {:?}, {:?}", dest, src),
     }
@@ -514,7 +516,10 @@ pub fn parse_code<VAR: Clone>(
             }
           }
         }
-        "jmp" => Instr::Jmp(parse_label(ops[1])),
+        "jmp" => {
+          let args = get_args(ops[1]);
+          Instr::Jmp(args[0].clone())
+        },
         "neg" => {
           let args = get_args(ops[1]);
           Instr::Neg(args[0].clone())

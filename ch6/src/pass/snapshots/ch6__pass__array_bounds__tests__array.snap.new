@@ -1,0 +1,24 @@
+---
+source: ch6/src/pass/array_bounds.rs
+assertion_line: 424
+expression: result.to_string_pretty()
+---
+(let
+ [x
+  (if (>= 3 0)
+   (make-vector 3 #t)
+   (length-error 3))]
+ (let
+  [i 1]
+  (let
+   [y
+    (if (and (>= i 0) (< i (vector-length x)))
+     (vector-ref x i)
+     (out-of-bounds-error i (vector-length x)))]
+   (let
+    [z (vector 1 #t "abc")]
+    (begin
+     (if (and (>= i 0) (< i (vector-length x)))
+      (vector-set! x i (vector-ref z 1))
+      (out-of-bounds-error i (vector-length x)))
+     (vector-set! z 1 (not y)))))))
