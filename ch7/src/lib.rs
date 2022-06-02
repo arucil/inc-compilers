@@ -22,6 +22,7 @@ pub fn compile(
   let prog = ch6::pass::array_bounds::insert_bounds_check(prog);
   let prog = ch6::pass::division::insert_division_check(prog);
   let prog = ch6::pass::string::expose_string_concat(prog);
+  let prog = self::pass::parameter::limit_arity(prog);
   let prog = ch2::pass::remove_complex_operands::remove_complex_operands(prog);
   let prog = ch4::pass::explicate_control::explicate_control(prog);
   let prog = ch4::pass::instruction_selection::select_instruction(prog, true);

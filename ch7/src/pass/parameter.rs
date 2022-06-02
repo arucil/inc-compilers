@@ -253,6 +253,8 @@ mod tests {
   (foo (+ a 1) (not h))
   (set! g (void))
   (print b))
+(let ([x (bar 0)])
+  (set! x #f))
       "#,
     )
     .unwrap();
