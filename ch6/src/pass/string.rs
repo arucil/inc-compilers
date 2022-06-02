@@ -1,19 +1,19 @@
-use ast::{Error, Exp, ExpKind, FuncDef, IdxVar, Program, Type};
+use ast::{Error, Exp, ExpKind, FunDef, IdxVar, Program, Type};
 
 pub fn expose_string_concat(
   prog: Program<IdxVar, Type>,
 ) -> Program<IdxVar, Type> {
   let mut state = State { tmp_counter: 0 };
   Program {
-    func_defs: prog
-      .func_defs
+    fun_defs: prog
+      .fun_defs
       .into_iter()
-      .map(|(name, func)| {
+      .map(|(name, fun)| {
         (
           name,
-          FuncDef {
-            body: state.exp_insert(func.body),
-            ..func
+          FunDef {
+            body: state.exp_insert(fun.body),
+            ..fun
           },
         )
       })
@@ -180,12 +180,12 @@ impl State {
         ..exp
       },
       ExpKind::Apply {
-        func,
+        fun,
         args,
         r#struct,
       } => Exp {
         kind: ExpKind::Apply {
-          func: box self.exp_insert(*func),
+          fun: box self.exp_insert(*fun),
           args: args.into_iter().map(|exp| self.exp_insert(exp)).collect(),
           r#struct,
         },
@@ -264,7 +264,7 @@ mod tests {
   use super::*;
   use ast::*;
   use ch4::pass::uniquify;
-use ch5::pass::typecheck::typecheck;
+  use ch5::pass::typecheck::typecheck;
   use insta::assert_snapshot;
 
   #[test]

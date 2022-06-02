@@ -454,7 +454,9 @@ pub fn parse_code<VAR: Clone>(
     } else if arg.starts_with("const_") {
       Arg::Label(Label::Name(arg.to_owned()))
     } else if arg.starts_with("block") {
-      Arg::Label(Label::Tmp(arg.strip_prefix("block").unwrap().parse().unwrap()))
+      Arg::Label(Label::Tmp(
+        arg.strip_prefix("block").unwrap().parse().unwrap(),
+      ))
     } else if arg == "conclusion" {
       Arg::Label(Label::Conclusion)
     } else {

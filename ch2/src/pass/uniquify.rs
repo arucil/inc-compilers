@@ -1,15 +1,20 @@
-use ast::{Error, Exp, ExpKind, FuncDef, IdxVar, Program};
+use ast::{Error, Exp, ExpKind, FunDef, IdxVar, Program};
 use std::collections::HashMap;
 
 /// Make variable names unique.
 pub fn uniquify(prog: Program) -> Program<IdxVar> {
   let mut uniq = Uniq::new();
+  let fun_defs = prog
+    .fun_defs
+    .into_iter()
+    .map(|(name, fun)| {
+      uniq.reset();
+      (name, uniq.uniquify_fun(fun))
+    })
+    .collect();
+  uniq.reset();
   Program {
-    func_defs: prog
-      .func_defs
-      .into_iter()
-      .map(|(name, fun)| (name, uniq.uniquify_func(fun)))
-      .collect(),
+    fun_defs,
     body: prog
       .body
       .into_iter()
@@ -30,32 +35,30 @@ impl Uniq {
     Self::default()
   }
 
-  pub fn uniquify_func<TYPE>(
+  pub fn reset(&mut self) {
+    self.env.clear();
+    self.counter = 0;
+  }
+
+  pub fn uniquify_fun<TYPE>(
     &mut self,
-    func: FuncDef<String, TYPE>,
-  ) -> FuncDef<IdxVar, TYPE> {
-    let params1 = func
+    fun: FunDef<String, TYPE>,
+  ) -> FunDef<IdxVar, TYPE> {
+    let params = fun
       .params
       .into_iter()
       .map(|(param, ty)| {
         let index = self.counter;
         self.counter += 1;
-        let old_value = self.env.insert(param.clone(), index);
-        ((IdxVar { name: param, index }, ty), old_value)
+        self.env.insert(param.clone(), index);
+        (IdxVar { name: param, index }, ty)
       })
-      .collect::<Vec<_>>();
-    let body = self.uniquify_exp(func.body);
-    let mut params = Vec::with_capacity(params1.len());
-    for (param, old_value) in params1 {
-      if let Some(v) = old_value {
-        self.env.insert(param.0.name.clone(), v);
-      }
-      params.push(param);
-    }
-    FuncDef {
+      .collect();
+    let body = self.uniquify_exp(fun.body);
+    FunDef {
       params,
       body,
-      ..func
+      ..fun
     }
   }
 
@@ -88,12 +91,12 @@ impl Uniq {
         ty,
       },
       ExpKind::Apply {
-        func,
+        fun,
         args,
         r#struct,
       } => Exp {
         kind: ExpKind::Apply {
-          func: box self.uniquify_exp(*func),
+          fun: box self.uniquify_exp(*fun),
           args: args.into_iter().map(|exp| self.uniquify_exp(exp)).collect(),
           r#struct,
         },

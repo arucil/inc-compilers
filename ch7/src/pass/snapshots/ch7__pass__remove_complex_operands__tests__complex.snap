@@ -55,7 +55,7 @@ expression: prog.to_string_pretty()
      (let
       [(tmp).6 {z.2}]
       (+ (tmp).6 1)))))))
-(define (bar [s.3 Id { idx: 0 }]) : Void
+(define (bar [s.0 (alias 0)]) : Void
  (let
   [(str-tmp).5 "-"]
   (let
@@ -63,7 +63,7 @@ expression: prog.to_string_pretty()
     (let
      [(str-tmp).1 ","]
      (let
-      [(str-tmp).2 (vector-ref s.3 0)]
+      [(str-tmp).2 (vector-ref s.0 0)]
       (let
        [(str-tmp).3 (string-length (str-tmp).1)]
        (let
@@ -98,5 +98,5 @@ expression: prog.to_string_pretty()
          (str-tmp).7
          (str-tmp).6)
         (str-tmp).8)]
-      (vector-set! s.3 0 (tmp).11)))))))
+      (vector-set! s.0 0 (tmp).11)))))))
 (void)

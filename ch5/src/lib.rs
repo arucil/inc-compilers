@@ -40,7 +40,6 @@ pub fn compile(
   Ok(prog.to_nasm(true))
 }
 
-
 #[cfg(test)]
 mod tests {
   use super::*;

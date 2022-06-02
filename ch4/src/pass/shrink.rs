@@ -1,13 +1,13 @@
-use ast::{Exp, ExpKind, Program, Type, FuncDef};
+use ast::{Exp, ExpKind, FunDef, Program, Type};
 
 pub fn shrink(prog: Program<String, Type>) -> Program<String, Type> {
-  let func_defs = prog
-    .func_defs
+  let fun_defs = prog
+    .fun_defs
     .into_iter()
     .map(|(name, func)| {
       (
         name,
-        FuncDef {
+        FunDef {
           body: shrink_exp(func.body),
           ..func
         },
@@ -16,7 +16,7 @@ pub fn shrink(prog: Program<String, Type>) -> Program<String, Type> {
     .collect();
   let body = prog.body.into_iter().map(shrink_exp).collect();
   Program {
-    func_defs,
+    fun_defs,
     body,
     ..prog
   }

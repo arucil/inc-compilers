@@ -115,11 +115,11 @@ fn collect_exp_locals<TYPE>(
       }
     }
     ExpKind::Apply {
-      func,
+      fun,
       args,
       r#struct: _,
     } => {
-      collect_exp_locals(&*func, locals);
+      collect_exp_locals(&*fun, locals);
       for arg in args {
         collect_exp_locals(arg, locals);
       }

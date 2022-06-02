@@ -1,4 +1,4 @@
-use asm::{Arg, Instr, Label, Program, Block};
+use asm::{Arg, Block, Instr, Label, Program};
 use ch4::pass::register_allocation::Info;
 
 pub fn add_perilogue(prog: &mut Program<Info>) {

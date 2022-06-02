@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use crate::{Exp, ExpKind, FuncDef, Program, Type, TypeAlias};
+use crate::{Exp, ExpKind, FunDef, Program, Type, TypeAlias};
 use indexmap::IndexMap;
 use std::collections::HashSet;
 use support::{CompileError, Range};
@@ -215,7 +215,7 @@ impl<'a> Parser<'a> {
 
 fn build_prog(input: &str, cst: Vec<Cst>) -> Result<Program> {
   let mut type_defs = IndexMap::new();
-  let mut func_defs = IndexMap::new();
+  let mut fun_defs = IndexMap::new();
   let mut iter = cst.into_iter().peekable();
   while let Some(Cst::List(xs, _)) = iter.peek() {
     if let Some(&Cst::Symbol(op_range)) = xs.first() {
@@ -236,8 +236,8 @@ fn build_prog(input: &str, cst: Vec<Cst>) -> Result<Program> {
         }
         "define" => {
           if let Some(Cst::List(xs, range)) = iter.next() {
-            let (name, def) = build_func_def(input, xs, range)?;
-            if func_defs.insert(name.clone(), def).is_some() {
+            let (name, def) = build_fun_def(input, xs, range)?;
+            if fun_defs.insert(name.clone(), def).is_some() {
               return Err(CompileError {
                 range,
                 message: format!("duplicate function {}", name),
@@ -253,10 +253,19 @@ fn build_prog(input: &str, cst: Vec<Cst>) -> Result<Program> {
       break;
     }
   }
+  let body = if iter.peek().is_none() {
+    vec![Exp {
+      kind: ExpKind::Void,
+      range: (0, 0).into(),
+      ty: (),
+    }]
+  } else {
+    iter.map(|c| build_exp(input, c)).collect::<Result<_>>()?
+  };
   Ok(Program {
     type_defs,
-    func_defs,
-    body: iter.map(|c| build_exp(input, c)).collect::<Result<_>>()?,
+    fun_defs,
+    body,
     types: Default::default(),
   })
 }
@@ -320,7 +329,7 @@ fn build_exp(input: &str, cst: Cst) -> Result<Exp> {
         .collect::<Result<Vec<_>>>()?;
       Ok(Exp {
         kind: ExpKind::Apply {
-          func: box xs.remove(0),
+          fun: box xs.remove(0),
           args: xs,
           r#struct: None,
         },
@@ -449,7 +458,7 @@ fn make_type_def(input: &str, def: Cst) -> Result<Type> {
           .into_iter()
           .map(|x| make_type_def(input, x))
           .collect::<Result<_>>()?;
-        Ok(Type::Func {
+        Ok(Type::Fun {
           params,
           ret: box ret,
         })
@@ -492,11 +501,11 @@ fn build_type_def(
   }
 }
 
-fn build_func_def(
+fn build_fun_def(
   input: &str,
   mut xs: Vec<Cst>,
   range: Range,
-) -> Result<(String, FuncDef)> {
+) -> Result<(String, FunDef)> {
   if xs.len() < 5 {
     return Err(CompileError {
       range,
@@ -566,7 +575,7 @@ fn build_func_def(
       let name = input[sym_range.start..sym_range.end].to_owned();
       Ok((
         name,
-        FuncDef {
+        FunDef {
           params,
           ret,
           body,

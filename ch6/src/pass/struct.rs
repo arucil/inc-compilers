@@ -1,18 +1,18 @@
-use ast::{Error, Exp, ExpKind, FuncDef, Program, StructApp, Type};
+use ast::{Error, Exp, ExpKind, FunDef, Program, StructApp, Type};
 use id_arena::Arena;
 
 pub fn desugar_struct(
   mut prog: Program<String, Type>,
 ) -> Program<String, Type> {
-  let func_defs = prog
-    .func_defs
+  let fun_defs = prog
+    .fun_defs
     .into_iter()
-    .map(|(name, func)| {
+    .map(|(name, fun)| {
       (
         name,
-        FuncDef {
-          body: exp_desugar(func.body, &prog.types),
-          ..func
+        FunDef {
+          body: exp_desugar(fun.body, &prog.types),
+          ..fun
         },
       )
     })
@@ -28,7 +28,7 @@ pub fn desugar_struct(
     }
   }
   Program {
-    func_defs,
+    fun_defs,
     body,
     ..prog
   }
@@ -62,11 +62,11 @@ fn exp_desugar(
       ..exp
     },
     ExpKind::Apply {
-      func,
+      fun,
       args,
       r#struct,
     } => {
-      let func = exp_desugar(*func, types);
+      let fun = exp_desugar(*fun, types);
       let mut args = args
         .into_iter()
         .map(|exp| exp_desugar(exp, types))
@@ -75,7 +75,7 @@ fn exp_desugar(
         match app {
           StructApp::Ctor => Exp {
             kind: ExpKind::Prim {
-              op: (func.range, "vector"),
+              op: (fun.range, "vector"),
               args,
             },
             ..exp
@@ -83,12 +83,12 @@ fn exp_desugar(
           StructApp::Getter(index) => {
             args.push(Exp {
               kind: ExpKind::Int(index as i64),
-              range: func.range,
+              range: fun.range,
               ty: Type::Int,
             });
             Exp {
               kind: ExpKind::Prim {
-                op: (func.range, "vector-ref"),
+                op: (fun.range, "vector-ref"),
                 args,
               },
               ..exp
@@ -99,13 +99,13 @@ fn exp_desugar(
               1,
               Exp {
                 kind: ExpKind::Int(index as i64),
-                range: func.range,
+                range: fun.range,
                 ty: Type::Int,
               },
             );
             Exp {
               kind: ExpKind::Prim {
-                op: (func.range, "vector-set!"),
+                op: (fun.range, "vector-set!"),
                 args,
               },
               ..exp
@@ -115,7 +115,7 @@ fn exp_desugar(
       } else {
         Exp {
           kind: ExpKind::Apply {
-            func: box func,
+            fun: box fun,
             args,
             r#struct: None,
           },

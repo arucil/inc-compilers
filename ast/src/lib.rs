@@ -14,13 +14,13 @@ pub use parser::{parse, Result};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Program<VAR = String, TYPE = ()> {
   pub type_defs: IndexMap<String, Type>,
-  pub func_defs: IndexMap<String, FuncDef<VAR, TYPE>>,
+  pub fun_defs: IndexMap<String, FunDef<VAR, TYPE>>,
   pub body: Vec<Exp<VAR, TYPE>>,
   pub types: Arena<Type>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FuncDef<VAR = String, TYPE = ()> {
+pub struct FunDef<VAR = String, TYPE = ()> {
   pub params: Vec<(VAR, Type)>,
   pub ret: Type,
   pub body: Exp<VAR, TYPE>,
@@ -42,7 +42,7 @@ pub enum ExpKind<VAR, TYPE> {
     args: Vec<Exp<VAR, TYPE>>,
   },
   Apply {
-    func: Box<Exp<VAR, TYPE>>,
+    fun: Box<Exp<VAR, TYPE>>,
     args: Vec<Exp<VAR, TYPE>>,
     r#struct: Option<StructApp>,
   },
@@ -112,7 +112,7 @@ pub enum Type {
   Array(Box<Type>),
   Alias(TypeAlias),
   Struct(IndexMap<String, Type>),
-  Func { params: Vec<Type>, ret: Box<Type> },
+  Fun { params: Vec<Type>, ret: Box<Type> },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -167,7 +167,7 @@ impl<VAR: Display, TYPE: Debug> Program<VAR, TYPE> {
   fn to_doc(&self) -> RcDoc {
     RcDoc::intersperse(
       self
-        .func_defs
+        .fun_defs
         .iter()
         .map(|(name, def)| def.to_doc(name))
         .chain(self.body.iter().map(|exp| exp.to_doc())),
@@ -176,39 +176,44 @@ impl<VAR: Display, TYPE: Debug> Program<VAR, TYPE> {
   }
 }
 
-impl<VAR: Display, TYPE: Debug> FuncDef<VAR, TYPE> {
+impl<VAR: Display, TYPE: Debug> FunDef<VAR, TYPE> {
   fn to_doc<'a>(&'a self, name: &str) -> RcDoc<'a> {
     RcDoc::text("(")
-      .append(RcDoc::text("define"))
-      .append(Doc::line())
       .append(
-        RcDoc::text("(")
-          .append(RcDoc::text(name.to_owned()))
+        RcDoc::text("define")
           .append(Doc::line())
-          .append(RcDoc::intersperse(
-            self.params.iter().map(|(name, ty)| {
-              RcDoc::text("[")
-                .append(RcDoc::text(name.to_string()))
-                .append(Doc::line())
-                .append(ty.to_doc())
-                .append(RcDoc::text("]"))
-                .group()
-            }),
-            Doc::line(),
-          ))
-          .append(RcDoc::text(")"))
-          .group(),
+          .append(
+            RcDoc::text("(")
+              .append(
+                RcDoc::text(name.to_owned())
+                  .append(Doc::line())
+                  .append(RcDoc::intersperse(
+                    self.params.iter().map(|(name, ty)| {
+                      RcDoc::text("[")
+                        .append(name.to_string())
+                        .append(Doc::line())
+                        .append(ty.to_doc())
+                        .append("]")
+                        .group()
+                    }),
+                    Doc::line(),
+                  ))
+                  .nest(1),
+              )
+              .append(")")
+              .group(),
+          )
+          .group()
+          .append(Doc::space())
+          .append(":")
+          .append(Doc::space())
+          .append(self.ret.to_doc())
+          .group()
+          .append(Doc::line())
+          .append(self.body.to_doc())
+          .nest(1),
       )
-      .group()
-      .append(Doc::space())
-      .append(RcDoc::text(":"))
-      .append(Doc::space())
-      .append(self.ret.to_doc())
-      .group()
-      .append(Doc::line())
-      .append(self.body.to_doc())
-      .nest(1)
-      .append(RcDoc::text(")"))
+      .append(")")
   }
 }
 
@@ -218,9 +223,9 @@ impl<VAR: Display, TYPE: Debug> Exp<VAR, TYPE> {
       ExpKind::Int(n) => RcDoc::text(format!("{}", n)),
       ExpKind::Str(s) => RcDoc::text(format!("{:?}", s)),
       ExpKind::Var(var) => RcDoc::text(format!("{}", var)),
-      ExpKind::Get(var) => RcDoc::text("{")
-        .append(RcDoc::text(format!("{}", var)))
-        .append(RcDoc::text("}")),
+      ExpKind::Get(var) => {
+        RcDoc::text("{").append(format!("{}", var)).append("}")
+      }
       ExpKind::Prim { op, args } => RcDoc::text("(")
         .append(
           RcDoc::intersperse(
@@ -231,22 +236,21 @@ impl<VAR: Display, TYPE: Debug> Exp<VAR, TYPE> {
           .nest(1)
           .group(),
         )
-        .append(RcDoc::text(")")),
+        .append(")"),
       ExpKind::Apply {
-        func,
+        fun,
         args,
         r#struct: _,
       } => RcDoc::text("(")
         .append(
           RcDoc::intersperse(
-            iter::once(func.to_doc())
-              .chain(args.iter().map(|arg| arg.to_doc())),
+            iter::once(fun.to_doc()).chain(args.iter().map(|arg| arg.to_doc())),
             Doc::line(),
           )
           .nest(1)
           .group(),
         )
-        .append(RcDoc::text(")")),
+        .append(")"),
       ExpKind::Let { var, init, body } => RcDoc::text("(")
         .append(
           RcDoc::text("let")
@@ -260,13 +264,13 @@ impl<VAR: Display, TYPE: Debug> Exp<VAR, TYPE> {
                     .nest(1)
                     .group(),
                 )
-                .append(RcDoc::text("]")),
+                .append("]"),
             )
             .append(Doc::line())
             .append(body.to_doc())
             .nest(1),
         )
-        .append(RcDoc::text(")")),
+        .append(")"),
       ExpKind::Bool(true) => RcDoc::text("#t"),
       ExpKind::Bool(false) => RcDoc::text("#f"),
       ExpKind::If { cond, conseq, alt } => RcDoc::text("(")
@@ -281,18 +285,18 @@ impl<VAR: Display, TYPE: Debug> Exp<VAR, TYPE> {
             .append(alt.to_doc())
             .nest(1),
         )
-        .append(RcDoc::text(")")),
+        .append(")"),
       ExpKind::Set { var, exp } => RcDoc::text("(")
         .append(
           RcDoc::text("set!")
             .append(Doc::line())
-            .append(RcDoc::text(format!("{}", var.1)))
+            .append(format!("{}", var.1))
             .append(Doc::line())
             .append(exp.to_doc())
             .nest(1)
             .group(),
         )
-        .append(RcDoc::text(")")),
+        .append(")"),
       ExpKind::Begin { seq, last } => RcDoc::text("(")
         .append(
           RcDoc::text("begin")
@@ -306,7 +310,7 @@ impl<VAR: Display, TYPE: Debug> Exp<VAR, TYPE> {
             ))
             .nest(1),
         )
-        .append(RcDoc::text(")")),
+        .append(")"),
       ExpKind::While { cond, body } => RcDoc::text("(")
         .append(
           RcDoc::text("while")
@@ -318,7 +322,7 @@ impl<VAR: Display, TYPE: Debug> Exp<VAR, TYPE> {
             .nest(1)
             .group(),
         )
-        .append(RcDoc::text(")")),
+        .append(")"),
       ExpKind::Void => RcDoc::text("(void)"),
       ExpKind::Print(args) => RcDoc::text("(")
         .append(
@@ -330,7 +334,7 @@ impl<VAR: Display, TYPE: Debug> Exp<VAR, TYPE> {
           .nest(1)
           .group(),
         )
-        .append(RcDoc::text(")")),
+        .append(")"),
       ExpKind::NewLine => RcDoc::text("(newline)"),
       ExpKind::Error(Error::Length(arg)) => RcDoc::text("(")
         .append(
@@ -340,7 +344,7 @@ impl<VAR: Display, TYPE: Debug> Exp<VAR, TYPE> {
             .nest(1)
             .group(),
         )
-        .append(RcDoc::text(")")),
+        .append(")"),
       ExpKind::Error(Error::OutOfBounds { index, len }) => RcDoc::text("(")
         .append(
           RcDoc::text("out-of-bounds-error")
@@ -351,19 +355,19 @@ impl<VAR: Display, TYPE: Debug> Exp<VAR, TYPE> {
             .nest(1)
             .group(),
         )
-        .append(RcDoc::text(")")),
+        .append(")"),
       ExpKind::Error(Error::DivByZero) => RcDoc::text("(div-by-zero)"),
       ExpKind::FunRef { name, arity } => RcDoc::text("{")
         .append(
           RcDoc::text("fun-ref")
             .append(Doc::line())
-            .append(RcDoc::text(name))
+            .append(name)
             .append(Doc::line())
-            .append(RcDoc::text(format!("{}", arity)))
+            .append(format!("{}", arity))
             .nest(1)
             .group(),
         )
-        .append(RcDoc::text("}")),
+        .append("}"),
     }
   }
 }
@@ -416,7 +420,7 @@ impl Type {
     match self {
       Self::Void => RcDoc::text("Void"),
       Self::Int => RcDoc::text("Int"),
-      Self::Bool => RcDoc::text("Str"),
+      Self::Bool => RcDoc::text("Bool"),
       Self::Str => RcDoc::text("Str"),
       Self::Tuple(tys) => RcDoc::text("(")
         .append(RcDoc::intersperse(
@@ -424,42 +428,48 @@ impl Type {
           Doc::line(),
         ))
         .nest(1)
-        .append(RcDoc::text(")")),
+        .append(")"),
       Self::Array(ty) => RcDoc::text("(")
-        .append("array-of")
-        .append(Doc::line())
-        .append(ty.to_doc())
-        .nest(1)
-        .append(RcDoc::text(")")),
+        .append(
+          RcDoc::text("array-of")
+            .append(Doc::line())
+            .append(ty.to_doc())
+            .nest(1),
+        )
+        .append(")"),
       Self::Alias(TypeAlias::Pending(_, alias)) => RcDoc::text(alias),
-      Self::Alias(TypeAlias::Resolved(id)) => RcDoc::text(format!("{:?}", id)),
+      Self::Alias(TypeAlias::Resolved(id)) => {
+        RcDoc::text(format!("(alias {})", id.index()))
+      }
       Self::Struct(fields) => RcDoc::text("(")
-        .append(RcDoc::text("struct"))
-        .append(Doc::line())
-        .append(RcDoc::intersperse(
-          fields.iter().map(|(name, ty)| {
-            RcDoc::text("[")
-              .append(RcDoc::text(name))
-              .append(Doc::line())
-              .append(ty.to_doc())
-              .append(RcDoc::text("]"))
-          }),
-          Doc::line(),
-        ))
-        .nest(1)
-        .append(RcDoc::text(")")),
-      Self::Func { params, ret } => RcDoc::text("(")
+        .append(
+          RcDoc::text("struct")
+            .append(Doc::line())
+            .append(RcDoc::intersperse(
+              fields.iter().map(|(name, ty)| {
+                RcDoc::text("[")
+                  .append(name)
+                  .append(Doc::line())
+                  .append(ty.to_doc())
+                  .append("]")
+              }),
+              Doc::line(),
+            ))
+            .nest(1),
+        )
+        .append(")"),
+      Self::Fun { params, ret } => RcDoc::text("(")
         .append(RcDoc::intersperse(
           params.iter().map(|ty| ty.to_doc()),
           Doc::line(),
         ))
         .append(Doc::line())
         .group()
-        .append(RcDoc::text("->"))
+        .append("->")
         .append(Doc::line())
         .append(ret.to_doc())
         .nest(1)
-        .append(RcDoc::text(")")),
+        .append(")"),
     }
   }
 }

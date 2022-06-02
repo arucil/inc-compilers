@@ -1,0 +1,42 @@
+---
+source: ch7/src/pass/parameter.rs
+expression: result.to_string_pretty()
+---
+(define (foo [a.0 Int] [b.1 Bool]) : Void
+ (begin
+  (print ({fun-ref bar 1} a.0))
+  (set! b.1 (not b.1))
+  ({fun-ref qux 6} 1 2 3 4 5 6)
+  ({fun-ref baz 8}
+   1
+   "a"
+   (vector)
+   (void)
+   b.1
+   (vector (* a.0 2) (void) (not b.1)))))
+(define (bar [x.0 Int]) : Bool
+ (> x.0 0))
+(define
+ (qux
+  [a.0 Int]
+  [b.1 Int]
+  [c.2 Int]
+  [d.3 Int]
+  [e.4 Int]
+  [f.5 Int]) : Bool
+ (> a.0 (+ b.1 c.2)))
+(define
+ (baz
+  [a.0 Int]
+  [b.1 Str]
+  [c.2 ()]
+  [d.3 Void]
+  [e.4 Bool]
+  [(arity-tmp).0 (Int Void Bool)]) : Void
+ (begin
+  ({fun-ref foo 2}
+   (+ a.0 1)
+   (not (vector-ref (arity-tmp).0 2)))
+  (vector-set! (arity-tmp).0 1 (void))
+  (print b.1)))
+(void)

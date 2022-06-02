@@ -4,14 +4,14 @@ expression: result.to_string_pretty()
 ---
 (define (foo [x.0 Int] [y.1 Int]) : Int
  (+ x.0 y.1))
-(define (bar [x.2 Int] [y.3 Int]) : Int
+(define (bar [x.0 Int] [y.1 Int]) : Int
  (let
-  [x.4 (+ x.2 1)]
+  [x.2 (+ x.0 1)]
   (let
-   [f.5 {fun-ref bar 2}]
+   [f.3 {fun-ref bar 2}]
    (begin
-    (set! f.5 {fun-ref foo 2})
-    (* x.4 y.3)))))
+    (set! f.3 {fun-ref foo 2})
+    (* x.2 y.1)))))
 (let
- [x.6 (if #t {fun-ref foo 2} {fun-ref bar 2})]
- (print (x.6 1 0)))
+ [x.0 (if #t {fun-ref foo 2} {fun-ref bar 2})]
+ (print (x.0 1 0)))

@@ -3,12 +3,17 @@ use ch2::pass::uniquify::Uniq;
 
 pub fn uniquify<TYPE>(prog: Program<String, TYPE>) -> Program<IdxVar, TYPE> {
   let mut uniq = Uniq::new();
+  let fun_defs = prog
+    .fun_defs
+    .into_iter()
+    .map(|(name, fun)| {
+      uniq.reset();
+      (name, uniq.uniquify_fun(fun))
+    })
+    .collect();
+  uniq.reset();
   Program {
-    func_defs: prog
-      .func_defs
-      .into_iter()
-      .map(|(name, fun)| (name, uniq.uniquify_func(fun)))
-      .collect(),
+    fun_defs,
     body: prog
       .body
       .into_iter()

@@ -1,4 +1,4 @@
-use asm::{Block, Instr, Label, Program, Arg};
+use asm::{Arg, Block, Instr, Label, Program};
 use indexmap::IndexMap;
 
 pub fn merge_blocks<INFO>(prog: Program<INFO>) -> Program<INFO> {

@@ -1,4 +1,4 @@
-use asm::{Instr, Label, Program, Arg};
+use asm::{Arg, Instr, Label, Program};
 use ast::IdxVar;
 use ch3::location_set::{LocationSet, VarStore};
 use ch3::pass::liveness_analysis::AnalysisState;

@@ -1,4 +1,4 @@
-use ast::{Error, Exp, ExpKind, FuncDef, IdxVar, Program};
+use ast::{Error, Exp, ExpKind, FunDef, IdxVar, Program};
 use support::Range;
 
 pub fn remove_complex_operands<TYPE: Clone>(
@@ -6,13 +6,13 @@ pub fn remove_complex_operands<TYPE: Clone>(
 ) -> Program<IdxVar, TYPE> {
   let mut counter = 0;
   Program {
-    func_defs: prog
-      .func_defs
+    fun_defs: prog
+      .fun_defs
       .into_iter()
       .map(|(name, fun)| {
         (
           name,
-          FuncDef {
+          FunDef {
             body: mon_exp(fun.body, &mut counter),
             ..fun
           },
@@ -66,16 +66,16 @@ fn mon_exp<TYPE: Clone>(
       counter,
     ),
     ExpKind::Apply {
-      func,
+      fun,
       mut args,
       r#struct,
     } => {
-      args.insert(0, *func);
+      args.insert(0, *fun);
       mon_prim(
         args,
         |mut args| Exp {
           kind: ExpKind::Apply {
-            func: box args.remove(0),
+            fun: box args.remove(0),
             args,
             r#struct,
           },
@@ -213,18 +213,18 @@ fn atom_exp<TYPE: Clone>(
       assign_var(exp, tmps, counter)
     }
     ExpKind::Apply {
-      func,
+      fun,
       args,
       r#struct,
     } => {
-      let func = atom_exp(*func, tmps, counter);
+      let fun = atom_exp(*fun, tmps, counter);
       let args = args
         .into_iter()
         .map(|arg| atom_exp(arg, tmps, counter))
         .collect();
       let exp = Exp {
         kind: ExpKind::Apply {
-          func: box func,
+          fun: box fun,
           args,
           r#struct,
         },

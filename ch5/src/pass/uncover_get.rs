@@ -1,22 +1,22 @@
-use ast::{Error, Exp, ExpKind, IdxVar, Program, FuncDef};
+use ast::{Error, Exp, ExpKind, FunDef, IdxVar, Program};
 use std::collections::HashSet;
 
 pub fn uncover_get<TYPE>(prog: Program<IdxVar, TYPE>) -> Program<IdxVar, TYPE> {
-  let func_defs = prog
-    .func_defs
+  let fun_defs = prog
+    .fun_defs
     .into_iter()
-    .map(|(name, func)| {
+    .map(|(name, fun)| {
       (
         name,
-        FuncDef {
-          body: uncover_exp(func.body),
-          ..func
+        FunDef {
+          body: uncover_exp(fun.body),
+          ..fun
         },
       )
     })
     .collect();
   Program {
-    func_defs,
+    fun_defs,
     body: prog.body.into_iter().map(uncover_exp).collect(),
     ..prog
   }
@@ -90,12 +90,12 @@ fn mark_mutable_vars<TYPE>(
       ty: exp.ty,
     },
     ExpKind::Apply {
-      func,
+      fun,
       args,
       r#struct,
     } => Exp {
       kind: ExpKind::Apply {
-        func: box mark_mutable_vars(*func, set_vars),
+        fun: box mark_mutable_vars(*fun, set_vars),
         args: args
           .into_iter()
           .map(|exp| mark_mutable_vars(exp, set_vars))
@@ -184,11 +184,11 @@ fn collect_set_vars<TYPE>(
       }
     }
     ExpKind::Apply {
-      func,
+      fun,
       args,
       r#struct: _,
     } => {
-      collect_set_vars(&*func, set_vars);
+      collect_set_vars(&*fun, set_vars);
       for exp in args {
         collect_set_vars(exp, set_vars);
       }

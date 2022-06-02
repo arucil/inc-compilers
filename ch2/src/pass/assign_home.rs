@@ -73,7 +73,7 @@ fn assign_home_instr(
     Instr::Jmp(arg) => {
       let arg = assign_home_arg(arg, local_spaces);
       Instr::Jmp(arg)
-    },
+    }
     Instr::Mov { src, dest } => {
       let src = assign_home_arg(src, local_spaces);
       let dest = assign_home_arg(dest, local_spaces);

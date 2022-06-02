@@ -1,5 +1,5 @@
 use super::instruction_selection::Info as OldInfo;
-use asm::{Block, Instr, Label, Program, Arg};
+use asm::{Arg, Block, Instr, Label, Program};
 use ast::{IdxVar, Type};
 use ch3::location_set::{LocationSet, VarStore};
 use ch3::pass::liveness_analysis::AnalysisState;

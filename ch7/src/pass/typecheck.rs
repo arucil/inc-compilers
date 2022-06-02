@@ -19,10 +19,7 @@ mod tests {
     )
     .unwrap();
     let result = typecheck(prog);
-    assert_eq!(
-      result.map(|_| ()),
-      Ok(())
-    );
+    assert_eq!(result.map(|_| ()), Ok(()));
   }
 
   #[test]
@@ -65,7 +62,10 @@ mod tests {
     assert_eq!(
       result.map(|_| ()),
       Err(CompileError {
-        range: Range { start: 119, end: 124 },
+        range: Range {
+          start: 119,
+          end: 124
+        },
         message: "expected 2 argument(s), found 1".to_owned(),
       })
     );
@@ -88,7 +88,10 @@ mod tests {
     assert_eq!(
       result.map(|_| ()),
       Err(CompileError {
-        range: Range { start: 119, end: 126 },
+        range: Range {
+          start: 119,
+          end: 126
+        },
         message: "type mismatch for argument 2".to_owned(),
       })
     );
@@ -112,7 +115,10 @@ mod tests {
     assert_eq!(
       result.map(|_| ()),
       Err(CompileError {
-        range: Range { start: 127, end: 141 },
+        range: Range {
+          start: 127,
+          end: 141
+        },
         message: "global function bar is immutable".to_owned(),
       })
     );

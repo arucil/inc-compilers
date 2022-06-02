@@ -110,11 +110,11 @@ fn collect_exp_locals(
       }
     }
     ExpKind::Apply {
-      func,
+      fun,
       args,
       r#struct: _,
     } => {
-      collect_exp_locals(&*func, locals);
+      collect_exp_locals(&*fun, locals);
       for arg in args {
         collect_exp_locals(arg, locals);
       }
@@ -543,7 +543,8 @@ fn explicate_exp_effect(
     }
     ExpKind::While { cond, body } => {
       let loop_start = state.new_label();
-      let body = explicate_exp_effect(state, *body, CTail::Goto(loop_start.clone()));
+      let body =
+        explicate_exp_effect(state, *body, CTail::Goto(loop_start.clone()));
       let block = explicate_pred(state, *cond, body, cont);
       state.add_label_block(loop_start.clone(), block);
       CTail::Goto(loop_start)

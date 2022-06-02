@@ -1,4 +1,4 @@
-use ast::{Error, Exp, ExpKind, FuncDef, IdxVar, Program, Type};
+use ast::{Error, Exp, ExpKind, FunDef, IdxVar, Program, Type};
 
 /// (remainder e1 e2) / (quotient e1 e2)
 ///
@@ -11,24 +11,26 @@ use ast::{Error, Exp, ExpKind, FuncDef, IdxVar, Program, Type};
 pub fn insert_division_check(
   prog: Program<IdxVar, Type>,
 ) -> Program<IdxVar, Type> {
-  let mut state = State {
-    tmp_counter: 0,
-  };
+  let mut state = State { tmp_counter: 0 };
   Program {
-    func_defs: prog
-      .func_defs
+    fun_defs: prog
+      .fun_defs
       .into_iter()
-      .map(|(name, func)| {
+      .map(|(name, fun)| {
         (
           name,
-          FuncDef {
-            body: state.exp_insert(func.body),
-            ..func
+          FunDef {
+            body: state.exp_insert(fun.body),
+            ..fun
           },
         )
       })
       .collect(),
-    body: prog.body.into_iter().map(|exp| state.exp_insert(exp)).collect(),
+    body: prog
+      .body
+      .into_iter()
+      .map(|exp| state.exp_insert(exp))
+      .collect(),
     ..prog
   }
 }
@@ -130,12 +132,12 @@ impl State {
         ..exp
       },
       ExpKind::Apply {
-        func,
+        fun,
         args,
         r#struct,
       } => Exp {
         kind: ExpKind::Apply {
-          func: box self.exp_insert(*func),
+          fun: box self.exp_insert(*fun),
           args: args.into_iter().map(|exp| self.exp_insert(exp)).collect(),
           r#struct,
         },
@@ -179,7 +181,9 @@ impl State {
         ..exp
       },
       ExpKind::Print(args) => Exp {
-        kind: ExpKind::Print(args.into_iter().map(|exp| self.exp_insert(exp)).collect()),
+        kind: ExpKind::Print(
+          args.into_iter().map(|exp| self.exp_insert(exp)).collect(),
+        ),
         ..exp
       },
       ExpKind::Error(Error::Length(arg)) => Exp {
@@ -202,7 +206,7 @@ impl State {
     self.tmp_counter += 1;
     IdxVar {
       name: "(div-tmp)".to_owned(),
-      index: self.tmp_counter
+      index: self.tmp_counter,
     }
   }
 }
@@ -212,7 +216,7 @@ mod tests {
   use super::*;
   use ast::*;
   use ch4::pass::uniquify;
-use ch5::pass::typecheck::typecheck;
+  use ch5::pass::typecheck::typecheck;
   use insta::assert_snapshot;
 
   #[test]

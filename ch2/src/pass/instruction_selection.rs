@@ -369,7 +369,7 @@ impl<'a> CodeGen<'a> {
               size += 8;
               ptr_mask |= 1 << i;
             }
-            Type::Func {..} => size += 8,
+            Type::Fun { .. } => size += 8,
             Type::Struct(..) => unreachable!(),
             Type::Alias(_) => unreachable!(),
           }
@@ -690,7 +690,7 @@ impl<'a> CodeGen<'a> {
       Type::Str => 8,
       Type::Tuple(_) => 8,
       Type::Array(_) => 8,
-      Type::Func {..} => 8,
+      Type::Fun { .. } => 8,
       Type::Struct(..) => unreachable!(),
       Type::Alias(_) => unreachable!(),
     }
