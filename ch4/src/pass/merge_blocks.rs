@@ -1,15 +1,15 @@
-use asm::{Block, Instr, Label, Program};
+use asm::{Block, Instr, Label, Program, Arg};
 use indexmap::IndexMap;
 
 pub fn merge_blocks<INFO>(prog: Program<INFO>) -> Program<INFO> {
   let mut refs = IndexMap::<Label, usize>::new();
   let mut blocks = IndexMap::<Label, Block>::new();
   for (label, block) in prog.blocks {
-    if let Instr::JmpLabel(label) = block.code.last().unwrap() {
-      *refs.entry(*label).or_default() += 1;
+    if let Instr::Jmp(Arg::Label(label)) = block.code.last().unwrap() {
+      *refs.entry(label.clone()).or_default() += 1;
       if block.code.len() > 1 {
         if let Instr::JumpIf { label, .. } = &block.code[block.code.len() - 2] {
-          *refs.entry(*label).or_default() += 1;
+          *refs.entry(label.clone()).or_default() += 1;
         }
       }
     }
@@ -24,14 +24,14 @@ pub fn merge_blocks<INFO>(prog: Program<INFO>) -> Program<INFO> {
     } else {
       continue;
     };
-    while let Instr::JmpLabel(next_label) = block.code.last().unwrap() {
+    while let Instr::Jmp(Arg::Label(next_label)) = block.code.last().unwrap() {
       if block.code.len() > 1 {
         if let Instr::JumpIf { label, .. } = &block.code[block.code.len() - 2] {
-          worklist.push(*label);
+          worklist.push(label.clone());
         }
       }
 
-      let next_label = *next_label;
+      let next_label = next_label.clone();
       if refs[&next_label] == 1 {
         let mut next_block = blocks.remove(&next_label).unwrap();
         block.code.pop();

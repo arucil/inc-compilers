@@ -5,16 +5,12 @@ expression: result.to_string_pretty()
 (let
  [a.3
   (let
-   [x.1
-    (let
-     [x.0 (read)]
-     (+ x.0 13))]
+   [x.1 (let [x.0 (read)] (+ x.0 13))]
    (let
     [y.2 (- x.1)]
     (let
      [(tmp).0 (- y.2)]
      (let
-      [(tmp).1
-       (+ x.1 (tmp).0)]
+      [(tmp).1 (+ x.1 (tmp).0)]
       (+ (tmp).1 7)))))]
  (- a.3))

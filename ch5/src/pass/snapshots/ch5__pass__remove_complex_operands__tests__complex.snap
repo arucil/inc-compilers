@@ -11,45 +11,35 @@ expression: result.to_string_pretty()
    (let
     [z.3 (read)]
     (begin
-    (let
+     (let
       [(tmp).0 "start"]
       (print (tmp).0))
      (let
       [(tmp).2
        (if
         (let
-         [(tmp).1
-          (eq? y.1 z.3)]
+         [(tmp).1 (eq? y.1 z.3)]
          (not (tmp).1))
         "y!=z "
         "y=z")]
       (let
        [(tmp).3 (eq? z.3 y.1)]
-       (print
-        (tmp).2
-        (tmp).3)))
+       (print (tmp).2 (tmp).3)))
      (while (< x.0 y.1)
       (let
        [t.4 (+ x.0 step.2)]
        (begin
-       (set! x.0 t.4)
+        (set! x.0 t.4)
         (let
          [(tmp).4 "?="]
          (let
           [(tmp).6
-           (if
-            (if (> x.0 5)
-             (< x.0 9)
-             #f)
+           (if (if (> x.0 5) (< x.0 9) #f)
             (begin
-            (let
+             (let
               [(tmp).5 "neg!"]
               (print (tmp).5))
-             (set!
-              z.3
-              (+ z.3 1))
+             (set! z.3 (+ z.3 1))
              (- step.2))
             z.3)]
-          (print
-           (tmp).4
-           (tmp).6)))))))))))
+          (print (tmp).4 (tmp).6)))))))))))

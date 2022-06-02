@@ -35,7 +35,7 @@ impl<'a> State<'a> {
 
   fn add_block(&mut self, block: CTail) -> Label {
     let label = self.new_label();
-    self.add_label_block(label, block);
+    self.add_label_block(label.clone(), block);
     label
   }
 
@@ -171,7 +171,7 @@ fn remove_unreachable_blocks(
         }
         CTail::Goto(goto_label) => {
           if let Some(goto_block) = blocks.remove(goto_label) {
-            worklist.push_back((*goto_label, goto_block));
+            worklist.push_back((goto_label.clone(), goto_block));
           }
         }
         CTail::If {
@@ -180,10 +180,10 @@ fn remove_unreachable_blocks(
           ..
         } => {
           if let Some(goto_block) = blocks.remove(goto_label1) {
-            worklist.push_back((*goto_label1, goto_block));
+            worklist.push_back((goto_label1.clone(), goto_block));
           }
           if let Some(goto_block) = blocks.remove(goto_label2) {
-            worklist.push_back((*goto_label2, goto_block));
+            worklist.push_back((goto_label2.clone(), goto_block));
           }
         }
         _ => {}
@@ -543,9 +543,9 @@ fn explicate_exp_effect(
     }
     ExpKind::While { cond, body } => {
       let loop_start = state.new_label();
-      let body = explicate_exp_effect(state, *body, CTail::Goto(loop_start));
+      let body = explicate_exp_effect(state, *body, CTail::Goto(loop_start.clone()));
       let block = explicate_pred(state, *cond, body, cont);
-      state.add_label_block(loop_start, block);
+      state.add_label_block(loop_start.clone(), block);
       CTail::Goto(loop_start)
     }
     ExpKind::NewLine => CTail::Seq(CStmt::NewLine, box cont),

@@ -13,8 +13,5 @@ expression: result.to_string_pretty()
     (let
      [(tmp).2 (- 2)]
      (let
-      [(tmp).3
-       (- y.1 (tmp).2)]
-      (+
-       (tmp).1
-       (tmp).3)))))))
+      [(tmp).3 (- y.1 (tmp).2)]
+      (+ (tmp).1 (tmp).3)))))))

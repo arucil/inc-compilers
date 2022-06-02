@@ -2,19 +2,18 @@
 source: ch6/src/pass/explicate_control.rs
 expression: result.to_string_pretty()
 ---
-locals: {a0.0: Int, b0.1: Int, a.2: Int, b.3: Int, (division-divisor-tmp).4: Int, (tmp).0: Int, (tmp).1: Bool, tmp.5: Int, (division-divisor-tmp).6: Int, (tmp).2: Str, (tmp).3: Str, (tmp).4: Str, (tmp).5: Str, (division-divisor-tmp).7: Int, (tmp).7: Int, (tmp).6: Int}
+locals: {a0.0: Int, b0.1: Int, a.2: Int, b.3: Int, (tmp).0: Int, (tmp).1: Bool, tmp.4: Int, (tmp).2: Str, (tmp).3: Str, (tmp).4: Str, (tmp).5: Str, (div-tmp).1: Int, (tmp).6: Int}
 
 start:
     a0.0 = (read)
     b0.1 = (read)
     a.2 = a0.0
     b.3 = b0.1
-    (division-divisor-tmp).4 = b.3
-    if (eq? (division-divisor-tmp).4 0) goto block10 else goto block11
+    if (eq? b.3 0) goto block10 else goto block11
 block10:
     div-by-zero-error
 block11:
-    (tmp).0 = (qoutient a.2 (division-divisor-tmp).4)
+    (tmp).0 = (qoutient a.2 b.3)
     goto block9
 block9:
     print-int (tmp).0
@@ -24,27 +23,25 @@ block3:
     (tmp).1 = (eq? b.3 0)
     if (eq? (tmp).1 #f) goto block8 else goto block7
 block8:
-    tmp.5 = b.3
-    (division-divisor-tmp).6 = b.3
-    if (eq? (division-divisor-tmp).6 0) goto block5 else goto block6
+    tmp.4 = b.3
+    if (eq? b.3 0) goto block5 else goto block6
 block7:
     (tmp).4 = "gcd="
     (tmp).5 = ", lcm="
-    (division-divisor-tmp).7 = a.2
-    if (eq? (division-divisor-tmp).7 0) goto block1 else goto block2
+    (div-tmp).1 = (* a0.0 b0.1)
+    if (eq? a.2 0) goto block1 else goto block2
 block5:
     div-by-zero-error
 block6:
-    b.3 = (remainder a.2 (division-divisor-tmp).6)
+    b.3 = (remainder a.2 b.3)
     goto block4
 block1:
     div-by-zero-error
 block2:
-    (tmp).6 = (* a0.0 b0.1)
-    (tmp).7 = (qoutient (tmp).6 (division-divisor-tmp).7)
+    (tmp).6 = (qoutient (div-tmp).1 a.2)
     goto block0
 block4:
-    a.2 = tmp.5
+    a.2 = tmp.4
     (tmp).2 = "a="
     (tmp).3 = ", b="
     print-str (tmp).2
@@ -57,7 +54,7 @@ block0:
     print-str (tmp).4
     print-int a.2
     print-str (tmp).5
-    print-int (tmp).7
+    print-int (tmp).6
     newline
     return #<void>
 

@@ -3,51 +3,43 @@ source: ch6/src/pass/string.rs
 expression: result.to_string_pretty()
 ---
 (let
- [x "\n"]
+ [x.0 "\n"]
  (print
   (let
-   [(append-tmp-1) "abc"]
+   [(str-tmp).5 "abc"]
    (let
-    [(append-tmp-2)
+    [(str-tmp).6
      (let
-      [(append-tmp-1) "+"]
+      [(str-tmp).1 "+"]
       (let
-       [(append-tmp-2) x]
+       [(str-tmp).2 x.0]
        (let
-        [(append-len-1)
-         (string-length (append-tmp-1))]
+        [(str-tmp).3 (string-length (str-tmp).1)]
         (let
-         [(append-tmp-3)
+         [(str-tmp).4
           (alloc-string
            (+
-            (append-len-1)
-            (string-length (append-tmp-2))))]
+            (str-tmp).3
+            (string-length (str-tmp).2)))]
          (begin
+          (copy-string! (str-tmp).4 0 (str-tmp).1)
           (copy-string!
-           (append-tmp-3)
-           0
-           (append-tmp-1))
-          (copy-string!
-           (append-tmp-3)
-           (append-len-1)
-           (append-tmp-2))
-          (append-tmp-3))))))]
+           (str-tmp).4
+           (str-tmp).3
+           (str-tmp).2)
+          (str-tmp).4)))))]
     (let
-     [(append-len-1)
-      (string-length (append-tmp-1))]
+     [(str-tmp).7 (string-length (str-tmp).5)]
      (let
-      [(append-tmp-3)
+      [(str-tmp).8
        (alloc-string
         (+
-         (append-len-1)
-         (string-length (append-tmp-2))))]
+         (str-tmp).7
+         (string-length (str-tmp).6)))]
       (begin
+       (copy-string! (str-tmp).8 0 (str-tmp).5)
        (copy-string!
-        (append-tmp-3)
-        0
-        (append-tmp-1))
-       (copy-string!
-        (append-tmp-3)
-        (append-len-1)
-        (append-tmp-2))
-       (append-tmp-3))))))))
+        (str-tmp).8
+        (str-tmp).7
+        (str-tmp).6)
+       (str-tmp).8)))))))

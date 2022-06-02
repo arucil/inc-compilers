@@ -83,7 +83,6 @@ fn assign_home_instr(
     Instr::Pop(dest) => Instr::Pop(assign_home_arg(dest, local_spaces)),
     Instr::Push(src) => Instr::Push(assign_home_arg(src, local_spaces)),
     Instr::Ret => Instr::Ret,
-    Instr::JmpLabel(label) => Instr::JmpLabel(label),
     instr => unimplemented!("{:?}", instr),
   }
 }
@@ -98,7 +97,7 @@ fn assign_home_arg(
     Arg::Reg(r) => Arg::Reg(r),
     Arg::Deref(r, i) => Arg::Deref(r, i),
     Arg::ByteReg(_) => unimplemented!(),
-    Arg::Label(_) => unimplemented!(),
+    Arg::Label(label) => Arg::Label(label),
   }
 }
 

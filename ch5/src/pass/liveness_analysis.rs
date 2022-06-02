@@ -1,4 +1,4 @@
-use asm::{Instr, Label, Program};
+use asm::{Instr, Label, Program, Arg};
 use ast::IdxVar;
 use ch3::location_set::{LocationSet, VarStore};
 use ch3::pass::liveness_analysis::AnalysisState;
@@ -24,18 +24,18 @@ pub fn analyze_liveness(
   let blocks: HashMap<_, _> = prog
     .blocks
     .iter()
-    .map(|(label, block)| (*label, block))
+    .map(|(label, block)| (label.clone(), block))
     .collect();
   let mut graph = Graph::<Label, ()>::new();
   let mut nodes = HashMap::<Label, NodeIndex>::new();
   for (label, _) in &prog.blocks {
-    let ix = graph.add_node(*label);
-    nodes.insert(*label, ix);
+    let ix = graph.add_node(label.clone());
+    nodes.insert(label.clone(), ix);
   }
 
   for node in nodes.values() {
     let last = blocks[&graph[*node]].code.last().unwrap().clone();
-    if let Instr::JmpLabel(label) = last {
+    if let Instr::Jmp(Arg::Label(label)) = last {
       if let Some(&node1) = nodes.get(&label) {
         graph.add_edge(node1, *node, ());
       }
@@ -96,23 +96,23 @@ pub fn analyze_dataflow<N, T, F, J>(
   join: J,
 ) -> HashMap<N, T>
 where
-  N: Copy + Hash + Eq,
+  N: Clone + Hash + Eq,
   T: Clone + PartialEq,
   F: FnMut(&HashMap<N, T>, N, T) -> T,
   J: Fn(T, &T) -> T,
 {
-  for &label in g.node_weights() {
-    mapping.insert(label, bottom.clone());
+  for label in g.node_weights() {
+    mapping.insert(label.clone(), bottom.clone());
   }
 
   let mut worklist: VecDeque<_> = g.node_indices().collect();
   while let Some(node_ix) = worklist.pop_front() {
-    let label = g[node_ix];
+    let label = g[node_ix].clone();
     let input = g
       .neighbors_directed(node_ix, Direction::Incoming)
       .map(|node_ix| &mapping[&g[node_ix]])
       .fold(bottom.clone(), &join);
-    let output = transfer(&mapping, label, input);
+    let output = transfer(&mapping, label.clone(), input);
     if output != mapping[&label] {
       mapping.insert(label, output);
       for node_ix in g.neighbors_directed(node_ix, Direction::Outgoing) {

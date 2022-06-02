@@ -3,65 +3,31 @@ source: ch6/src/pass/array_bounds.rs
 expression: result.to_string_pretty()
 ---
 (let
- [x
-  (let
-   [(bounds-tmp-index) 3]
-   (if
-    (>= (bounds-tmp-index) 0)
-    (make-vector
-     (bounds-tmp-index)
-     #t)
-    (length-error
-     (bounds-tmp-index))))]
+ [x.0
+  (if (>= 3 0)
+   (make-vector 3 #t)
+   (length-error 3))]
  (let
-  [i 1]
+  [i.1 1]
   (let
-   [y
-    (let
-     [(bounds-tmp-vec) x]
-     (let
-      [(bounds-tmp-index) i]
-      (if
-       (and
-        (>=
-         (bounds-tmp-index)
-         0)
-        (<
-         (bounds-tmp-index)
-         (vector-length
-          (bounds-tmp-vec))))
-       (vector-ref
-        (bounds-tmp-vec)
-        (bounds-tmp-index))
-       (out-of-bounds-error
-        (bounds-tmp-index)
-        (vector-length
-         (bounds-tmp-vec))))))]
+   [y.2
+    (if
+     (if (>= i.1 0)
+      (< i.1 (vector-length x.0))
+      #f)
+     (vector-ref x.0 i.1)
+     (out-of-bounds-error
+      i.1
+      (vector-length x.0)))]
    (let
-    [z (vector 1 #t "abc")]
+    [z.3 (vector 1 #t "abc")]
     (begin
-    (let
-      [(bounds-tmp-vec) x]
-      (let
-       [(bounds-tmp-index) i]
-       (if
-        (and
-         (>=
-          (bounds-tmp-index)
-          0)
-         (<
-          (bounds-tmp-index)
-          (vector-length
-           (bounds-tmp-vec))))
-        (vector-set!
-         (bounds-tmp-vec)
-         (bounds-tmp-index)
-         (vector-ref z 1))
-        (out-of-bounds-error
-         (bounds-tmp-index)
-         (vector-length
-          (bounds-tmp-vec))))))
-     (vector-set!
-      z
-      1
-      (not y)))))))
+     (if
+      (if (>= i.1 0)
+       (< i.1 (vector-length x.0))
+       #f)
+      (vector-set! x.0 i.1 (vector-ref z.3 1))
+      (out-of-bounds-error
+       i.1
+       (vector-length x.0)))
+     (vector-set! z.3 1 (not y.2)))))))

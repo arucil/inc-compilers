@@ -96,7 +96,7 @@ impl<'a> CodeGen<'a> {
       match tail {
         CTail::Return(exp) => {
           self.exp_instructions(Arg::Reg(Reg::Rax), exp);
-          self.code.push(Instr::JmpLabel(Label::Conclusion));
+          self.code.push(Instr::Jmp(Arg::Label(Label::Conclusion)));
           return;
         }
         CTail::Seq(stmt, new_tail) => {
@@ -105,7 +105,7 @@ impl<'a> CodeGen<'a> {
         }
         // ch4
         CTail::Goto(label) => {
-          self.code.push(Instr::JmpLabel(label));
+          self.code.push(Instr::Jmp(Arg::Label(label)));
           return;
         }
         CTail::If {
@@ -125,7 +125,7 @@ impl<'a> CodeGen<'a> {
             cmp: cmp.into(),
             label: conseq,
           });
-          self.code.push(Instr::JmpLabel(alt));
+          self.code.push(Instr::Jmp(Arg::Label(alt)));
           return;
         }
         // ch6
@@ -646,7 +646,7 @@ impl<'a> CodeGen<'a> {
             dest: Arg::Reg(Reg::Rdi),
           });
           self.code.push(Instr::Mov {
-            src: Arg::Label(label),
+            src: Arg::Label(Label::Name(label)),
             dest: Arg::Reg(Reg::Rsi),
           });
           self.code.push(Instr::Mov {
@@ -666,7 +666,7 @@ impl<'a> CodeGen<'a> {
           });
         } else {
           self.code.push(Instr::Mov {
-            src: Arg::Label(label),
+            src: Arg::Label(Label::Name(label)),
             dest: target,
           });
         }

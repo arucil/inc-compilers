@@ -6,10 +6,7 @@ expression: result.to_string_pretty()
  [(tmp).0 (- 3 2)]
  (let
   [(tmp).5
-   (if
-    (let
-     [(tmp).1 (eq? 2 3)]
-     (not (tmp).1))
+   (if (let [(tmp).1 (eq? 2 3)] (not (tmp).1))
     (let
      [(tmp).2 (read)]
      (- (tmp).2))

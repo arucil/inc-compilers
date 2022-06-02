@@ -51,7 +51,6 @@ pub enum Instr<VAR = !> {
   Push(Arg<VAR>),
   Pop(Arg<VAR>),
   Jmp(Arg<VAR>),
-  JmpLabel(Label),
   Syscall,
   Xor {
     src: Arg<VAR>,
@@ -92,9 +91,10 @@ pub enum Instr<VAR = !> {
   },
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Label {
   Tmp(u32),
+  Name(String),
   Start,
   EntryPoint,
   Conclusion,
@@ -117,7 +117,7 @@ pub enum Arg<VAR = !> {
   ByteReg(ByteReg),
   Deref(Reg, i32),
   /// used for .rodata
-  Label(String),
+  Label(Label),
   Var(VAR),
 }
 
@@ -243,7 +243,6 @@ impl<VAR: Debug> Debug for Instr<VAR> {
       Self::Mov { src, dest } => write!(f, "mov {:?}, {:?}", dest, src),
       Self::Call { label, .. } => write!(f, "call {}", label),
       Self::Jmp(arg) => write!(f, "jmp {:?}", arg),
-      Self::JmpLabel(label) => write!(f, "jmp {:?}", label),
       Self::Neg(dest) => write!(f, "neg {:?}", dest),
       Self::Pop(dest) => write!(f, "pop {:?}", dest),
       Self::Push(src) => write!(f, "push {:?}", src),
@@ -275,7 +274,7 @@ impl<VAR: Debug> Debug for Arg<VAR> {
       },
       Self::Reg(r) => r.fmt(f),
       Self::ByteReg(r) => r.fmt(f),
-      Self::Label(l) => write!(f, "{}", l),
+      Self::Label(l) => l.fmt(f),
     }
   }
 }
@@ -377,6 +376,7 @@ impl Debug for Label {
       Self::EntryPoint => write!(f, "_start"),
       Self::Conclusion => write!(f, "conclusion"),
       Self::Tmp(n) => write!(f, "block{}", n),
+      Self::Name(name) => write!(f, "{}", name),
     }
   }
 }
@@ -452,7 +452,11 @@ pub fn parse_code<VAR: Clone>(
       };
       Arg::Deref(reg, off)
     } else if arg.starts_with("const_") {
-      Arg::Label(arg.to_owned())
+      Arg::Label(Label::Name(arg.to_owned()))
+    } else if arg.starts_with("block") {
+      Arg::Label(Label::Tmp(arg.strip_prefix("block").unwrap().parse().unwrap()))
+    } else if arg == "conclusion" {
+      Arg::Label(Label::Conclusion)
     } else {
       Arg::Var(make_var(arg))
     }
@@ -519,7 +523,7 @@ pub fn parse_code<VAR: Clone>(
         "jmp" => {
           let args = get_args(ops[1]);
           Instr::Jmp(args[0].clone())
-        },
+        }
         "neg" => {
           let args = get_args(ops[1]);
           Instr::Neg(args[0].clone())

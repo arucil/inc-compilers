@@ -134,43 +134,45 @@ impl<'a> State<'a> {
           tmps,
           idx,
           |idx_var| Exp {
-            kind: ExpKind::Prim {
-              op: (range, "and"),
-              args: vec![
-                Exp {
-                  kind: ExpKind::Prim {
-                    op: (range, ">="),
-                    args: vec![
-                      idx_var.clone(),
-                      Exp {
-                        kind: ExpKind::Int(0),
-                        range,
-                        ty: Type::Int,
-                      },
-                    ],
-                  },
-                  range,
-                  ty: Type::Bool,
+            kind: ExpKind::If {
+              cond: box Exp {
+                kind: ExpKind::Prim {
+                  op: (range, ">="),
+                  args: vec![
+                    idx_var.clone(),
+                    Exp {
+                      kind: ExpKind::Int(0),
+                      range,
+                      ty: Type::Int,
+                    },
+                  ],
                 },
-                Exp {
-                  kind: ExpKind::Prim {
-                    op: (range, "<"),
-                    args: vec![
-                      idx_var,
-                      Exp {
-                        kind: ExpKind::Prim {
-                          op: (range, "vector-length"),
-                          args: vec![vec_var.clone()],
-                        },
-                        range,
-                        ty: Type::Int,
+                range,
+                ty: Type::Bool,
+              },
+              conseq: box Exp {
+                kind: ExpKind::Prim {
+                  op: (range, "<"),
+                  args: vec![
+                    idx_var,
+                    Exp {
+                      kind: ExpKind::Prim {
+                        op: (range, "vector-length"),
+                        args: vec![vec_var.clone()],
                       },
-                    ],
-                  },
-                  range,
-                  ty: Type::Bool,
+                      range,
+                      ty: Type::Int,
+                    },
+                  ],
                 },
-              ],
+                range,
+                ty: Type::Bool,
+              },
+              alt: box Exp {
+                kind: ExpKind::Bool(false),
+                range,
+                ty: Type::Bool,
+              },
             },
             range,
             ty: Type::Bool,
@@ -224,43 +226,45 @@ impl<'a> State<'a> {
           tmps,
           idx,
           |idx_var| Exp {
-            kind: ExpKind::Prim {
-              op: (range, "and"),
-              args: vec![
-                Exp {
-                  kind: ExpKind::Prim {
-                    op: (range, ">="),
-                    args: vec![
-                      idx_var.clone(),
-                      Exp {
-                        kind: ExpKind::Int(0),
-                        range,
-                        ty: Type::Int,
-                      },
-                    ],
-                  },
-                  range,
-                  ty: Type::Bool,
+            kind: ExpKind::If {
+              cond: box Exp {
+                kind: ExpKind::Prim {
+                  op: (range, ">="),
+                  args: vec![
+                    idx_var.clone(),
+                    Exp {
+                      kind: ExpKind::Int(0),
+                      range,
+                      ty: Type::Int,
+                    },
+                  ],
                 },
-                Exp {
-                  kind: ExpKind::Prim {
-                    op: (range, "<"),
-                    args: vec![
-                      idx_var,
-                      Exp {
-                        kind: ExpKind::Prim {
-                          op: (range, "vector-length"),
-                          args: vec![vec_var.clone()],
-                        },
-                        range,
-                        ty: Type::Int,
+                range,
+                ty: Type::Bool,
+              },
+              conseq: box Exp {
+                kind: ExpKind::Prim {
+                  op: (range, "<"),
+                  args: vec![
+                    idx_var,
+                    Exp {
+                      kind: ExpKind::Prim {
+                        op: (range, "vector-length"),
+                        args: vec![vec_var.clone()],
                       },
-                    ],
-                  },
-                  range,
-                  ty: Type::Bool,
+                      range,
+                      ty: Type::Int,
+                    },
+                  ],
                 },
-              ],
+                range,
+                ty: Type::Bool,
+              },
+              alt: box Exp {
+                kind: ExpKind::Bool(false),
+                range,
+                ty: Type::Bool,
+              },
             },
             range,
             ty: Type::Bool,
@@ -348,11 +352,26 @@ impl<'a> State<'a> {
         ),
         ..exp
       },
-      ExpKind::Error(_) => unreachable!(),
+      ExpKind::Error(Error::Length(arg)) => Exp {
+        kind: ExpKind::Error(Error::Length(box self.exp_insert(*arg))),
+        ..exp
+      },
+      ExpKind::Error(Error::OutOfBounds { index, len }) => Exp {
+        kind: ExpKind::Error(Error::OutOfBounds {
+          index: box self.exp_insert(*index),
+          len: box self.exp_insert(*len),
+        }),
+        ..exp
+      },
+      ExpKind::Error(Error::DivByZero) => Exp {
+        kind: ExpKind::Error(Error::DivByZero),
+        ..exp
+      },
       ExpKind::FunRef { .. } => exp,
     }
   }
 
+  #[allow(clippy::too_many_arguments)]
   fn make_check_exp<F, G, E>(
     &mut self,
     range: Range,

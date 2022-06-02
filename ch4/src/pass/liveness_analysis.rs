@@ -1,5 +1,5 @@
 use super::instruction_selection::Info as OldInfo;
-use asm::{Block, Instr, Label, Program};
+use asm::{Block, Instr, Label, Program, Arg};
 use ast::{IdxVar, Type};
 use ch3::location_set::{LocationSet, VarStore};
 use ch3::pass::liveness_analysis::AnalysisState;
@@ -34,7 +34,7 @@ pub fn analyze_liveness(
   let live = sort_blocks(&prog.blocks)
     .map(|(label, block)| {
       let live = state.block_liveness(block, &label_live);
-      label_live.insert(label, live[0].clone());
+      label_live.insert(label.clone(), live[0].clone());
       (label, live)
     })
     .collect();
@@ -55,13 +55,13 @@ fn sort_blocks(
   let mut graph = Graph::new();
   let mut nodes = HashMap::<Label, NodeIndex>::new();
   for (label, block) in blocks {
-    let ix = graph.add_node((*label, block));
-    nodes.insert(*label, ix);
+    let ix = graph.add_node((label.clone(), block));
+    nodes.insert(label.clone(), ix);
   }
 
   for node in nodes.values() {
     let last = graph[*node].1.code.last().unwrap().clone();
-    if let Instr::JmpLabel(label) = last {
+    if let Instr::Jmp(Arg::Label(label)) = last {
       if let Some(&node1) = nodes.get(&label) {
         graph.add_edge(*node, node1, ());
       }
@@ -78,7 +78,7 @@ fn sort_blocks(
     .unwrap()
     .into_iter()
     .rev()
-    .map(move |node| graph[node])
+    .map(move |node| graph[node].clone())
 }
 
 #[cfg(test)]

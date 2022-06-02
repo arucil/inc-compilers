@@ -32,7 +32,7 @@ pub fn analyze_liveness(
     .iter()
     .map(|(label, block)| {
       let live = state.block_liveness(block, &label_live);
-      (*label, live)
+      (label.clone(), live)
     })
     .collect();
 
@@ -112,10 +112,13 @@ impl<'a> AnalysisState<'a> {
       Instr::JumpIf { label, .. } => {
         *before |= &label_live[label];
       }
-      Instr::JmpLabel(label) => {
+      Instr::Jmp(Arg::Label(label)) => {
         *before = label_live[label].clone();
       }
-      Instr::Jmp(_) => todo!(),
+      Instr::Jmp(arg) => {
+        // TODO modify L_before
+        self.add_arg(before, arg);
+      }
       Instr::Call { arity, .. } => {
         assert!(*arity <= 6);
         for reg in Reg::caller_saved_regs() {
@@ -165,7 +168,8 @@ impl<'a> AnalysisState<'a> {
         let var = self.var_store.get(var.clone());
         set.add_var(var);
       }
-      _ => {}
+      Arg::Imm(_) => {}
+      Arg::Label(_) => {}
     }
   }
 }

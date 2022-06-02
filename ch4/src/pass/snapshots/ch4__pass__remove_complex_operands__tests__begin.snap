@@ -7,14 +7,9 @@ expression: result.to_string_pretty()
  (let
   [y1.1 0]
   (let
-   [(tmp).0
-    (begin
-    (set! y1.1 (read)) x0.0)]
+   [(tmp).0 (begin (set! y1.1 (read)) x0.0)]
    (let
-    [(tmp).1
-     (begin
-     (set! x0.0 (read)) y1.1)]
+    [(tmp).1 (begin (set! x0.0 (read)) y1.1)]
     (let
-     [(tmp).2
-      (+ (tmp).0 (tmp).1)]
+     [(tmp).2 (+ (tmp).0 (tmp).1)]
      (+ (tmp).2 x0.0))))))
