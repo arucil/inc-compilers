@@ -7,12 +7,12 @@ used_callee_saved_regs: {r12}
 stack_space: 0 bytes
 constants: {}
 
-start:
+.start:
     pop rdi
     pop rsi
     push rdx
     mov r12, rbx
     call foo
     add r12, rax
-    jmp conclusion
+    jmp .conclusion
 

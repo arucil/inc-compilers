@@ -4,13 +4,13 @@ expression: result.to_string_pretty()
 ---
 locals: {x.0: Int, y.1: Int, (tmp).0: Str, (tmp).1: Int, (tmp).2: Int, (tmp).3: Bool, k.2: Int, (tmp).4: Int, (tmp).6: Int, (tmp).5: Bool, (tmp).7: Int}
 
-start:
+.start:
     x.0 = 1
     y.1 = (read)
-    goto block3
-block3:
-    if (> x.0 10) goto block4 else goto block5
-block4:
+    goto .block3
+.block3:
+    if (> x.0 10) goto .block4 else goto .block5
+.block4:
     (tmp).0 = "x="
     print-str (tmp).0
     print-int x.0
@@ -21,22 +21,22 @@ block4:
     (tmp).3 = (> x.0 (tmp).2)
     print-bool (tmp).3
     newline
-    goto block3
-block5:
+    goto .block3
+.block5:
     k.2 = (+ x.0 1)
     print-int k.2
     newline
     (tmp).4 = (read)
     y.1 = 37
     (tmp).5 = (eq? y.1 x.0)
-    if (eq? (tmp).5 #f) goto block2 else goto block1
-block2:
+    if (eq? (tmp).5 #f) goto .block2 else goto .block1
+.block2:
     (tmp).6 = 11
-    goto block0
-block1:
+    goto .block0
+.block1:
     (tmp).6 = 23
-    goto block0
-block0:
+    goto .block0
+.block0:
     (tmp).7 = (+ (tmp).4 (tmp).6)
     return #<void>
 

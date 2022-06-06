@@ -16,14 +16,14 @@ _start:
     call rt_read_int
     mov rcx, rax
     cmp rbx, 1
-    jl block3
+    jl .block3
     cmp rbx, 2
-    je block1
+    je .block1
 
-block2:
+.block2:
     add rcx, 10
 
-block0:
+.block0:
     mov rdi, rcx
     call rt_print_int
     call rt_print_newline
@@ -34,12 +34,12 @@ block0:
     mov rdi, 0
     syscall
 
-block1:
+.block1:
     add rcx, 2
-    jmp block0
+    jmp .block0
 
-block3:
+.block3:
     cmp rbx, 0
-    je block1
-    jmp block2
+    je .block1
+    jmp .block2
 

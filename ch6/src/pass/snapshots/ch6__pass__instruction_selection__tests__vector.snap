@@ -6,7 +6,7 @@ locals: {y.1: Tuple([Int, Bool, Void, Tuple([Void]), Str]), (tmp).1: Tuple([Void
 
 constants: {"const_1": "abc"}
 
-start:
+.start:
     mov rdi, 1
     mov rsi, 0
     mov rdx, r15
@@ -14,7 +14,7 @@ start:
     mov r11, rax
     mov (tmp).1, r11
     mov rdi, 3
-    mov rsi, const_1
+    lea rsi, [rel const_1]
     mov rdx, r15
     call rt_new_string
     mov (tmp).2, rax
@@ -39,5 +39,5 @@ start:
     mov qword [r11 + 8], (tmp).5
     mov r11, y.1
     mov (tmp).6, qword [r11 + 24]
-    jmp conclusion
+    jmp .conclusion
 

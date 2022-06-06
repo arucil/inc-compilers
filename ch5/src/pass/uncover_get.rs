@@ -17,7 +17,7 @@ pub fn uncover_get<TYPE>(prog: Program<IdxVar, TYPE>) -> Program<IdxVar, TYPE> {
     .collect();
   Program {
     fun_defs,
-    body: prog.body.into_iter().map(uncover_exp).collect(),
+    body: uncover_exp(prog.body),
     ..prog
   }
 }

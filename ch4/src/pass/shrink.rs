@@ -14,7 +14,7 @@ pub fn shrink(prog: Program<String, Type>) -> Program<String, Type> {
       )
     })
     .collect();
-  let body = prog.body.into_iter().map(shrink_exp).collect();
+  let body = shrink_exp(prog.body);
   Program {
     fun_defs,
     body,

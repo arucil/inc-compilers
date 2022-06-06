@@ -27,7 +27,7 @@ _start:
     mov r11, rax
     mov qword [r15 - 8], r11
     mov rdi, 3
-    mov rsi, const_1
+    lea rsi, [rel const_1]
     mov rdx, r15
     call rt_new_string
     mov qword [r15 - 16], rax

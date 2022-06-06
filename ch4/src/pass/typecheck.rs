@@ -84,21 +84,14 @@ pub fn typecheck(prog: Program) -> Result<Program<String, Type>> {
     .into_iter()
     .map(|(name, fun)| checker.typecheck_fun(name, fun))
     .collect::<Result<_>>()?;
-  let body = prog
-    .body
-    .into_iter()
-    .map(|exp| {
-      let range = exp.range;
-      let exp = checker.typecheck(exp)?;
-      if exp.ty != Type::Int {
-        return Err(CompileError {
-          range,
-          message: format!("expected Int, found {:?}", exp.ty),
-        });
-      }
-      Ok(exp)
-    })
-    .collect::<Result<_>>()?;
+  let range = prog.body.range;
+  let body = checker.typecheck(prog.body)?;
+  if body.ty != Type::Int {
+    return Err(CompileError {
+      range,
+      message: format!("expected Int, found {:?}", body.ty),
+    });
+  }
   Ok(Program {
     fun_defs,
     type_defs: IndexMap::new(),

@@ -1,9 +1,8 @@
 ---
 source: ch5/src/pass/liveness_analysis.rs
 expression: result.show()
-
 ---
-start:
+.start:
                     {rsp, z.0}
     call read_int
                     {rsp, rax, z.0}
@@ -15,45 +14,45 @@ start:
                     {rsp, x.0, y.0, z.0}
     cmp x.0, 1
                     {rsp, x.0, y.0, z.0}
-    jl block2
+    jl .block2
                     {rsp, x.0, y.0, z.0}
-    jmp block3
+    jmp .block3
                     {}
 
-block0:
+.block0:
                     {rsp, y.0}
     mov rax, y.0
                     {rsp, rax}
     add rax, 2
                     {rsp, rax}
-    jmp conclusion
+    jmp .conclusion
                     {}
 
-block1:
+.block1:
                     {rsp, z.0}
     mov rax, z.0
                     {rsp, rax}
     add rax, 10
                     {rsp, rax}
-    jmp conclusion
+    jmp .conclusion
                     {}
 
-block2:
+.block2:
                     {rsp, x.0, y.0, z.0}
     cmp x.0, 0
                     {rsp, y.0, z.0}
-    je block0
+    je .block0
                     {rsp, z.0}
-    jmp block1
+    jmp .block1
                     {}
 
-block3:
+.block3:
                     {rsp, x.0, y.0, z.0}
     cmp x.0, 2
                     {rsp, y.0, z.0}
-    je block0
+    je .block0
                     {rsp, z.0}
-    jmp block1
+    jmp .block1
                     {}
 
 

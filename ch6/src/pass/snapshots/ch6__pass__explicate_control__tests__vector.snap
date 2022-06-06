@@ -2,9 +2,9 @@
 source: ch6/src/pass/explicate_control.rs
 expression: result.to_string_pretty()
 ---
-locals: {y.1: Tuple([Int, Bool, Void, Tuple([Void]), Str]), (tmp).1: Tuple([Void]), (tmp).2: Str, (tmp).3: Bool, (tmp).4: Bool, (tmp).5: Int, (tmp).6: Tuple([Void])}
+locals: {y.1: Tuple([Int, Bool, Void, Tuple([Void]), Str]), (tmp).1: Tuple([Void]), (tmp).2: Str, (tmp).3: Bool, (tmp).4: Bool, (tmp).5: Int, (tmp).6: Tuple([Void]), (tmp).10: Int, (tmp).8: Tuple([Int, Bool]), (tmp).9: Bool}
 
-start:
+.start:
     (tmp).1 = (vector ((tmp).0 : Void))
     (tmp).2 = "abc"
     y.1 = (vector (1 : Int) (#f : Bool) (#<void> : Void) ((tmp).1 : Tuple([Void])) ((tmp).2 : Str))
@@ -14,5 +14,17 @@ start:
     (tmp).5 = 5
     vector-set! y.1 [] (tmp).5
     (tmp).6 = (vector-ref y.1 [Int, Bool, Void])
+    (tmp).8 = (vector (1 : Int) (#t : Bool))
+    (tmp).9 = (vector-ref (tmp).8 [Int])
+    if (eq? (tmp).9 #f) goto .block2 else goto .block1
+.block2:
+    (tmp).10 = 2
+    goto .block0
+.block1:
+    (tmp).10 = 1
+    goto .block0
+.block0:
+    print-int (tmp).10
+    newline
     return #<void>
 

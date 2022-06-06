@@ -15,7 +15,7 @@ pub use parser::{parse, Result};
 pub struct Program<VAR = String, TYPE = ()> {
   pub type_defs: IndexMap<String, Type>,
   pub fun_defs: IndexMap<String, FunDef<VAR, TYPE>>,
-  pub body: Vec<Exp<VAR, TYPE>>,
+  pub body: Exp<VAR, TYPE>,
   pub types: Arena<Type>,
 }
 
@@ -170,7 +170,7 @@ impl<VAR: Display, TYPE: Debug> Program<VAR, TYPE> {
         .fun_defs
         .iter()
         .map(|(name, def)| def.to_doc(name))
-        .chain(self.body.iter().map(|exp| exp.to_doc())),
+        .chain(std::iter::once(self.body.to_doc())),
       Doc::line(),
     )
   }

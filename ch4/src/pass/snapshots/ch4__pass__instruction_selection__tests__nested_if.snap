@@ -6,28 +6,28 @@ locals: {x.0: Int, y.1: Int}
 
 constants: {}
 
-start:
+.start:
     call rt_read_int
     mov x.0, rax
     call rt_read_int
     mov y.1, rax
     cmp x.0, 1
-    jl block2
-    jmp block3
-block2:
+    jl .block2
+    jmp .block3
+.block2:
     cmp x.0, 0
-    je block0
-    jmp block1
-block3:
+    je .block0
+    jmp .block1
+.block3:
     cmp x.0, 2
-    je block0
-    jmp block1
-block0:
+    je .block0
+    jmp .block1
+.block0:
     mov rax, y.1
     add rax, 2
-    jmp conclusion
-block1:
+    jmp .conclusion
+.block1:
     mov rax, y.1
     add rax, 10
-    jmp conclusion
+    jmp .conclusion
 

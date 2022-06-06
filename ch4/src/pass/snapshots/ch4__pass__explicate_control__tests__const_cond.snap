@@ -1,10 +1,9 @@
 ---
 source: ch4/src/pass/explicate_control.rs
 expression: result.to_string_pretty()
-
 ---
 locals: {}
 
-start:
+.start:
     return 2
 

@@ -14,11 +14,12 @@ impl Debug for CInfo {
   }
 }
 
-pub fn explicate_control(mut prog: Program<IdxVar>) -> CProgram<CInfo> {
+pub fn explicate_control(prog: Program<IdxVar>) -> CProgram<CInfo> {
   let locals = collect_locals(&prog);
   CProgram {
     info: CInfo { locals },
-    body: vec![(Label::Start, explicate_tail(prog.body.pop().unwrap()))],
+    funs: vec![],
+    body: vec![(Label::Start, explicate_tail(prog.body))],
     types: prog.types,
   }
 }
@@ -87,9 +88,7 @@ fn prim(op: &str, mut args: Vec<Exp<IdxVar>>) -> CPrim {
 
 fn collect_locals<TYPE>(prog: &Program<IdxVar, TYPE>) -> IndexSet<IdxVar> {
   let mut locals = IndexSet::new();
-  for exp in &prog.body {
-    collect_exp_locals(exp, &mut locals);
-  }
+  collect_exp_locals(&prog.body, &mut locals);
   locals
 }
 

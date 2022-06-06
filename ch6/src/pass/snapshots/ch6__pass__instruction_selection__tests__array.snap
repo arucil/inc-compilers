@@ -6,11 +6,11 @@ locals: {x.0: Array(Bool), y.1: Array(Int), z.2: Array(Array(Bool)), t.3: Array(
 
 constants: {}
 
-start:
+.start:
     cmp 3, 0
-    jge block24
-    jmp block25
-block24:
+    jge .block24
+    jmp .block25
+.block24:
     mov rsi, 3
     shl rsi, 3
     mov rdi, 3
@@ -22,15 +22,15 @@ block24:
     mov rsi, 1
     call rt_fill_array
     mov x.0, rax
-    jmp block23
-block25:
+    jmp .block23
+.block25:
     mov rdi, 3
     call rt_length_error
-block23:
+.block23:
     cmp 0, 0
-    jge block21
-    jmp block22
-block21:
+    jge .block21
+    jmp .block22
+.block21:
     mov rsi, 0
     shl rsi, 3
     mov rdi, 0
@@ -42,15 +42,15 @@ block21:
     mov rsi, 2
     call rt_fill_array
     mov y.1, rax
-    jmp block20
-block22:
+    jmp .block20
+.block22:
     mov rdi, 0
     call rt_length_error
-block20:
+.block20:
     cmp 2, 0
-    jge block18
-    jmp block19
-block18:
+    jge .block18
+    jmp .block19
+.block18:
     mov rsi, 2
     shl rsi, 3
     mov rdi, 2
@@ -62,15 +62,15 @@ block18:
     mov rsi, x.0
     call rt_fill_array
     mov z.2, rax
-    jmp block17
-block19:
+    jmp .block17
+.block19:
     mov rdi, 2
     call rt_length_error
-block17:
+.block17:
     cmp 10, 0
-    jge block15
-    jmp block16
-block15:
+    jge .block15
+    jmp .block16
+.block15:
     mov rsi, 0
     mov rdi, 10
     shl rdi, 5
@@ -78,102 +78,102 @@ block15:
     mov rdx, r15
     call rt_allocate
     mov t.3, rax
-    jmp block14
-block16:
+    jmp .block14
+.block16:
     mov rdi, 10
     call rt_length_error
-block14:
+.block14:
     cmp 1, 0
-    jge block13
-    jmp block12
-block13:
+    jge .block13
+    jmp .block12
+.block13:
     mov r11, x.0
     mov (tmp).0, qword [r11]
     shr (tmp).0, 5
     cmp 1, (tmp).0
-    jl block11
-    jmp block12
-block12:
+    jl .block11
+    jmp .block12
+.block12:
     mov r11, x.0
     mov (tmp).1, qword [r11]
     shr (tmp).1, 5
     mov rdi, 1
     mov rsi, (tmp).1
     call rt_out_of_bounds_error
-block11:
+.block11:
     mov r11, 1
     add r11, 1
     shl r11, 3
     add r11, x.0
     mov qword [r11], 0
-    jmp block10
-block10:
+    jmp .block10
+.block10:
     cmp 3, 0
-    jge block9
-    jmp block8
-block9:
+    jge .block9
+    jmp .block8
+.block9:
     mov r11, t.3
     mov (tmp).2, qword [r11]
     shr (tmp).2, 5
     cmp 3, (tmp).2
-    jl block7
-    jmp block8
-block8:
+    jl .block7
+    jmp .block8
+.block8:
     mov r11, t.3
     mov (tmp).3, qword [r11]
     shr (tmp).3, 5
     mov rdi, 3
     mov rsi, (tmp).3
     call rt_out_of_bounds_error
-block7:
+.block7:
     cmp 0, 0
-    jge block6
-    jmp block5
-block6:
+    jge .block6
+    jmp .block5
+.block6:
     mov r11, y.1
     mov (tmp).4, qword [r11]
     shr (tmp).4, 5
     cmp 0, (tmp).4
-    jl block4
-    jmp block5
-block5:
+    jl .block4
+    jmp .block5
+.block5:
     mov r11, y.1
     mov (tmp).5, qword [r11]
     shr (tmp).5, 5
     mov rdi, 0
     mov rsi, (tmp).5
     call rt_out_of_bounds_error
-block4:
+.block4:
     mov r11, 0
     add r11, 1
     shl r11, 3
     add r11, y.1
     mov (bounds-tmp).1, qword [r11]
-    jmp block3
-block3:
+    jmp .block3
+.block3:
     cmp (bounds-tmp).1, 0
-    jge block2
-    jmp block1
-block2:
+    jge .block2
+    jmp .block1
+.block2:
     mov r11, t.3
     mov (tmp).6, qword [r11]
     shr (tmp).6, 5
     cmp (bounds-tmp).1, (tmp).6
-    jl block0
-    jmp block1
-block1:
+    jl .block0
+    jmp .block1
+.block1:
     mov r11, t.3
     mov (tmp).7, qword [r11]
     shr (tmp).7, 5
     mov rdi, (bounds-tmp).1
     mov rsi, (tmp).7
     call rt_out_of_bounds_error
-block0:
+.block0:
     mov r11, t.3
     mov (tmp).8, qword [r11]
     shr (tmp).8, 5
     mov rdi, (tmp).8
     call rt_print_int
     call rt_print_newline
-    jmp conclusion
+    jmp .conclusion
 

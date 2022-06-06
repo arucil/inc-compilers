@@ -1,14 +1,22 @@
-use asm::{Arg, Block, Instr, Program, Reg};
+use asm::{Arg, Block, Fun, Instr, Program, Reg};
 
 pub fn patch_instructions<T>(prog: Program<T>) -> Program<T> {
   Program {
-    blocks: prog
-      .blocks
+    funs: prog
+      .funs
       .into_iter()
-      .map(|(label, block)| (label, patch_block(block)))
+      .map(|fun| Fun {
+        blocks: patch_body(fun.blocks),
+        ..fun
+      })
       .collect(),
+    blocks: patch_body(prog.blocks),
     ..prog
   }
+}
+
+fn patch_body(blocks: Vec<Block>) -> Vec<Block> {
+  blocks.into_iter().map(patch_block).collect()
 }
 
 fn patch_block(block: Block) -> Block {
@@ -123,15 +131,64 @@ fn patch_block(block: Block) -> Block {
           dest: Arg::Reg(Reg::Rax),
         });
       }
+      Instr::And {
+        src: src @ Arg::Deref(..),
+        dest: dest @ Arg::Deref(..),
+      } => {
+        code.push(Instr::Mov {
+          src,
+          dest: Arg::Reg(Reg::Rax),
+        });
+        code.push(Instr::And {
+          src: Arg::Reg(Reg::Rax),
+          dest,
+        });
+      }
+      Instr::Or {
+        src: src @ Arg::Deref(..),
+        dest: dest @ Arg::Deref(..),
+      } => {
+        code.push(Instr::Mov {
+          src,
+          dest: Arg::Reg(Reg::Rax),
+        });
+        code.push(Instr::Or {
+          src: Arg::Reg(Reg::Rax),
+          dest,
+        });
+      }
+      Instr::Lea {
+        src: src @ Arg::Deref(..),
+        dest: dest @ Arg::Deref(..),
+      } => {
+        code.push(Instr::Lea {
+          src,
+          dest: Arg::Reg(Reg::Rax),
+        });
+        code.push(Instr::Mov {
+          src: Arg::Reg(Reg::Rax),
+          dest,
+        });
+      }
+      Instr::Lea {
+        src: src @ Arg::Label(_),
+        dest: dest @ Arg::Deref(..),
+      } => {
+        code.push(Instr::Lea {
+          src,
+          dest: Arg::Reg(Reg::Rax),
+        });
+        code.push(Instr::Mov {
+          src: Arg::Reg(Reg::Rax),
+          dest,
+        });
+      }
       _ => {
         code.push(instr);
       }
     }
   }
-  Block {
-    global: block.global,
-    code,
-  }
+  Block { code, ..block }
 }
 
 #[cfg(test)]

@@ -5,7 +5,7 @@ expression: prog
 extern rt_print_int, rt_print_newline, rt_read_int
 section .text
 
-start:
+.start:
     call rt_read_int
     mov qword [rbp - 8], rax
     mov qword [rbp - 16], 5
@@ -19,16 +19,16 @@ start:
     add qword [rbp - 40], rax
     mov rax, qword [rbp - 32]
     add rax, qword [rbp - 40]
-    jmp conclusion
+    jmp .conclusion
 
     global _start
 _start:
     push rbp
     mov rbp, rsp
     sub rsp, 48
-    jmp start
+    jmp .start
 
-conclusion:
+.conclusion:
     mov rsp, rbp
     pop rbp
     mov rdi, rax

@@ -36,10 +36,8 @@ mod tests {
           IdxVar::new("w") => Type::Int,
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);
@@ -73,10 +71,8 @@ mod tests {
           IdxVar::new("w") => Type::Int,
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);

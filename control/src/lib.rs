@@ -6,20 +6,17 @@ use std::str::FromStr;
 
 pub struct CProgram<INFO> {
   pub info: INFO,
+  pub funs: Vec<CFun<INFO>>,
   pub body: Vec<(Label, CTail)>,
   pub types: Arena<Type>,
 }
 
-pub struct CDef {
-  pub label: String,
-  pub params: Vec<CParam>,
+pub struct CFun<INFO> {
+  pub name: String,
+  pub params: Vec<(IdxVar, Type)>,
+  pub info: INFO,
   pub ty: Type,
-  pub body: Vec<(Label, CTail)>,
-}
-
-pub struct CParam {
-  pub name: IdxVar,
-  pub ty: Type,
+  pub blocks: Vec<(Label, CTail)>,
 }
 
 #[derive(Clone)]
@@ -35,6 +32,7 @@ pub enum CTail {
     conseq: Label,
     alt: Label,
   },
+  TailCall(CAtom, Vec<CAtom>),
 }
 
 #[derive(Clone)]
@@ -70,12 +68,14 @@ pub enum CStmt {
     src: CAtom,
     offset: CAtom,
   },
+  Call(CAtom, Vec<CAtom>),
 }
 
 #[derive(Clone)]
 pub enum CExp {
   Atom(CAtom),
   Prim(CPrim),
+  Call(CAtom, Vec<CAtom>),
 }
 
 #[derive(Clone)]
@@ -125,27 +125,54 @@ pub enum CAtom {
   Bool(bool),
   Void,
   Str(String),
+  FunRef(String, usize),
 }
 
 impl<INFO: Debug> CProgram<INFO> {
   #[allow(unused)]
   pub fn to_string_pretty(&self) -> String {
-    let mut buf = format!("{:?}\n", self.info);
+    let mut buf = String::new();
     if self.types.len() != 0 {
-      write!(&mut buf, "types: ");
+      write!(&mut buf, "types: ").unwrap();
       let mut comma = false;
       for (id, ty) in &self.types {
         if comma {
-          write!(&mut buf, ", ");
+          write!(&mut buf, ", ").unwrap();
         }
         comma = true;
-        write!(&mut buf, "{} => {:?}", id.index(), ty);
+        write!(&mut buf, "{} => {:?}", id.index(), ty).unwrap();
       }
-      writeln!(&mut buf);
+      writeln!(&mut buf).unwrap();
     }
-    writeln!(&mut buf);
+
+    for fun in &self.funs {
+      write!(&mut buf, "--------------------------- ").unwrap();
+      writeln!(&mut buf, "{} -------------------------", fun.name).unwrap();
+      write!(&mut buf, "params: ").unwrap();
+      let mut comma = false;
+      for (name, ty) in &fun.params {
+        if comma {
+          write!(&mut buf, ", ").unwrap();
+        }
+        comma = true;
+        write!(&mut buf, "{}: {:?}", name, ty).unwrap();
+      }
+      writeln!(&mut buf, "\nreturns: {:?}", fun.ty).unwrap();
+      writeln!(&mut buf, "{:?}", fun.info).unwrap();
+      writeln!(&mut buf).unwrap();
+      for (label, block) in &fun.blocks {
+        writeln!(&mut buf, "{}:", label.name()).unwrap();
+        writeln!(&mut buf, "{:?}", block).unwrap();
+      }
+    }
+    if !self.funs.is_empty() {
+      writeln!(&mut buf, "\n----------------------------------------").unwrap();
+    }
+
+    writeln!(&mut buf, "{:?}", self.info).unwrap();
+    writeln!(&mut buf).unwrap();
     for (label, block) in &self.body {
-      writeln!(&mut buf, "{:?}:", label).unwrap();
+      writeln!(&mut buf, "{}:", label.name()).unwrap();
       writeln!(&mut buf, "{:?}", block).unwrap();
     }
     buf
@@ -171,7 +198,7 @@ impl Debug for CTail {
         Self::Error(CError::DivByZero) => {
           return write!(f, "    div-by-zero-error")
         }
-        Self::Goto(label) => return write!(f, "    goto {:?}", label),
+        Self::Goto(label) => return write!(f, "    goto {}", label.name()),
         Self::If {
           cmp,
           lhs,
@@ -181,9 +208,22 @@ impl Debug for CTail {
         } => {
           return write!(
             f,
-            "    if ({:?} {:?} {:?}) goto {:?} else goto {:?}",
-            cmp, lhs, rhs, conseq, alt
-          )
+            "    if ({:?} {:?} {:?}) goto {} else goto {}",
+            cmp,
+            lhs,
+            rhs,
+            conseq.name(),
+            alt.name()
+          );
+        }
+        Self::TailCall(fun, args) => {
+          write!(f, "    ")?;
+          fun.fmt(f)?;
+          for arg in args {
+            write!(f, " ")?;
+            arg.fmt(f)?;
+          }
+          return Ok(());
         }
       }
     }
@@ -224,6 +264,14 @@ impl Debug for CStmt {
       Self::CopyStr { dest, src, offset } => {
         write!(f, "copy-string! {:?} {:?} {:?}", dest, offset, src)
       }
+      Self::Call(fun, args) => {
+        fun.fmt(f)?;
+        for arg in args {
+          write!(f, " ")?;
+          arg.fmt(f)?;
+        }
+        Ok(())
+      }
     }
   }
 }
@@ -233,6 +281,15 @@ impl Debug for CExp {
     match self {
       Self::Atom(atom) => atom.fmt(f),
       Self::Prim(prim) => prim.fmt(f),
+      Self::Call(fun, args) => {
+        write!(f, "(")?;
+        fun.fmt(f)?;
+        for arg in args {
+          write!(f, " ")?;
+          arg.fmt(f)?;
+        }
+        write!(f, ")")
+      }
     }
   }
 }
@@ -320,6 +377,7 @@ impl Debug for CAtom {
       Self::Bool(false) => write!(f, "#f"),
       Self::Void => write!(f, "#<void>"),
       Self::Str(s) => write!(f, "{:?}", s),
+      Self::FunRef(label, arity) => write!(f, "(fun-ref {} {})", label, arity),
     }
   }
 }

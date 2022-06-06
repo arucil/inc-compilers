@@ -4,12 +4,12 @@ expression: result.to_string_pretty()
 ---
 locals: {x.0: Bool, (tmp).0: Int}
 
-start:
+.start:
     (tmp).0 = (read)
     x.0 = (eq? (tmp).0 20)
-    if (eq? x.0 #f) goto block1 else goto block0
-block1:
+    if (eq? x.0 #f) goto .block1 else goto .block0
+.block1:
     return 89
-block0:
+.block0:
     return 42
 

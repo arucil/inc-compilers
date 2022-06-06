@@ -1,4 +1,4 @@
-use asm::{Arg, Instr, Label, Program};
+use asm::{Arg, Block, Fun, Instr, Label, Program};
 use ast::IdxVar;
 use ch3::location_set::{LocationSet, VarStore};
 use ch3::pass::liveness_analysis::AnalysisState;
@@ -16,21 +16,37 @@ pub fn analyze_liveness(
   prog: Program<OldInfo, IdxVar>,
   label_live: HashMap<Label, LocationSet>,
 ) -> Program<NewInfo, IdxVar> {
+  let funs = prog
+    .funs
+    .into_iter()
+    .map(|fun| Fun {
+      info: analyze_body(fun.info, &fun.blocks, Default::default()),
+      ..fun
+    })
+    .collect();
+  let info = analyze_body(prog.info, &prog.blocks, label_live);
+  Program { info, funs, ..prog }
+}
+
+fn analyze_body(
+  info: OldInfo,
+  body: &[Block<IdxVar>],
+  label_live: HashMap<Label, LocationSet>,
+) -> NewInfo {
   let mut var_store = VarStore::new();
-  for var in prog.info.locals.keys() {
+  for var in info.locals.keys() {
     var_store.insert(var.clone());
   }
 
-  let blocks: HashMap<_, _> = prog
-    .blocks
+  let blocks: HashMap<_, _> = body
     .iter()
-    .map(|(label, block)| (label.clone(), block))
+    .map(|block| (block.label.clone(), block))
     .collect();
   let mut graph = Graph::<Label, ()>::new();
   let mut nodes = HashMap::<Label, NodeIndex>::new();
-  for (label, _) in &prog.blocks {
-    let ix = graph.add_node(label.clone());
-    nodes.insert(label.clone(), ix);
+  for block in body {
+    let ix = graph.add_node(block.label.clone());
+    nodes.insert(block.label.clone(), ix);
   }
 
   for node in nodes.values() {
@@ -69,13 +85,10 @@ pub fn analyze_liveness(
     },
   );
 
-  Program {
-    info: NewInfo {
-      locals: prog.info.locals,
-      live,
-      var_store,
-    },
-    ..prog
+  NewInfo {
+    locals: info.locals,
+    live,
+    var_store,
   }
 }
 
@@ -141,9 +154,9 @@ mod tests {
   impl ShowLiveness for Program<NewInfo, IdxVar> {
     fn show(&self) -> String {
       let mut buf = String::new();
-      for (label, block) in &self.blocks {
-        writeln!(&mut buf, "{:?}:", label).unwrap();
-        let live = &self.info.live[label];
+      for block in &self.blocks {
+        writeln!(&mut buf, "{}:", block.label.name()).unwrap();
+        let live = &self.info.live[&block.label];
         for (i, l) in live.iter().enumerate().take(block.code.len()) {
           buf += "                    ";
           l.write(&mut buf, &self.info.var_store).unwrap();
@@ -197,10 +210,8 @@ mod tests {
           IdxVar::new("t") => Type::Int,
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -231,10 +242,8 @@ mod tests {
           IdxVar::new("w") => Type::Int,
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -267,10 +276,8 @@ mod tests {
           IdxVar::new("w") => Type::Int,
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -297,10 +304,8 @@ mod tests {
       info: OldInfo {
         locals: indexmap! {},
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -350,10 +355,8 @@ mod tests {
           IdxVar::new("z") => Type::Int,
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -405,10 +408,8 @@ block4:
           IdxVar::new("tmp.1") => Type::Int,
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -484,10 +485,8 @@ block9:
           IdxVar::new("tmp.0") => Type::Int,
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -533,10 +532,8 @@ block8:
           IdxVar::new("tmp.4") => Type::Int,
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let result = analyze_liveness(prog, label_live);
 

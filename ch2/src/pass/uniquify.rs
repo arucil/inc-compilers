@@ -15,11 +15,7 @@ pub fn uniquify(prog: Program) -> Program<IdxVar> {
   uniq.reset();
   Program {
     fun_defs,
-    body: prog
-      .body
-      .into_iter()
-      .map(|exp| uniq.uniquify_exp(exp))
-      .collect(),
+    body: uniq.uniquify_exp(prog.body),
     ..prog
   }
 }

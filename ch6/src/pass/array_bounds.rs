@@ -44,11 +44,7 @@ pub fn insert_bounds_check(
         )
       })
       .collect(),
-    body: prog
-      .body
-      .into_iter()
-      .map(|exp| state.exp_insert(exp))
-      .collect(),
+    body: state.exp_insert(prog.body),
     ..prog
   }
 }

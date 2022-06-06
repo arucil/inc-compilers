@@ -1,11 +1,12 @@
 use super::explicate_control::CInfo;
 use asm::Program;
 use ast::{IdxVar, Type};
-use ch2::pass::instruction_selection::CodeGen;
+use ch2::pass::instruction_selection::{CodeGen, Locals};
 use control::*;
 use indexmap::IndexMap;
 use std::fmt::{self, Debug, Formatter};
 
+#[derive(Default)]
 pub struct Info {
   pub locals: IndexMap<IdxVar, Type>,
 }
@@ -24,17 +25,24 @@ impl From<CInfo> for Info {
   }
 }
 
+impl Locals for Info {
+  fn add_local(&mut self, local: IdxVar, ty: Type) {
+    self.locals.insert(local, ty);
+  }
+}
+
 pub fn select_instruction(
   prog: CProgram<CInfo>,
   use_heap: bool,
 ) -> Program<Info, IdxVar> {
   let types = prog.types;
   let mut codegen = CodeGen::new(&types, use_heap);
-  let blocks = prog
-    .body
+  let funs = prog
+    .funs
     .into_iter()
-    .map(|(label, tail)| (label, codegen.tail_block(tail)))
+    .map(|fun| codegen.gen_fun(fun))
     .collect();
+  let blocks = codegen.gen_body(prog.body);
   let result = codegen.finish();
   Program {
     info: Info {
@@ -43,6 +51,7 @@ pub fn select_instruction(
     blocks,
     constants: result.constants,
     externs: result.externs,
+    funs,
     types,
   }
 }

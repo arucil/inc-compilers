@@ -1,5 +1,5 @@
 use super::explicate_control::CInfo;
-use asm::{Arg, Block, ByteReg, Instr, Label, Program, Reg};
+use asm::{Arg, Block, ByteReg, Fun, Instr, Label, Program, Reg};
 use ast::{IdxVar, Type};
 use control::*;
 use id_arena::Arena;
@@ -7,6 +7,11 @@ use indexmap::{IndexMap, IndexSet};
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::{self, Debug, Formatter};
 
+pub trait Locals {
+  fn add_local(&mut self, local: IdxVar, ty: Type);
+}
+
+#[derive(Default)]
 pub struct Info {
   pub locals: IndexSet<IdxVar>,
 }
@@ -25,26 +30,34 @@ impl From<CInfo> for Info {
   }
 }
 
+impl Locals for Info {
+  fn add_local(&mut self, local: IdxVar, _: Type) {
+    self.locals.insert(local);
+  }
+}
+
 pub fn select_instruction<OldInfo, NewInfo>(
   prog: CProgram<OldInfo>,
   use_heap: bool,
 ) -> Program<NewInfo, IdxVar>
 where
-  NewInfo: From<OldInfo>,
+  NewInfo: From<OldInfo> + Locals,
 {
   let types = Arena::new();
   let mut codegen = CodeGen::new(&types, use_heap);
-  let blocks = prog
-    .body
+  let funs = prog
+    .funs
     .into_iter()
-    .map(|(label, tail)| (label, codegen.tail_block(tail)))
+    .map(|fun| codegen.gen_fun(fun))
     .collect();
+  let blocks = codegen.gen_body(prog.body);
   let result = codegen.finish();
   Program {
     info: prog.info.into(),
     blocks,
     constants: result.constants,
     externs: result.externs,
+    funs,
     types: prog.types,
   }
 }
@@ -82,13 +95,54 @@ impl<'a> CodeGen<'a> {
     }
   }
 
-  pub fn tail_block(&mut self, tail: CTail) -> Block<IdxVar> {
+  pub fn gen_fun<OldInfo, NewInfo>(
+    &mut self,
+    fun: CFun<OldInfo>,
+  ) -> Fun<NewInfo, IdxVar>
+  where
+    NewInfo: From<OldInfo> + Locals,
+  {
+    let mut info: NewInfo = fun.info.into();
+    let mut blocks = self.gen_body(fun.blocks);
+    for block in &mut blocks {
+      if let Label::Start = block.label {
+        let mut new_code = vec![];
+        for ((var, ty), reg) in fun.params.into_iter().zip(Reg::argument_regs())
+        {
+          if !matches!(ty.resolved(self.types), Type::Void) {
+            new_code.push(Instr::Mov {
+              src: Arg::Reg(reg),
+              dest: Arg::Var(var.clone()),
+            });
+            info.add_local(var, ty.clone());
+          }
+        }
+        new_code.append(&mut block.code);
+        std::mem::swap(&mut block.code, &mut new_code);
+        break;
+      }
+    }
+    Fun {
+      name: fun.name,
+      info,
+      blocks,
+    }
+  }
+
+  pub fn gen_body(&mut self, body: Vec<(Label, CTail)>) -> Vec<Block<IdxVar>> {
+    body
+      .into_iter()
+      .map(|(label, tail)| Block {
+        label,
+        code: self.gen_tail(tail),
+      })
+      .collect()
+  }
+
+  fn gen_tail(&mut self, tail: CTail) -> Vec<Instr<IdxVar>> {
     self.code.clear();
     self.tail_instructions(tail);
-    Block {
-      global: false,
-      code: std::mem::take(&mut self.code),
-    }
+    std::mem::take(&mut self.code)
   }
 
   fn tail_instructions(&mut self, mut tail: CTail) {
@@ -162,6 +216,7 @@ impl<'a> CodeGen<'a> {
           });
           return;
         }
+        CTail::TailCall(..) => todo!(),
       }
     }
   }
@@ -279,6 +334,7 @@ impl<'a> CodeGen<'a> {
           gc: false,
         })
       }
+      CStmt::Call(..) => todo!(),
     }
   }
 
@@ -286,6 +342,7 @@ impl<'a> CodeGen<'a> {
     match exp {
       CExp::Atom(atom) => self.atom_instructions(target, atom),
       CExp::Prim(prim) => self.prim_instructions(target, prim),
+      CExp::Call(..) => todo!(),
     }
   }
 
@@ -645,7 +702,7 @@ impl<'a> CodeGen<'a> {
             src: Arg::Imm(len as i64),
             dest: Arg::Reg(Reg::Rdi),
           });
-          self.code.push(Instr::Mov {
+          self.code.push(Instr::Lea {
             src: Arg::Label(Label::Name(label)),
             dest: Arg::Reg(Reg::Rsi),
           });
@@ -665,11 +722,17 @@ impl<'a> CodeGen<'a> {
             dest: target,
           });
         } else {
-          self.code.push(Instr::Mov {
+          self.code.push(Instr::Lea {
             src: Arg::Label(Label::Name(label)),
             dest: target,
           });
         }
+      }
+      CAtom::FunRef(name, _) => {
+        self.code.push(Instr::Lea {
+          src: Arg::Label(Label::Name(name)),
+          dest: target,
+        });
       }
     }
   }
@@ -705,6 +768,7 @@ fn atom_to_arg(atom: CAtom) -> Arg<IdxVar> {
     CAtom::Bool(false) => Arg::Imm(0),
     CAtom::Void => unreachable!(),
     CAtom::Str(_) => unreachable!(),
+    CAtom::FunRef(..) => unreachable!(),
   }
 }
 

@@ -30,7 +30,7 @@ pub fn assign_home(
   let blocks = prog
     .blocks
     .into_iter()
-    .map(|(label, block)| (label, assign_home_block(block, &local_spaces)))
+    .map(|block| assign_home_block(block, &local_spaces))
     .collect();
   Program {
     info: Info {
@@ -39,6 +39,7 @@ pub fn assign_home(
     },
     externs: prog.externs,
     constants: Default::default(),
+    funs: vec![],
     blocks,
     types: prog.types,
   }
@@ -53,10 +54,7 @@ fn assign_home_block(
     .into_iter()
     .map(|ins| assign_home_instr(ins, local_spaces))
     .collect();
-  Block {
-    global: block.global,
-    code,
-  }
+  Block { code, ..block }
 }
 
 fn assign_home_instr(

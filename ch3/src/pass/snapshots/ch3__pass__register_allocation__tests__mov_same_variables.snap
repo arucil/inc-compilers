@@ -7,7 +7,7 @@ used_callee_saved_regs: {}
 stack_space: 0 bytes
 constants: {}
 
-start:
+.start:
     mov r8, rdx
     add r8, rsi
     mov r8, r8

@@ -1,9 +1,8 @@
 ---
 source: ch5/src/pass/liveness_analysis.rs
 expression: result.show()
-
 ---
-start:
+.start:
                     {rsp}
     call read_int
                     {rsp, rax}
@@ -11,28 +10,28 @@ start:
                     {rsp, x.0}
     cmp x.0, 100
                     {rsp, x.0}
-    jg block8
+    jg .block8
                     {rsp, x.0}
-    jmp block9
+    jmp .block9
                     {}
 
-block0:
+.block0:
                     {rsp}
     mov rax, -1
                     {rsp, rax}
-    jmp conclusion
+    jmp .conclusion
                     {}
 
-block1:
+.block1:
                     {rsp, y.1}
     mov rax, y.1
                     {rsp, rax}
     neg rax
                     {rsp, rax}
-    jmp conclusion
+    jmp .conclusion
                     {}
 
-block2:
+.block2:
                     {rsp, x.0, y.1}
     mov tmp.1, y.1
                     {rsp, x.0, y.1, tmp.1}
@@ -40,21 +39,21 @@ block2:
                     {rsp, y.1, tmp.1}
     cmp tmp.1, 10
                     {rsp, y.1}
-    jl block0
+    jl .block0
                     {rsp, y.1}
-    jmp block1
+    jmp .block1
                     {}
 
-block3:
+.block3:
                     {rsp, x.0, y.1}
     cmp x.0, y.1
                     {rsp, x.0, y.1}
-    jl block2
+    jl .block2
                     {rsp, y.1}
-    jmp block1
+    jmp .block1
                     {}
 
-block4:
+.block4:
                     {rsp, x.0, y.1}
     mov tmp.0, x.0
                     {rsp, x.0, y.1, tmp.0}
@@ -62,35 +61,35 @@ block4:
                     {rsp, x.0, y.1, tmp.0}
     cmp tmp.0, 10
                     {rsp, x.0, y.1}
-    jl block0
+    jl .block0
                     {rsp, x.0, y.1}
-    jmp block3
+    jmp .block3
                     {}
 
-block5:
+.block5:
                     {rsp}
     mov rax, 5000
                     {rsp, rax}
-    jmp conclusion
+    jmp .conclusion
                     {}
 
-block6:
+.block6:
                     {rsp, x.0}
     mov rax, x.0
                     {rsp, rax}
-    jmp conclusion
+    jmp .conclusion
                     {}
 
-block7:
+.block7:
                     {rsp, x.0}
     cmp x.0, 60
                     {rsp, x.0}
-    jl block5
+    jl .block5
                     {rsp, x.0}
-    jmp block6
+    jmp .block6
                     {}
 
-block8:
+.block8:
                     {rsp, x.0}
     call read_int
                     {rsp, rax, x.0}
@@ -98,18 +97,18 @@ block8:
                     {rsp, x.0, y.1}
     cmp x.0, y.1
                     {rsp, x.0, y.1}
-    jge block4
+    jge .block4
                     {rsp, x.0, y.1}
-    jmp block3
+    jmp .block3
                     {}
 
-block9:
+.block9:
                     {rsp, x.0}
     cmp x.0, 40
                     {rsp, x.0}
-    jg block7
+    jg .block7
                     {rsp, x.0}
-    jmp block6
+    jmp .block6
                     {}
 
 

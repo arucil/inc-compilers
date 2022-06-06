@@ -5,7 +5,7 @@ expression: prog
 extern rt_print_int, rt_print_newline, rt_read_int
 section .text
 
-start:
+.start:
     call rt_read_int
     mov rdx, rax
     mov rbx, 5
@@ -50,7 +50,7 @@ start:
     add rbx, rcx
     mov rax, rdx
     add rax, rbx
-    jmp conclusion
+    jmp .conclusion
 
     global _start
 _start:
@@ -62,9 +62,9 @@ _start:
     push r13
     push r14
     push r15
-    jmp start
+    jmp .start
 
-conclusion:
+.conclusion:
     mov rdi, rax
     call rt_print_int
     call rt_print_newline

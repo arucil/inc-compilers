@@ -7,7 +7,7 @@ used_callee_saved_regs: {}
 stack_space: 16 bytes
 constants: {}
 
-start:
+.start:
     mov rcx, 1
     mov qword [rbp - 16], 42
     mov rcx, rcx
@@ -19,5 +19,5 @@ start:
     neg rcx
     mov rax, qword [rbp - 8]
     add rax, rcx
-    jmp conclusion
+    jmp .conclusion
 

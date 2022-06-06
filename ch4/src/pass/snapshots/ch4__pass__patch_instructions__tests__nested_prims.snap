@@ -7,7 +7,7 @@ used_callee_saved_regs: {rbx}
 stack_space: 0 bytes
 constants: {}
 
-start:
+.start:
     call rt_read_int
     mov rbx, rax
     mov rbx, 2
@@ -20,5 +20,5 @@ start:
     add rbx, rdx
     mov rax, rcx
     add rax, rbx
-    jmp conclusion
+    jmp .conclusion
 

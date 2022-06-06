@@ -6,12 +6,12 @@ locals: {}
 
 constants: {}
 
-start:
+.start:
     mov rdi, 3
     call rt_print_int
     call rt_print_newline
     mov rdi, 1
     call rt_print_bool
     call rt_print_newline
-    jmp conclusion
+    jmp .conclusion
 

@@ -1,9 +1,10 @@
 use super::liveness_analysis::Info as OldInfo;
-use asm::Program;
+use asm::{Block, Fun, Program};
 use ast::{IdxVar, Type};
 use ch3::location_graph::LocationGraph;
 use ch3::location_set::{Location, VarStore};
 use ch3::pass::interference::{Interference, Moves, State};
+use id_arena::Arena;
 use indexmap::IndexMap;
 use petgraph::dot::{Config, Dot};
 use std::fmt::{self, Debug, Formatter};
@@ -20,10 +21,27 @@ pub struct Info {
 pub fn build_interference(
   prog: Program<OldInfo, IdxVar>,
 ) -> Program<Info, IdxVar> {
-  let locals = &prog.info.locals;
   let types = &prog.types;
-  let var_store = &prog.info.var_store;
-  let live = &prog.info.live;
+  let funs = prog
+    .funs
+    .into_iter()
+    .map(|fun| Fun {
+      info: analyze_body(types, fun.info, &fun.blocks),
+      ..fun
+    })
+    .collect();
+  let info = analyze_body(types, prog.info, &prog.blocks);
+  Program { info, funs, ..prog }
+}
+
+fn analyze_body(
+  types: &Arena<Type>,
+  info: OldInfo,
+  blocks: &[Block<IdxVar>],
+) -> Info {
+  let locals = &info.locals;
+  let var_store = &info.var_store;
+  let live = &info.live;
   let mut conflicts = LocationGraph::new();
   for (_, var) in var_store.iter() {
     conflicts.insert_node(Location::from(*var));
@@ -33,18 +51,16 @@ pub fn build_interference(
     conflicts,
     var_store,
   };
-  for (label, block) in &prog.blocks {
-    state.build_graph(block, &live[label]);
+  for block in blocks {
+    let live_sets = &live[&block.label];
+    state.build_graph(block, live_sets);
   }
 
-  Program {
-    info: Info {
-      conflicts: state.conflicts,
-      locals: prog.info.locals,
-      moves: LocationGraph::new(),
-      var_store: prog.info.var_store,
-    },
-    ..prog
+  Info {
+    conflicts: state.conflicts,
+    locals: info.locals,
+    moves: LocationGraph::new(),
+    var_store: info.var_store,
   }
 }
 
@@ -105,10 +121,8 @@ mod tests {
           IdxVar::new("t") => Type::Int,
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);
@@ -142,10 +156,8 @@ mod tests {
           IdxVar::new("w") => Type::Int,
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);
@@ -176,10 +188,8 @@ mod tests {
           IdxVar::new("w") => Type::Int,
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);
@@ -231,10 +241,8 @@ block4:
           IdxVar::new("tmp.1") => Type::Int,
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);
@@ -285,10 +293,8 @@ block4:
           IdxVar::new("z") => Type::Int,
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);
@@ -365,10 +371,8 @@ block9:
           IdxVar::new("tmp.0") => Type::Int,
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);

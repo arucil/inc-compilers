@@ -6,7 +6,7 @@ locals: {x.0, y.1, (tmp).0, (tmp).1, (tmp).2, (tmp).3}
 stack_space: 48 bytes
 constants: {}
 
-start:
+.start:
     call rt_read_int
     mov qword [rbp - 8], rax
     mov qword [rbp - 16], 2
@@ -24,5 +24,5 @@ start:
     add qword [rbp - 48], rax
     mov rax, qword [rbp - 32]
     add rax, qword [rbp - 48]
-    jmp conclusion
+    jmp .conclusion
 

@@ -32,6 +32,8 @@ pub fn allocate_registers(
   prog: Program<OldInfo, IdxVar>,
   available_regs: &[Reg],
 ) -> Program<Info> {
+  assert!(prog.funs.is_empty());
+
   let mut num_locals = 0;
   let blocks;
   let used_callee_saved_regs;
@@ -60,10 +62,7 @@ pub fn allocate_registers(
     blocks = prog
       .blocks
       .into_iter()
-      .map(|(label, block)| {
-        let block = alloc.allocate_block_registers(block);
-        (label, block)
-      })
+      .map(|block| alloc.allocate_block_registers(block))
       .collect();
 
     used_callee_saved_regs = alloc.used_callee_saved_regs;
@@ -76,6 +75,7 @@ pub fn allocate_registers(
       used_callee_saved_regs,
     },
     blocks,
+    funs: vec![],
     ..prog
   }
 }
@@ -107,12 +107,12 @@ where
     }
 
     Block {
-      global: block.global,
       code: block
         .code
         .into_iter()
         .map(|instr| (self.assign_instr_registers)(instr, &var_colors))
         .collect(),
+      ..block
     }
   }
 }
@@ -179,6 +179,10 @@ pub fn gen_assign_instr_registers<'a>(
         dest: assign(dest),
       },
       Instr::Xor { src, dest } => Instr::Xor {
+        src: assign(src),
+        dest: assign(dest),
+      },
+      Instr::Lea { src, dest } => Instr::Lea {
         src: assign(src),
         dest: assign(dest),
       },
@@ -405,10 +409,8 @@ mod tests {
           IdxVar::new("t")
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let prog = interference::build_interference(prog);
@@ -440,10 +442,8 @@ mod tests {
       info: OldOldInfo {
         locals: indexset! {IdxVar::new("x"),IdxVar::new("w")},
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let prog = interference::build_interference(prog);
@@ -475,10 +475,8 @@ mod tests {
       info: OldOldInfo {
         locals: indexset! {IdxVar::new("x"),IdxVar::new("w")},
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let prog = interference::build_interference(prog);
@@ -515,10 +513,8 @@ mod tests {
           IdxVar::new("w"),
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let prog = interference::build_interference(prog);
@@ -562,10 +558,8 @@ mod tests {
           IdxVar::new("t")
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let prog = interference::build_interference(prog);

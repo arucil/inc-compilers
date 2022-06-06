@@ -6,29 +6,29 @@ locals: {x.0: Int, (tmp).0: Int, (tmp).1: Bool}
 
 constants: {}
 
-start:
+.start:
     call rt_read_int
     mov (tmp).0, rax
     cmp (tmp).0, 3
-    jge block3
-    jmp block4
-block3:
+    jge .block3
+    jmp .block4
+.block3:
     mov x.0, 10
-    jmp block2
-block4:
+    jmp .block2
+.block4:
     mov x.0, 77
-    jmp block2
-block2:
+    jmp .block2
+.block2:
     cmp x.0, 10
     sete al
     movzx (tmp).1, al
     cmp (tmp).1, 0
-    je block1
-    jmp block0
-block1:
+    je .block1
+    jmp .block0
+.block1:
     mov rax, 41
-    jmp conclusion
-block0:
+    jmp .conclusion
+.block0:
     mov rax, 2
-    jmp conclusion
+    jmp .conclusion
 

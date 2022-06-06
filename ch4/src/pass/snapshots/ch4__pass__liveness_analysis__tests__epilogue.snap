@@ -1,9 +1,8 @@
 ---
 source: ch4/src/pass/liveness_analysis.rs
 expression: result.show()
-
 ---
-start:
+.start:
                     {rbp}
     mov rsp, rbp
                     {}

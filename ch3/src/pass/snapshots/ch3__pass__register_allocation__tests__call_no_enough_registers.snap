@@ -7,12 +7,12 @@ used_callee_saved_regs: {}
 stack_space: 8 bytes
 constants: {}
 
-start:
+.start:
     pop rdi
     pop rsi
     push rdx
     mov qword [rbp - 8], rbx
     call foo
     add qword [rbp - 8], rax
-    jmp conclusion
+    jmp .conclusion
 

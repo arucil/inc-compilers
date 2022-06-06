@@ -2,7 +2,7 @@
 source: ch4/src/pass/liveness_analysis.rs
 expression: result.show()
 ---
-start:
+.start:
                     {rsp, rax, rbx, x.0}
     push x.0
                     {rsp, rax, rbx, x.0}
@@ -12,7 +12,7 @@ start:
                     {rsp, rax, x.0, w.0}
     add x.0, w.0
                     {rsp, rax}
-    jmp conclusion
+    jmp .conclusion
                     {}
 
 

@@ -5,15 +5,15 @@ expression: result.to_string_pretty()
 (define (foo [a.0 Int] [b.1 Bool]) : Void
  (begin
   (print ({fun-ref bar 1} a.0))
-  (set! b.1 (not b.1))
+  (set! b.1 (not {b.1}))
   ({fun-ref qux 6} 1 2 3 4 5 6)
   ({fun-ref baz 8}
    1
    "a"
    (vector)
    (void)
-   b.1
-   (vector (* a.0 2) (void) (not b.1)))))
+   {b.1}
+   (vector (* a.0 2) (void) (not {b.1})))))
 (define (bar [x.0 Int]) : Bool
  (> x.0 0))
 (define
@@ -39,4 +39,6 @@ expression: result.to_string_pretty()
    (not (vector-ref (arity-tmp).0 2)))
   (vector-set! (arity-tmp).0 1 (void))
   (print b.1)))
-(void)
+(let
+ [x.0 ({fun-ref bar 1} 0)]
+ (set! x.0 (not {x.0})))

@@ -7,7 +7,7 @@ used_callee_saved_regs: {}
 stack_space: 0 bytes
 constants: {}
 
-start:
+.start:
     mov rdx, 1
     mov rsi, 42
     mov rdx, rdx
@@ -19,5 +19,5 @@ start:
     neg rcx
     mov rax, rdx
     add rax, rcx
-    jmp conclusion
+    jmp .conclusion
 

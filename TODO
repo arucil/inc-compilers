@@ -1,1 +1,5 @@
 - 字符串字面量不创建堆对象
+- ch7  CTail::Return 返回 Prim not 如何生成asm ?
+- ch7  params 中有 void 如何 explicate control
+- ch6 测试 array 遍历，相乘
+- currying: ((f a) b)

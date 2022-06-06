@@ -1,4 +1,4 @@
-use asm::{Arg, Instr, Program, Reg};
+use asm::{Arg, Block, Fun, Instr, Program, Reg};
 use ast::{IdxVar, Type};
 use ch3::location_set::{Var, VarStore};
 use ch3::pass::register_allocation::{Color, RegisterAlloc};
@@ -34,6 +34,36 @@ pub fn allocate_registers(
   prog: Program<OldInfo, IdxVar>,
   available_regs: &[Reg],
 ) -> Program<Info> {
+  let types = &prog.types;
+  let (info, blocks) =
+    alloc_body_regs(prog.info, prog.blocks, types, available_regs);
+  let funs = prog
+    .funs
+    .into_iter()
+    .map(|fun| {
+      let (info, blocks) =
+        alloc_body_regs(fun.info, fun.blocks, types, available_regs);
+      Fun {
+        name: fun.name,
+        info,
+        blocks,
+      }
+    })
+    .collect();
+  Program {
+    info,
+    blocks,
+    funs,
+    ..prog
+  }
+}
+
+fn alloc_body_regs(
+  info: OldInfo,
+  body: Vec<Block<IdxVar>>,
+  types: &Arena<Type>,
+  available_regs: &[Reg],
+) -> (Info, Vec<Block>) {
   let mut num_prim_locals = 0;
   let mut num_ref_locals = 0;
   let used_callee_saved_regs;
@@ -47,44 +77,39 @@ pub fn allocate_registers(
       .collect();
 
     let mut alloc = RegisterAlloc {
-      num_locals: prog.info.locals.len(),
-      conflicts: &prog.info.conflicts,
-      moves: &prog.info.moves,
+      num_locals: info.locals.len(),
+      conflicts: &info.conflicts,
+      moves: &info.moves,
       reg_colors: &reg_colors,
       available_regs,
       used_callee_saved_regs: IndexSet::new(),
       assign_instr_registers: gen_assign_instr_registers(
-        &prog.info.locals,
-        &prog.types,
-        &prog.info.var_store,
+        &info.locals,
+        types,
+        &info.var_store,
         available_regs,
         &mut num_prim_locals,
         &mut num_ref_locals,
       ),
     };
 
-    blocks = prog
-      .blocks
+    blocks = body
       .into_iter()
-      .map(|(label, block)| {
-        let block = alloc.allocate_block_registers(block);
-        (label, block)
-      })
+      .map(|block| alloc.allocate_block_registers(block))
       .collect();
 
     used_callee_saved_regs = alloc.used_callee_saved_regs;
   }
 
-  Program {
-    info: Info {
-      locals: prog.info.locals,
+  (
+    Info {
+      locals: info.locals,
       stack_space: num_prim_locals * 8,
       rootstack_space: num_ref_locals * 8,
       used_callee_saved_regs,
     },
     blocks,
-    ..prog
-  }
+  )
 }
 
 pub fn gen_assign_instr_registers<'a>(
@@ -188,6 +213,10 @@ pub fn gen_assign_instr_registers<'a>(
       },
       Instr::IMul(arg) => Instr::IMul(assign(arg)),
       Instr::IDiv(arg) => Instr::IDiv(assign(arg)),
+      Instr::Lea { src, dest } => Instr::Lea {
+        src: assign(src),
+        dest: assign(dest),
+      },
     }
   }
 }
@@ -218,7 +247,7 @@ start:
     mov [r11], 1
     mov tmp.1, r11
     mov rdi, 3
-    mov rsi, const_1
+    lea rsi, const_1
     mov rdx, r15
     call rt_new_string
     mov tmp.2, rax
@@ -261,10 +290,8 @@ start:
           IdxVar::new("tmp.6") => Type::Tuple(vec![Type::Void]),
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let prog = interference::build_interference(prog);
@@ -287,7 +314,7 @@ start:
     mov [r11], 1
     mov tmp.1, r11
     mov rdi, 3
-    mov rsi, const_1
+    lea rsi, const_1
     mov rdx, r15
     call rt_new_string
     mov tmp.2, rax
@@ -327,10 +354,8 @@ start:
           IdxVar::new("tmp.5") => Type::Int,
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let prog = interference::build_interference(prog);
@@ -353,7 +378,7 @@ start:
     mov [r11], 1
     mov tmp.1, r11
     mov rdi, 3
-    mov rsi, const_1
+    lea rsi, const_1
     mov rdx, r15
     call rt_new_string
     mov tmp.2, rax
@@ -393,10 +418,8 @@ start:
           IdxVar::new("tmp.5") => Type::Int,
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let prog = interference::build_interference(prog);

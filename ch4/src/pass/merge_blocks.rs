@@ -1,10 +1,25 @@
-use asm::{Arg, Block, Instr, Label, Program};
+use asm::{Arg, Block, Fun, Instr, Label, Program};
 use indexmap::IndexMap;
 
 pub fn merge_blocks<INFO>(prog: Program<INFO>) -> Program<INFO> {
+  Program {
+    funs: prog
+      .funs
+      .into_iter()
+      .map(|fun| Fun {
+        blocks: merge_body_blocks(fun.blocks),
+        ..fun
+      })
+      .collect(),
+    blocks: merge_body_blocks(prog.blocks),
+    ..prog
+  }
+}
+
+fn merge_body_blocks(body: Vec<Block>) -> Vec<Block> {
   let mut refs = IndexMap::<Label, usize>::new();
   let mut blocks = IndexMap::<Label, Block>::new();
-  for (label, block) in prog.blocks {
+  for block in body {
     if let Instr::Jmp(Arg::Label(label)) = block.code.last().unwrap() {
       *refs.entry(label.clone()).or_default() += 1;
       if block.code.len() > 1 {
@@ -13,7 +28,7 @@ pub fn merge_blocks<INFO>(prog: Program<INFO>) -> Program<INFO> {
         }
       }
     }
-    blocks.insert(label, block);
+    blocks.insert(block.label.clone(), block);
   }
 
   let mut worklist = vec![Label::EntryPoint];
@@ -38,17 +53,16 @@ pub fn merge_blocks<INFO>(prog: Program<INFO>) -> Program<INFO> {
         block.code.append(&mut next_block.code);
       } else if let Some(next_block) = blocks.remove(&next_label) {
         block.code.pop();
-        new_blocks.push((label, block));
+        block.label = label;
+        new_blocks.push(block);
         label = next_label;
         block = next_block;
       } else {
         break;
       }
     }
-    new_blocks.push((label, block));
+    block.label = label;
+    new_blocks.push(block);
   }
-  Program {
-    blocks: new_blocks,
-    ..prog
-  }
+  new_blocks
 }

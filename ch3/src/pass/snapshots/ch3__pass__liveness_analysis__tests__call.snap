@@ -1,7 +1,6 @@
 ---
 source: ch3/src/pass/liveness_analysis.rs
 expression: result.show()
-
 ---
                 {rsp, rbx, rdx, x.0}
 pop rdi
@@ -16,6 +15,6 @@ call foo
                 {rsp, rax, w.0}
 add w.0, rax
                 {rsp, rax}
-jmp conclusion
+jmp .conclusion
                 {}
 

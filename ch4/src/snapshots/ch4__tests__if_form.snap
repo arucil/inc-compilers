@@ -14,10 +14,10 @@ _start:
     call rt_read_int
     mov rbx, rax
     cmp rbx, 1
-    je block0
+    je .block0
     xor rax, rax
 
-conclusion:
+.conclusion:
     mov rdi, rax
     call rt_print_int
     call rt_print_newline
@@ -28,7 +28,7 @@ conclusion:
     mov rdi, 0
     syscall
 
-block0:
+.block0:
     mov rax, 42
-    jmp conclusion
+    jmp .conclusion
 

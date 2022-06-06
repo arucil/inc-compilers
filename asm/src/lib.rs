@@ -4,6 +4,7 @@ use ast::Type;
 use id_arena::Arena;
 use indexmap::IndexMap;
 use num_derive::{FromPrimitive, ToPrimitive};
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::fmt::{self, Debug, Formatter, Write};
@@ -14,14 +15,23 @@ pub struct Program<INFO = (), VAR = !> {
   pub info: INFO,
   pub constants: IndexMap<String, String>,
   pub externs: BTreeSet<String>,
+  pub funs: Vec<Fun<INFO, VAR>>,
   /// The order matters.
-  pub blocks: Vec<(Label, Block<VAR>)>,
+  pub blocks: Vec<Block<VAR>>,
   pub types: Arena<Type>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Fun<INFO = (), VAR = !> {
+  pub name: String,
+  pub info: INFO,
+  /// The order matters.
+  pub blocks: Vec<Block<VAR>>,
 }
 
 #[derive(Clone)]
 pub struct Block<VAR = !> {
-  pub global: bool,
+  pub label: Label,
   pub code: Vec<Instr<VAR>>,
 }
 
@@ -72,11 +82,12 @@ pub enum Instr<VAR = !> {
     cmp: CmpResult,
     label: Label,
   },
-  /// `count` must be byte.
+  /// `count` must be byte integer or CL.
   Shr {
     dest: Arg<VAR>,
     count: Arg<VAR>,
   },
+  /// `count` must be byte integer or CL.
   Shl {
     dest: Arg<VAR>,
     count: Arg<VAR>,
@@ -89,13 +100,19 @@ pub enum Instr<VAR = !> {
     src: Arg<VAR>,
     dest: Arg<VAR>,
   },
+  Lea {
+    src: Arg<VAR>,
+    dest: Arg<VAR>,
+  },
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Label {
   Tmp(u32),
   Name(String),
+  /// entry point of main or function
   Start,
+  /// entry point of entire program
   EntryPoint,
   Conclusion,
 }
@@ -167,8 +184,7 @@ impl<VAR: Clone> Arg<VAR> {
 impl<INFO: Debug, VAR: Debug> Program<INFO, VAR> {
   pub fn to_string_pretty(&self) -> String {
     let mut buf = format!("{:?}constants: {:?}\n\n", self.info, self.constants);
-    for (label, block) in &self.blocks {
-      writeln!(&mut buf, "{:?}:", label).unwrap();
+    for block in &self.blocks {
       write!(&mut buf, "{:?}", block).unwrap();
     }
     buf
@@ -210,21 +226,41 @@ impl<INFO: Debug, VAR: Debug> Program<INFO, VAR> {
       }
     }
     buf += "section .text\n";
-    for (label, block) in &self.blocks {
+    for block in &self.blocks {
       buf += "\n";
-      if block.global {
+      if let Label::EntryPoint = block.label {
         buf += "    global ";
-        writeln!(&mut buf, "{:?}", label).unwrap();
+        writeln!(&mut buf, "{}", block.label.name()).unwrap();
       }
-      writeln!(&mut buf, "{:?}:", label).unwrap();
       write!(&mut buf, "{:?}", block).unwrap();
+    }
+    for fun in &self.funs {
+      writeln!(&mut buf, "{}:", fun.name).unwrap();
+      for block in &fun.blocks {
+        buf += "\n";
+        write!(&mut buf, "{:?}", block).unwrap();
+      }
     }
     buf
   }
 }
 
+impl<INFO: Default, VAR> Default for Program<INFO, VAR> {
+  fn default() -> Self {
+    Self {
+      info: Default::default(),
+      constants: Default::default(),
+      externs: Default::default(),
+      funs: Default::default(),
+      blocks: Default::default(),
+      types: Default::default(),
+    }
+  }
+}
+
 impl<VAR: Debug> Debug for Block<VAR> {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    writeln!(f, "{}:", self.label.name())?;
     for instr in &self.code {
       write!(f, "    ")?;
       instr.fmt(f)?;
@@ -253,11 +289,12 @@ impl<VAR: Debug> Debug for Instr<VAR> {
       Self::Cmp { src, dest } => write!(f, "cmp {:?}, {:?}", dest, src),
       Self::Movzx { src, dest } => write!(f, "movzx {:?}, {:?}", dest, src),
       Self::SetIf { cmp, dest } => write!(f, "set{:?} {:?}", cmp, dest),
-      Self::JumpIf { cmp, label } => write!(f, "j{:?} {:?}", cmp, label),
+      Self::JumpIf { cmp, label } => write!(f, "j{:?} {}", cmp, label.name()),
       Self::Shr { dest, count } => write!(f, "shr {:?}, {:?}", dest, count),
       Self::Shl { dest, count } => write!(f, "shl {:?}, {:?}", dest, count),
       Self::And { src, dest } => write!(f, "and {:?}, {:?}", dest, src),
       Self::Or { src, dest } => write!(f, "or {:?}, {:?}", dest, src),
+      Self::Lea { src, dest } => write!(f, "lea {:?}, {:?}", dest, src),
     }
   }
 }
@@ -274,7 +311,7 @@ impl<VAR: Debug> Debug for Arg<VAR> {
       },
       Self::Reg(r) => r.fmt(f),
       Self::ByteReg(r) => r.fmt(f),
-      Self::Label(l) => l.fmt(f),
+      Self::Label(l) => write!(f, "{}", l.arg()),
     }
   }
 }
@@ -369,14 +406,24 @@ impl Debug for CmpResult {
   }
 }
 
-impl Debug for Label {
-  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+impl Label {
+  pub fn arg(&self) -> Cow<'_, str> {
     match self {
-      Self::Start => write!(f, "start"),
-      Self::EntryPoint => write!(f, "_start"),
-      Self::Conclusion => write!(f, "conclusion"),
-      Self::Tmp(n) => write!(f, "block{}", n),
-      Self::Name(name) => write!(f, "{}", name),
+      Self::Start => ".start".into(),
+      Self::EntryPoint => "_start".into(),
+      Self::Conclusion => ".conclusion".into(),
+      Self::Tmp(n) => format!(".block{}", n).into(),
+      Self::Name(name) => format!("[rel {}]", name).into(),
+    }
+  }
+
+  pub fn name(&self) -> Cow<'_, str> {
+    match self {
+      Self::Start => ".start".into(),
+      Self::EntryPoint => "_start".into(),
+      Self::Conclusion => ".conclusion".into(),
+      Self::Tmp(n) => format!(".block{}", n).into(),
+      Self::Name(name) => name.clone().into(),
     }
   }
 }
@@ -384,7 +431,7 @@ impl Debug for Label {
 pub fn parse_blocks<VAR: Clone>(
   make_var: fn(&str) -> VAR,
   code: &str,
-) -> Vec<(Label, Block<VAR>)> {
+) -> Vec<Block<VAR>> {
   let mut iter = code.split(':').peekable();
   let mut label = iter.next().unwrap().trim();
   let mut blocks = vec![];
@@ -396,13 +443,11 @@ pub fn parse_blocks<VAR: Clone>(
     } else {
       next_label = None;
     }
-    blocks.push((
-      parse_label(label),
-      Block {
-        global: false,
-        code: parse_code(make_var, code),
-      },
-    ));
+    let block = Block {
+      label: parse_label(label),
+      code: parse_code(make_var, code),
+    };
+    blocks.push(block);
     if let Some(next_label) = next_label {
       label = next_label;
     }
@@ -557,6 +602,13 @@ pub fn parse_code<VAR: Clone>(
         "movzx" => {
           let args = get_args(ops[1]);
           Instr::Movzx {
+            src: args[1].clone(),
+            dest: args[0].clone(),
+          }
+        }
+        "lea" => {
+          let args = get_args(ops[1]);
+          Instr::Lea {
             src: args[1].clone(),
             dest: args[0].clone(),
           }

@@ -17,11 +17,7 @@ pub fn desugar_struct(
       )
     })
     .collect();
-  let body = prog
-    .body
-    .into_iter()
-    .map(|exp| exp_desugar(exp, &prog.types))
-    .collect();
+  let body = exp_desugar(prog.body, &prog.types);
   for (_, ty) in &mut prog.types {
     if let Type::Struct(fields) = std::mem::replace(ty, Type::Void) {
       *ty = Type::Tuple(fields.into_values().collect())

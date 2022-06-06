@@ -12,7 +12,7 @@ pub struct LocationSet(SmallVec<[u32; 2]>);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Location(usize);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct VarStore(IndexMap<IdxVar, Var>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -149,15 +149,9 @@ fn var_index(var: Var) -> usize {
   var.0 + 16
 }
 
-impl Default for VarStore {
-  fn default() -> Self {
-    Self::new()
-  }
-}
-
 impl VarStore {
   pub fn new() -> Self {
-    Self(IndexMap::new())
+    Self::default()
   }
 
   pub fn insert(&mut self, var: IdxVar) -> Var {

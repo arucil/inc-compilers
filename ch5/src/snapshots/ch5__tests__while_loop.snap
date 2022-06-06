@@ -22,24 +22,24 @@ _start:
     push rbx
     push r12
     push r13
-    mov rbx, 1
-    mov rcx, 2
+    mov rdx, 1
+    mov rsi, 2
 
-block3:
-    mov rdx, rcx
-    neg rdx
-    cmp rbx, rdx
-    jl block6
-    add rbx, 1
-    cmp rbx, rcx
-    je block1
-    mov rcx, const_2
+.block3:
+    mov rdi, rsi
+    neg rdi
+    cmp rdx, rdi
+    jl .block6
+    add rdx, 1
+    cmp rdx, rsi
+    je .block1
+    lea rcx, [rel const_2]
 
-block0:
-    mov r13, const_3
+.block0:
+    lea r13, [rel const_3]
     mov r12, 1
     xor r12, 1
-    mov rbx, const_4
+    lea rbx, [rel const_4]
     mov rdi, rcx
     call rt_print_str_const
     mov rdi, r13
@@ -62,19 +62,19 @@ block0:
     mov rdi, 0
     syscall
 
-block1:
-    mov rcx, const_1
-    jmp block0
+.block1:
+    lea rcx, [rel const_1]
+    jmp .block0
 
-block6:
-    add rbx, rcx
-    cmp rbx, 10
-    jg block4
-    mov rcx, rbx
-    jmp block3
+.block6:
+    add rdx, rsi
+    cmp rdx, 10
+    jg .block4
+    mov rsi, rdx
+    jmp .block3
 
-block4:
-    mov rcx, rbx
-    sub rcx, 1
-    jmp block3
+.block4:
+    mov rsi, rdx
+    sub rsi, 1
+    jmp .block3
 

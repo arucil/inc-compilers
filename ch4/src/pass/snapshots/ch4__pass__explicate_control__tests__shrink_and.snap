@@ -4,14 +4,14 @@ expression: result.to_string_pretty()
 ---
 locals: {(tmp).0: Int, (tmp).1: Int}
 
-start:
+.start:
     (tmp).0 = (read)
-    if (eq? (tmp).0 0) goto block2 else goto block1
-block2:
+    if (eq? (tmp).0 0) goto .block2 else goto .block1
+.block2:
     (tmp).1 = (read)
-    if (eq? (tmp).1 2) goto block0 else goto block1
-block1:
+    if (eq? (tmp).1 2) goto .block0 else goto .block1
+.block1:
     return 42
-block0:
+.block0:
     return 0
 

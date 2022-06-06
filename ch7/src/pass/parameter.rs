@@ -12,11 +12,7 @@ pub fn limit_arity(prog: Program<IdxVar, Type>) -> Program<IdxVar, Type> {
       .into_iter()
       .map(|(name, fun)| (name, state.fun_limit(fun)))
       .collect(),
-    body: prog
-      .body
-      .into_iter()
-      .map(|exp| state.exp_limit(exp))
-      .collect(),
+    body: state.exp_limit(prog.body),
     ..prog
   }
 }
@@ -69,12 +65,22 @@ impl State {
       | ExpKind::Bool(_)
       | ExpKind::Void
       | ExpKind::NewLine => exp,
-      ExpKind::Var(var) | ExpKind::Get(var) => {
+      ExpKind::Var(var) => {
         if let Some(param) = self.env.get(&var) {
           make_param_ref(exp.range, exp.ty, param, None)
         } else {
           Exp {
             kind: ExpKind::Var(var),
+            ..exp
+          }
+        }
+      }
+      ExpKind::Get(var) => {
+        if let Some(param) = self.env.get(&var) {
+          make_param_ref(exp.range, exp.ty, param, None)
+        } else {
+          Exp {
+            kind: ExpKind::Get(var),
             ..exp
           }
         }
@@ -233,7 +239,7 @@ mod tests {
   use super::*;
   use ast::*;
   use ch4::pass::uniquify;
-  use ch5::pass::typecheck::typecheck;
+  use ch5::pass::{typecheck::typecheck, uncover_get};
   use insta::assert_snapshot;
 
   #[test]
@@ -254,12 +260,13 @@ mod tests {
   (set! g (void))
   (print b))
 (let ([x (bar 0)])
-  (set! x #f))
+  (set! x (not x)))
       "#,
     )
     .unwrap();
     let prog = typecheck(prog).unwrap();
     let prog = uniquify::uniquify(prog);
+    let prog = uncover_get::uncover_get(prog);
     let result = limit_arity(prog);
     assert_snapshot!(result.to_string_pretty());
   }

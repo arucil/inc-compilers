@@ -1,0 +1,29 @@
+---
+source: ch7/src/pass/explicate_control.rs
+expression: result.to_string_pretty()
+---
+--------------------------- foo -------------------------
+params: x.0: Tuple([Int, Bool, Void])
+returns: Bool
+locals: {(tmp).0: Bool, (tmp).1: Bool}
+
+.start:
+    (tmp).0 = (vector-ref x.0 [Int])
+    if (eq? (tmp).0 #f) goto .block1 else goto .block0
+.block0:
+    (tmp).1 = (vector-ref x.0 [Int])
+    return (not (tmp).1)
+.block1:
+    return (> 3 2)
+
+----------------------------------------
+locals: {(tmp).2: Tuple([Int, Bool, Void]), (tmp).3: Bool, (tmp).5: Tuple([Int, Bool, Void])}
+
+.start:
+    (tmp).2 = (vector (1 : Int) (#f : Bool) (#<void> : Void))
+    (tmp).3 = ((fun-ref foo 1) (tmp).2)
+    newline
+    (tmp).5 = (vector (1 : Int) ((tmp).3 : Bool) ((tmp).4 : Void))
+    (fun-ref foo 1) (tmp).5
+    return #<void>
+

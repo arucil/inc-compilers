@@ -11,7 +11,7 @@ pub fn build_move_graph(
 ) -> Program<Info, IdxVar> {
   let moves = &mut prog.info.moves;
   let var_store = &prog.info.var_store;
-  for (_, block) in &prog.blocks {
+  for block in &prog.blocks {
     build_block_move_graph(block, moves, var_store);
   }
   prog

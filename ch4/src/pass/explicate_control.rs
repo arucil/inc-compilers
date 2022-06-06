@@ -1,6 +1,8 @@
 use asm::Label;
 use ast::{Error, Exp, ExpKind, IdxVar, Program, Type};
-use control::{CAtom, CCmpOp, CError, CExp, CPrim, CProgram, CStmt, CTail};
+use control::{
+  CAtom, CCmpOp, CError, CExp, CFun, CPrim, CProgram, CStmt, CTail,
+};
 use id_arena::Arena;
 use indexmap::IndexMap;
 use std::collections::VecDeque;
@@ -58,31 +60,48 @@ impl<'a> State<'a> {
   }
 }
 
-pub fn explicate_control(mut prog: Program<IdxVar, Type>) -> CProgram<CInfo> {
-  let locals = collect_locals(&prog);
+pub fn explicate_control(prog: Program<IdxVar, Type>) -> CProgram<CInfo> {
   let mut state = State {
     blocks: vec![],
     label_index: 0,
     types: &prog.types,
   };
-  let last = explicate_tail(&mut state, prog.body.pop().unwrap());
-  let start = explicate_effect(&mut state, prog.body.into_iter(), last);
-  state.blocks.insert(0, (Label::Start, start));
+  let funs = prog
+    .fun_defs
+    .into_iter()
+    .map(|(name, fun)| {
+      let locals = collect_locals(&fun.body);
+      state.blocks.clear();
+      let body = explicate_tail(&mut state, fun.body);
+      state.blocks.insert(0, (Label::Start, body));
+      CFun {
+        name,
+        params: fun.params,
+        info: CInfo { locals },
+        ty: fun.ret,
+        blocks: std::mem::take(&mut state.blocks),
+      }
+    })
+    .collect();
+
+  let locals = collect_locals(&prog.body);
+  state.blocks.clear();
+  let body = explicate_tail(&mut state, prog.body);
+  state.blocks.insert(0, (Label::Start, body));
 
   let blocks = remove_unreachable_blocks(state.blocks);
 
   CProgram {
     info: CInfo { locals },
+    funs,
     body: blocks,
     types: prog.types,
   }
 }
 
-pub fn collect_locals(prog: &Program<IdxVar, Type>) -> IndexMap<IdxVar, Type> {
+pub fn collect_locals(exp: &Exp<IdxVar, Type>) -> IndexMap<IdxVar, Type> {
   let mut locals = IndexMap::new();
-  for exp in &prog.body {
-    collect_exp_locals(exp, &mut locals);
-  }
+  collect_exp_locals(exp, &mut locals);
   locals
 }
 
@@ -232,7 +251,11 @@ fn explicate_tail(state: &mut State, exp: Exp<IdxVar, Type>) -> CTail {
         CTail::Return(CExp::Prim(prim(state, op, args)))
       }
     }
-    ExpKind::Apply { .. } => todo!(),
+    ExpKind::Apply {
+      fun,
+      args,
+      r#struct: _,
+    } => CTail::TailCall(atom(*fun), args.into_iter().map(atom).collect()),
     ExpKind::Let { var, init, body } => {
       let cont = explicate_tail(state, *body);
       explicate_assign(state, var.1, *init, cont)
@@ -253,7 +276,9 @@ fn explicate_tail(state: &mut State, exp: Exp<IdxVar, Type>) -> CTail {
       explicate_exp_effect(state, exp, CTail::Return(CExp::Atom(CAtom::Void)))
     }
     ExpKind::Error(err) => explicate_error(err),
-    ExpKind::FunRef { .. } => todo!(),
+    ExpKind::FunRef { name, arity } => {
+      CTail::Return(CExp::Atom(CAtom::FunRef(name, arity)))
+    }
   }
 }
 
@@ -332,7 +357,17 @@ fn explicate_assign(
         CTail::Seq(assign, box cont)
       }
     }
-    ExpKind::Apply { .. } => todo!(),
+    ExpKind::Apply {
+      fun,
+      args,
+      r#struct: _,
+    } => {
+      let assign = CStmt::Assign {
+        var,
+        exp: CExp::Call(atom(*fun), args.into_iter().map(atom).collect()),
+      };
+      CTail::Seq(assign, box cont)
+    }
     ExpKind::Let {
       var: (_, var1),
       init: init1,
@@ -356,7 +391,13 @@ fn explicate_assign(
     | ExpKind::NewLine
     | ExpKind::Set { .. } => explicate_exp_effect(state, init, cont),
     ExpKind::Error(err) => explicate_error(err),
-    ExpKind::FunRef { .. } => todo!(),
+    ExpKind::FunRef { name, arity } => {
+      let assign = CStmt::Assign {
+        var,
+        exp: CExp::Atom(CAtom::FunRef(name, arity)),
+      };
+      CTail::Seq(assign, box cont)
+    }
   }
 }
 
@@ -407,7 +448,6 @@ fn explicate_pred(
         alt,
       }
     }
-    ExpKind::Apply { .. } => todo!(),
     ExpKind::If {
       cond: cond1,
       conseq: conseq1,
@@ -434,7 +474,8 @@ fn explicate_pred(
       unreachable!()
     }
     ExpKind::Error(err) => explicate_error(err),
-    ExpKind::FunRef { .. } => todo!(),
+    ExpKind::Apply { .. } => unreachable!(),
+    ExpKind::FunRef { .. } => unreachable!(),
   }
 }
 
@@ -525,7 +566,14 @@ fn explicate_exp_effect(
     ExpKind::Prim { op: _, args } => {
       explicate_effect(state, args.into_iter(), cont)
     }
-    ExpKind::Apply { .. } => todo!(),
+    ExpKind::Apply {
+      fun,
+      args,
+      r#struct: _,
+    } => CTail::Seq(
+      CStmt::Call(atom(*fun), args.into_iter().map(atom).collect()),
+      box cont,
+    ),
     ExpKind::Let { var, init, body } => {
       let body = explicate_exp_effect(state, *body, cont);
       explicate_assign(state, var.1, *init, body)
@@ -560,7 +608,7 @@ fn explicate_exp_effect(
       },
     ),
     ExpKind::Error(err) => explicate_error(err),
-    ExpKind::FunRef { .. } => todo!(),
+    ExpKind::FunRef { .. } => cont,
   }
 }
 
@@ -571,6 +619,7 @@ fn atom(exp: Exp<IdxVar, Type>) -> CAtom {
     ExpKind::Bool(v) => CAtom::Bool(v),
     ExpKind::Str(s) => CAtom::Str(s),
     ExpKind::Void => CAtom::Void,
+    ExpKind::FunRef { name, arity } => CAtom::FunRef(name, arity),
     _ => unreachable!("{:?}", exp),
   }
 }

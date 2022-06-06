@@ -254,13 +254,31 @@ fn build_prog(input: &str, cst: Vec<Cst>) -> Result<Program> {
     }
   }
   let body = if iter.peek().is_none() {
-    vec![Exp {
+    Exp {
       kind: ExpKind::Void,
       range: (0, 0).into(),
       ty: (),
-    }]
+    }
   } else {
-    iter.map(|c| build_exp(input, c)).collect::<Result<_>>()?
+    let exp = build_exp(input, iter.next().unwrap())?;
+    if iter.peek().is_none() {
+      exp
+    } else {
+      let mut body = iter
+        .map(|c| build_exp(input, c))
+        .collect::<Result<Vec<_>>>()?;
+      body.insert(0, exp);
+      let range = (body[0].range.start, body.last().unwrap().range.end).into();
+      let last = body.pop().unwrap();
+      Exp {
+        kind: ExpKind::Begin {
+          seq: body,
+          last: box last,
+        },
+        range,
+        ty: (),
+      }
+    }
   };
   Ok(Program {
     type_defs,
@@ -282,6 +300,7 @@ fn build_exp(input: &str, cst: Cst) -> Result<Exp> {
           "set!" => return build_set(input, xs, range),
           "while" => return build_while(input, xs, range),
           "print" => return build_print(input, xs, range),
+          "newline" => return build_newline(input, xs, range),
           "void" => return build_void(input, xs, range),
           _ => {
             const OPERATORS: &[&str] = &[
@@ -806,6 +825,21 @@ fn build_print(input: &str, xs: Vec<Cst>, range: Range) -> Result<Exp> {
       kind: ExpKind::Print(args),
       range,
       ty: (),
+    })
+  }
+}
+
+fn build_newline(_: &str, xs: Vec<Cst>, range: Range) -> Result<Exp> {
+  if xs.len() == 1 {
+    Ok(Exp {
+      kind: ExpKind::NewLine,
+      range,
+      ty: (),
+    })
+  } else {
+    Err(CompileError {
+      range,
+      message: "too many arguments".to_owned(),
     })
   }
 }

@@ -62,8 +62,10 @@ fn add_prologue(prog: &mut Program<Info>) {
     },
     Jmp(Arg::Label(Label::Start)),
   ]);
-  let block = Block { global: true, code };
-  prog.blocks.push((Label::EntryPoint, block));
+  prog.blocks.push(Block {
+    label: Label::EntryPoint,
+    code,
+  });
 }
 
 fn add_epilogue(prog: &mut Program<Info>) {
@@ -97,9 +99,8 @@ fn add_epilogue(prog: &mut Program<Info>) {
     },
     Syscall,
   ]);
-  let block = Block {
-    global: false,
+  prog.blocks.push(Block {
+    label: Label::Conclusion,
     code,
-  };
-  prog.blocks.push((Label::Conclusion, block));
+  });
 }

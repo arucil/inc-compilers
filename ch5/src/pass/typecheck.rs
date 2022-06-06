@@ -11,23 +11,14 @@ pub fn typecheck(prog: Program) -> Result<Program<String, Type>> {
     .into_iter()
     .map(|(name, fun)| checker.typecheck_fun(name, fun))
     .collect::<Result<_>>()?;
-  let last = prog.body.len() - 1;
-  let body = prog
-    .body
-    .into_iter()
-    .enumerate()
-    .map(|(i, exp)| {
-      let range = exp.range;
-      let exp = checker.typecheck(exp)?;
-      if i == last && exp.ty != Type::Void {
-        return Err(CompileError {
-          range,
-          message: format!("expected Void, found {:?}", exp.ty),
-        });
-      }
-      Ok(exp)
-    })
-    .collect::<Result<_>>()?;
+  let range = prog.body.range;
+  let body = checker.typecheck(prog.body)?;
+  if body.ty != Type::Void {
+    return Err(CompileError {
+      range,
+      message: format!("expected Void, found {:?}", body.ty),
+    });
+  }
   Ok(Program {
     fun_defs,
     type_defs: Default::default(),

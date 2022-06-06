@@ -5,6 +5,7 @@ use ch2::pass::instruction_selection::Info as OldInfo;
 use indexmap::{IndexMap, IndexSet};
 use std::collections::HashMap;
 
+#[derive(Default)]
 pub struct Info {
   pub locals: IndexSet<IdxVar>,
   pub live: IndexMap<Label, Vec<LocationSet>>,
@@ -18,6 +19,8 @@ pub fn analyze_liveness(
   prog: Program<OldInfo, IdxVar>,
   label_live: HashMap<Label, LocationSet>,
 ) -> Program<Info, IdxVar> {
+  assert!(prog.funs.is_empty());
+
   let mut var_store = VarStore::new();
   for var in &prog.info.locals {
     var_store.insert(var.clone());
@@ -30,9 +33,9 @@ pub fn analyze_liveness(
   let live = prog
     .blocks
     .iter()
-    .map(|(label, block)| {
+    .map(|block| {
       let live = state.block_liveness(block, &label_live);
-      (label.clone(), live)
+      (block.label.clone(), live)
     })
     .collect();
 
@@ -42,6 +45,7 @@ pub fn analyze_liveness(
       live,
       var_store,
     },
+    funs: vec![],
     ..prog
   }
 }
@@ -137,6 +141,10 @@ impl<'a> AnalysisState<'a> {
         before.remove_reg(Reg::Rdx);
         self.add_arg(before, arg);
       }
+      Instr::Lea { src, dest } => {
+        self.add_arg(before, src);
+        self.add_arg(before, dest);
+      }
     }
   }
 
@@ -189,11 +197,11 @@ mod tests {
   impl ShowLiveness for Program<Info, IdxVar> {
     fn show(&self) -> String {
       let mut buf = String::new();
-      for (label, block) in &self.blocks {
-        if *label != Label::Start {
+      for block in &self.blocks {
+        if !matches!(block.label, Label::Start) {
           continue;
         }
-        let live = &self.info.live[label];
+        let live = &self.info.live[&block.label];
         for (i, l) in live.iter().enumerate().take(block.code.len()) {
           buf += "                ";
           l.write(&mut buf, &self.info.var_store).unwrap();
@@ -248,10 +256,8 @@ mod tests {
           IdxVar::new("t"),
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -282,10 +288,8 @@ mod tests {
           IdxVar::new("w"),
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -318,10 +322,8 @@ mod tests {
           IdxVar::new("w"),
         },
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let result = analyze_liveness(prog, label_live);
 
@@ -348,10 +350,8 @@ mod tests {
       info: OldInfo {
         locals: IndexSet::new(),
       },
-      constants: Default::default(),
-      externs: Default::default(),
       blocks,
-      types: Default::default(),
+      ..Program::default()
     };
     let result = analyze_liveness(prog, label_live);
 

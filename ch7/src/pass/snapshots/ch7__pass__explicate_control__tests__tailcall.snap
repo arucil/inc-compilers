@@ -1,0 +1,22 @@
+---
+source: ch7/src/pass/explicate_control.rs
+expression: result.to_string_pretty()
+---
+--------------------------- foo -------------------------
+params: x.0: Int, y.1: Void, z.2: Str
+returns: Bool
+locals: {(tmp).0: Int, (tmp).1: Str}
+
+.start:
+    print-str z.2
+    newline
+    (tmp).0 = (+ x.0 1)
+    (tmp).1 = "z"
+    (fun-ref foo 3) (tmp).0 y.1 (tmp).1
+
+----------------------------------------
+locals: {}
+
+.start:
+    return #<void>
+

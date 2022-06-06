@@ -6,7 +6,7 @@ locals: {}
 
 constants: {}
 
-start:
+.start:
     call rt_read_int
-    jmp conclusion
+    jmp .conclusion
 
