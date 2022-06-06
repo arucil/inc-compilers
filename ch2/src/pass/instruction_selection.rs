@@ -216,7 +216,26 @@ impl<'a> CodeGen<'a> {
           });
           return;
         }
-        CTail::TailCall(..) => todo!(),
+        CTail::TailCall(fun, args) => {
+          let arg_len = args.len();
+          assert!(args.len() <= 6, "arity: {}", args.len());
+          for (arg, reg) in args.into_iter().zip(Reg::argument_regs()) {
+            self.atom_instructions(Arg::Reg(reg), arg);
+          }
+          if let CAtom::FunRef(name, arity) = fun {
+            self.code.push(Instr::Call {
+              label: Arg::Label(Label::Name(name)),
+              arity,
+              gc: true,
+            });
+          } else {
+            self.code.push(Instr::Call {
+              label: atom_to_arg(arg),
+              arity: arg_len,
+              gc: true,
+            });
+          }
+        }
       }
     }
   }
@@ -334,7 +353,26 @@ impl<'a> CodeGen<'a> {
           gc: false,
         })
       }
-      CStmt::Call(..) => todo!(),
+      CStmt::Call(fun, args) => {
+        let arg_len = args.len();
+        assert!(args.len() <= 6, "arity: {}", args.len());
+        for (arg, reg) in args.into_iter().zip(Reg::argument_regs()) {
+          self.atom_instructions(Arg::Reg(reg), arg);
+        }
+        if let CAtom::FunRef(name, arity) = fun {
+          self.code.push(Instr::Call {
+            label: Arg::Label(Label::Name(name)),
+            arity,
+            gc: true,
+          });
+        } else {
+          self.code.push(Instr::Call {
+            label: atom_to_arg(arg),
+            arity: arg_len,
+            gc: true,
+          });
+        }
+      }
     }
   }
 
@@ -342,7 +380,13 @@ impl<'a> CodeGen<'a> {
     match exp {
       CExp::Atom(atom) => self.atom_instructions(target, atom),
       CExp::Prim(prim) => self.prim_instructions(target, prim),
-      CExp::Call(..) => todo!(),
+      CExp::Call(fun, args) => {
+        self.stmt_instructions(CStmt::Call(fun, args));
+        self.code.push(Instr::Mov {
+          src: Arg::Reg(Reg::Rax),
+          dest: target,
+        });
+      }
     }
   }
 

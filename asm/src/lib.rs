@@ -53,9 +53,18 @@ pub enum Instr<VAR = !> {
   },
   Neg(Arg<VAR>),
   Call {
-    label: String,
+    label: Arg<VAR>,
     arity: usize,
     gc: bool,
+  },
+  /// Pop the frame and do JMP. Used for tailcall.
+  /// 
+  /// When performing tailcall, the current frame must be popped, but we don't
+  /// know the frame size yet when selecting instructions, so we add a new
+  /// instruction that will be patched after register allocation.
+  TailJmp {
+    label: Arg<VAR>,
+    arity: usize,
   },
   Ret,
   Push(Arg<VAR>),
@@ -277,7 +286,8 @@ impl<VAR: Debug> Debug for Instr<VAR> {
       Self::IMul(src) => write!(f, "imul {:?}", src),
       Self::IDiv(src) => write!(f, "idiv {:?}", src),
       Self::Mov { src, dest } => write!(f, "mov {:?}, {:?}", dest, src),
-      Self::Call { label, .. } => write!(f, "call {}", label),
+      Self::Call { label, .. } => write!(f, "call {:?}", label),
+      Self::TailJmp { label, .. } => write!(f, "tailjmp {:?}", label),
       Self::Jmp(arg) => write!(f, "jmp {:?}", arg),
       Self::Neg(dest) => write!(f, "neg {:?}", dest),
       Self::Pop(dest) => write!(f, "pop {:?}", dest),
@@ -550,13 +560,13 @@ pub fn parse_code<VAR: Clone>(
             .collect::<Vec<_>>();
           if args.len() == 1 {
             Instr::Call {
-              label: args[0].to_owned(),
+              label: Arg::Label(Label::Name(args[0].to_owned())),
               arity: 0,
               gc: false,
             }
           } else {
             Instr::Call {
-              label: args[0].to_owned(),
+              label: Arg::Label(Label::Name(args[0].to_owned())),
               arity: args[1].parse().unwrap(),
               gc: if args.len() == 3 {
                 assert_eq!(args[2], "gc");

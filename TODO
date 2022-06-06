@@ -3,3 +3,4 @@
 - ch7  params 中有 void 如何 explicate control
 - ch6 测试 array 遍历，相乘
 - currying: ((f a) b)
+- call 确保后续的参数不会分配到之前的参数寄存器上

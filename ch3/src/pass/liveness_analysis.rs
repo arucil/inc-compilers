@@ -123,7 +123,22 @@ impl<'a> AnalysisState<'a> {
         // TODO modify L_before
         self.add_arg(before, arg);
       }
-      Instr::Call { arity, .. } => {
+      Instr::Call {
+        label,
+        arity,
+        gc: _,
+      } => {
+        assert!(*arity <= 6);
+        // TODO modify L_before
+        for reg in Reg::caller_saved_regs() {
+          before.remove_reg(reg);
+        }
+        for reg in Reg::argument_regs().into_iter().take(*arity) {
+          before.add_reg(reg);
+        }
+        before.add_reg(label);
+      }
+      Instr::TailJmp { label, arity } => {
         assert!(*arity <= 6);
         for reg in Reg::caller_saved_regs() {
           before.remove_reg(reg);
