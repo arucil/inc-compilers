@@ -1,4 +1,4 @@
-use asm::{Arg, Block, Fun, Instr, Label, Program};
+use asm::{Block, Fun, Instr, Label, Program};
 use indexmap::IndexMap;
 
 pub fn merge_blocks<INFO>(prog: Program<INFO>) -> Program<INFO> {
@@ -20,15 +20,15 @@ fn merge_body_blocks(body: Vec<Block>) -> Vec<Block> {
   let mut refs = IndexMap::<Label, usize>::new();
   let mut blocks = IndexMap::<Label, Block>::new();
   for block in body {
-    if let Instr::Jmp(Arg::Label(label)) = block.code.last().unwrap() {
-      *refs.entry(label.clone()).or_default() += 1;
+    if let Instr::LocalJmp(label) = block.code.last().unwrap() {
+      *refs.entry(*label).or_default() += 1;
       if block.code.len() > 1 {
         if let Instr::JumpIf { label, .. } = &block.code[block.code.len() - 2] {
-          *refs.entry(label.clone()).or_default() += 1;
+          *refs.entry(*label).or_default() += 1;
         }
       }
     }
-    blocks.insert(block.label.clone(), block);
+    blocks.insert(block.label, block);
   }
 
   let mut worklist = vec![Label::EntryPoint];
@@ -39,14 +39,14 @@ fn merge_body_blocks(body: Vec<Block>) -> Vec<Block> {
     } else {
       continue;
     };
-    while let Instr::Jmp(Arg::Label(next_label)) = block.code.last().unwrap() {
+    while let Instr::LocalJmp(next_label) = block.code.last().unwrap() {
       if block.code.len() > 1 {
         if let Instr::JumpIf { label, .. } = &block.code[block.code.len() - 2] {
-          worklist.push(label.clone());
+          worklist.push(*label);
         }
       }
 
-      let next_label = next_label.clone();
+      let next_label = *next_label;
       if refs[&next_label] == 1 {
         let mut next_block = blocks.remove(&next_label).unwrap();
         block.code.pop();

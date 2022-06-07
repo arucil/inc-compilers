@@ -42,7 +42,7 @@ mod tests {
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);
 
-    assert_snapshot!(format!("{:?}", result.info));
+    assert_snapshot!(format!("{}", result.info));
   }
 
   #[test]
@@ -77,6 +77,6 @@ mod tests {
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);
 
-    assert_snapshot!(format!("{:?}", result.info));
+    assert_snapshot!(format!("{}", result.info));
   }
 }

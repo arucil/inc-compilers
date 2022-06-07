@@ -1,5 +1,5 @@
 use super::instruction_selection::Info as OldInfo;
-use asm::{Arg, Block, Instr, Label, Program};
+use asm::{Block, Instr, Label, Program};
 use ast::{IdxVar, Type};
 use ch3::location_set::{LocationSet, VarStore};
 use ch3::pass::liveness_analysis::AnalysisState;
@@ -36,7 +36,7 @@ pub fn analyze_liveness(
   let live = sort_blocks(&prog.blocks)
     .map(|(label, block)| {
       let live = state.block_liveness(block, &label_live);
-      label_live.insert(label.clone(), live[0].clone());
+      label_live.insert(label, live[0].clone());
       (label, live)
     })
     .collect();
@@ -58,13 +58,13 @@ fn sort_blocks(
   let mut graph = Graph::new();
   let mut nodes = HashMap::<Label, NodeIndex>::new();
   for block in blocks {
-    let ix = graph.add_node((block.label.clone(), block));
-    nodes.insert(block.label.clone(), ix);
+    let ix = graph.add_node((block.label, block));
+    nodes.insert(block.label, ix);
   }
 
   for node in nodes.values() {
     let last = graph[*node].1.code.last().unwrap().clone();
-    if let Instr::Jmp(Arg::Label(label)) = last {
+    if let Instr::LocalJmp(label) = last {
       if let Some(&node1) = nodes.get(&label) {
         graph.add_edge(*node, node1, ());
       }
@@ -81,7 +81,7 @@ fn sort_blocks(
     .unwrap()
     .into_iter()
     .rev()
-    .map(move |node| graph[node].clone())
+    .map(move |node| graph[node])
 }
 
 #[cfg(test)]
@@ -101,13 +101,13 @@ mod tests {
     fn show(&self) -> String {
       let mut buf = String::new();
       for block in &self.blocks {
-        writeln!(&mut buf, "{}:", block.label.name()).unwrap();
+        writeln!(&mut buf, "{}:", block.label).unwrap();
         let live = &self.info.live[&block.label];
         for (i, l) in live.iter().enumerate().take(block.code.len()) {
           buf += "                    ";
           l.write(&mut buf, &self.info.var_store).unwrap();
           buf += "\n";
-          writeln!(&mut buf, "    {:?}", block.code[i]).unwrap();
+          writeln!(&mut buf, "    {}", block.code[i]).unwrap();
         }
         buf += "                    ";
         live

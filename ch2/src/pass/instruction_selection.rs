@@ -5,7 +5,7 @@ use control::*;
 use id_arena::Arena;
 use indexmap::{IndexMap, IndexSet};
 use std::collections::{BTreeSet, HashMap};
-use std::fmt::{self, Debug, Formatter};
+use std::fmt::{self, Display, Formatter};
 
 pub trait Locals {
   fn add_local(&mut self, local: IdxVar, ty: Type);
@@ -16,7 +16,7 @@ pub struct Info {
   pub locals: IndexSet<IdxVar>,
 }
 
-impl Debug for Info {
+impl Display for Info {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     writeln!(f, "locals: {:?}\n", self.locals)
   }
@@ -150,7 +150,7 @@ impl<'a> CodeGen<'a> {
       match tail {
         CTail::Return(exp) => {
           self.exp_instructions(Arg::Reg(Reg::Rax), exp);
-          self.code.push(Instr::Jmp(Arg::Label(Label::Conclusion)));
+          self.code.push(Instr::LocalJmp(Label::Conclusion));
           return;
         }
         CTail::Seq(stmt, new_tail) => {
@@ -159,7 +159,7 @@ impl<'a> CodeGen<'a> {
         }
         // ch4
         CTail::Goto(label) => {
-          self.code.push(Instr::Jmp(Arg::Label(label)));
+          self.code.push(Instr::LocalJmp(label));
           return;
         }
         CTail::If {
@@ -179,7 +179,7 @@ impl<'a> CodeGen<'a> {
             cmp: cmp.into(),
             label: conseq,
           });
-          self.code.push(Instr::Jmp(Arg::Label(alt)));
+          self.code.push(Instr::LocalJmp(alt));
           return;
         }
         // ch6
@@ -224,17 +224,17 @@ impl<'a> CodeGen<'a> {
           }
           if let CAtom::FunRef(name, arity) = fun {
             self.code.push(Instr::Call {
-              label: Arg::Label(Label::Name(name)),
+              label: name,
               arity,
               gc: true,
             });
           } else {
-            self.code.push(Instr::Call {
-              label: atom_to_arg(arg),
+            self.code.push(Instr::UserCall {
+              label: atom_to_arg(fun),
               arity: arg_len,
-              gc: true,
             });
           }
+          return;
         }
       }
     }
@@ -361,15 +361,14 @@ impl<'a> CodeGen<'a> {
         }
         if let CAtom::FunRef(name, arity) = fun {
           self.code.push(Instr::Call {
-            label: Arg::Label(Label::Name(name)),
+            label: name,
             arity,
             gc: true,
           });
         } else {
-          self.code.push(Instr::Call {
-            label: atom_to_arg(arg),
+          self.code.push(Instr::UserCall {
+            label: atom_to_arg(fun),
             arity: arg_len,
-            gc: true,
           });
         }
       }
@@ -747,7 +746,7 @@ impl<'a> CodeGen<'a> {
             dest: Arg::Reg(Reg::Rdi),
           });
           self.code.push(Instr::Lea {
-            src: Arg::Label(Label::Name(label)),
+            label,
             dest: Arg::Reg(Reg::Rsi),
           });
           self.code.push(Instr::Mov {
@@ -767,14 +766,14 @@ impl<'a> CodeGen<'a> {
           });
         } else {
           self.code.push(Instr::Lea {
-            src: Arg::Label(Label::Name(label)),
+            label,
             dest: target,
           });
         }
       }
       CAtom::FunRef(name, _) => {
         self.code.push(Instr::Lea {
-          src: Arg::Label(Label::Name(name)),
+          label: name,
           dest: target,
         });
       }

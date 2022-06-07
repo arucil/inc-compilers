@@ -6,7 +6,7 @@ use ch3::pass::register_allocation::{
 };
 use indexmap::{IndexMap, IndexSet};
 use std::collections::HashMap;
-use std::fmt::{self, Debug, Formatter};
+use std::fmt::{self, Formatter, Display};
 
 pub struct Info {
   pub locals: IndexMap<IdxVar, Type>,
@@ -15,15 +15,19 @@ pub struct Info {
   pub used_callee_saved_regs: IndexSet<Reg>,
 }
 
-impl Debug for Info {
+impl Display for Info {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     writeln!(f, "locals: {:?}", self.locals)?;
-    writeln!(
-      f,
-      "used_callee_saved_regs: {:?}",
-      self.used_callee_saved_regs
-    )?;
-    writeln!(f, "stack_space: {} bytes", self.stack_space)
+    write!(f, "used_callee_saved_regs: ",)?;
+    let mut comma = false;
+    for reg in &self.used_callee_saved_regs {
+      if comma {
+        write!(f, ", ")?;
+      }
+      comma = true;
+      write!(f, "{}", reg)?;
+    }
+    writeln!(f, "\nstack_space: {} bytes", self.stack_space)
   }
 }
 

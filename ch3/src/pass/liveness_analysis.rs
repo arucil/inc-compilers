@@ -35,7 +35,7 @@ pub fn analyze_liveness(
     .iter()
     .map(|block| {
       let live = state.block_liveness(block, &label_live);
-      (block.label.clone(), live)
+      (block.label, live)
     })
     .collect();
 
@@ -116,29 +116,24 @@ impl<'a> AnalysisState<'a> {
       Instr::JumpIf { label, .. } => {
         *before |= &label_live[label];
       }
-      Instr::Jmp(Arg::Label(label)) => {
+      Instr::LocalJmp(label) => {
         *before = label_live[label].clone();
       }
-      Instr::Jmp(arg) => {
-        // TODO modify L_before
-        self.add_arg(before, arg);
-      }
+      Instr::Jmp(arg) => unreachable!("jmp {}", arg),
       Instr::Call {
-        label,
+        label: _,
         arity,
         gc: _,
       } => {
         assert!(*arity <= 6);
-        // TODO modify L_before
         for reg in Reg::caller_saved_regs() {
           before.remove_reg(reg);
         }
         for reg in Reg::argument_regs().into_iter().take(*arity) {
           before.add_reg(reg);
         }
-        before.add_reg(label);
       }
-      Instr::TailJmp { label, arity } => {
+      Instr::UserCall { label, arity } => {
         assert!(*arity <= 6);
         for reg in Reg::caller_saved_regs() {
           before.remove_reg(reg);
@@ -146,6 +141,14 @@ impl<'a> AnalysisState<'a> {
         for reg in Reg::argument_regs().into_iter().take(*arity) {
           before.add_reg(reg);
         }
+        self.add_arg(before, label);
+      }
+      Instr::TailJmp { label, arity } => {
+        assert!(*arity <= 6);
+        for reg in Reg::argument_regs().into_iter().take(*arity) {
+          before.add_reg(reg);
+        }
+        self.add_arg(before, label);
       }
       Instr::Shl { dest, count } | Instr::Shr { dest, count } => {
         self.add_arg(before, dest);
@@ -156,8 +159,7 @@ impl<'a> AnalysisState<'a> {
         before.remove_reg(Reg::Rdx);
         self.add_arg(before, arg);
       }
-      Instr::Lea { src, dest } => {
-        self.add_arg(before, src);
+      Instr::Lea { label: _, dest } => {
         self.add_arg(before, dest);
       }
     }
@@ -192,7 +194,6 @@ impl<'a> AnalysisState<'a> {
         set.add_var(var);
       }
       Arg::Imm(_) => {}
-      Arg::Label(_) => {}
     }
   }
 }
@@ -221,7 +222,7 @@ mod tests {
           buf += "                ";
           l.write(&mut buf, &self.info.var_store).unwrap();
           buf += "\n";
-          writeln!(&mut buf, "{:?}", block.code[i]).unwrap();
+          writeln!(&mut buf, "{}", block.code[i]).unwrap();
         }
         buf += "                ";
         live

@@ -7,7 +7,7 @@ use indexmap::{IndexMap, IndexSet};
 use priority_queue::PriorityQueue;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
-use std::fmt::{self, Debug, Formatter};
+use std::fmt::{self, Debug, Display, Formatter};
 
 pub struct Info {
   pub locals: IndexSet<IdxVar>,
@@ -16,15 +16,19 @@ pub struct Info {
   pub used_callee_saved_regs: IndexSet<Reg>,
 }
 
-impl Debug for Info {
+impl Display for Info {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     writeln!(f, "locals: {:?}", self.locals)?;
-    writeln!(
-      f,
-      "used_callee_saved_regs: {:?}",
-      self.used_callee_saved_regs
-    )?;
-    writeln!(f, "stack_space: {} bytes", self.stack_space)
+    write!(f, "used_callee_saved_regs: ",)?;
+    let mut comma = false;
+    for reg in &self.used_callee_saved_regs {
+      if comma {
+        write!(f, ", ")?;
+      }
+      comma = true;
+      write!(f, "{}", reg)?;
+    }
+    writeln!(f, "\nstack_space: {} bytes", self.stack_space)
   }
 }
 
@@ -142,7 +146,6 @@ pub fn gen_assign_instr_registers<'a>(
         }
       }
       Arg::ByteReg(reg) => Arg::ByteReg(reg),
-      Arg::Label(l) => Arg::Label(l),
     };
 
     match instr {
@@ -151,7 +154,7 @@ pub fn gen_assign_instr_registers<'a>(
         dest: assign(dest),
       },
       Instr::Call { label, arity, gc } => Instr::Call { label, arity, gc },
-      Instr::Jmp(arg) => Instr::Jmp(assign(arg)),
+      Instr::LocalJmp(label) => Instr::LocalJmp(label),
       Instr::Mov { src, dest } => Instr::Mov {
         src: assign(src),
         dest: assign(dest),
@@ -182,11 +185,11 @@ pub fn gen_assign_instr_registers<'a>(
         src: assign(src),
         dest: assign(dest),
       },
-      Instr::Lea { src, dest } => Instr::Lea {
-        src: assign(src),
+      Instr::Lea { label, dest } => Instr::Lea {
+        label,
         dest: assign(dest),
       },
-      _ => unreachable!("{:?}", instr),
+      _ => unreachable!("{}", instr),
     }
   }
 }

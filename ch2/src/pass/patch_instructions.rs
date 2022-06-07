@@ -158,24 +158,11 @@ fn patch_block(block: Block) -> Block {
         });
       }
       Instr::Lea {
-        src: src @ Arg::Deref(..),
+        label,
         dest: dest @ Arg::Deref(..),
       } => {
         code.push(Instr::Lea {
-          src,
-          dest: Arg::Reg(Reg::Rax),
-        });
-        code.push(Instr::Mov {
-          src: Arg::Reg(Reg::Rax),
-          dest,
-        });
-      }
-      Instr::Lea {
-        src: src @ Arg::Label(_),
-        dest: dest @ Arg::Deref(..),
-      } => {
-        code.push(Instr::Lea {
-          src,
+          label,
           dest: Arg::Reg(Reg::Rax),
         });
         code.push(Instr::Mov {

@@ -161,7 +161,7 @@ impl<INFO: Debug> CProgram<INFO> {
       writeln!(&mut buf, "{:?}", fun.info).unwrap();
       writeln!(&mut buf).unwrap();
       for (label, block) in &fun.blocks {
-        writeln!(&mut buf, "{}:", label.name()).unwrap();
+        writeln!(&mut buf, "{}:", label).unwrap();
         writeln!(&mut buf, "{:?}", block).unwrap();
       }
     }
@@ -172,7 +172,7 @@ impl<INFO: Debug> CProgram<INFO> {
     writeln!(&mut buf, "{:?}", self.info).unwrap();
     writeln!(&mut buf).unwrap();
     for (label, block) in &self.body {
-      writeln!(&mut buf, "{}:", label.name()).unwrap();
+      writeln!(&mut buf, "{}:", label).unwrap();
       writeln!(&mut buf, "{:?}", block).unwrap();
     }
     buf
@@ -198,7 +198,7 @@ impl Debug for CTail {
         Self::Error(CError::DivByZero) => {
           return write!(f, "    div-by-zero-error")
         }
-        Self::Goto(label) => return write!(f, "    goto {}", label.name()),
+        Self::Goto(label) => return write!(f, "    goto {}", label),
         Self::If {
           cmp,
           lhs,
@@ -209,11 +209,7 @@ impl Debug for CTail {
           return write!(
             f,
             "    if ({:?} {:?} {:?}) goto {} else goto {}",
-            cmp,
-            lhs,
-            rhs,
-            conseq.name(),
-            alt.name()
+            cmp, lhs, rhs, conseq, alt,
           );
         }
         Self::TailCall(fun, args) => {

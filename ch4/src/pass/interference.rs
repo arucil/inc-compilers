@@ -7,7 +7,7 @@ use ch3::pass::interference::{Interference, Moves, State};
 use id_arena::Arena;
 use indexmap::IndexMap;
 use petgraph::dot::{Config, Dot};
-use std::fmt::{self, Debug, Formatter};
+use std::fmt::{self, Formatter, Display};
 
 pub struct Info {
   /// Includes all locals.
@@ -64,12 +64,12 @@ fn analyze_body(
   }
 }
 
-impl Debug for Info {
+impl Display for Info {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     let graph = self
       .conflicts
       .graph()
-      .map(|_, var| var.to_arg(&self.var_store), |_, _| ());
+      .map(|_, var| var.to_arg(&self.var_store), |_, e| *e);
     Dot::with_config(&graph, &[Config::EdgeNoLabel]).fmt(f)
   }
 }
@@ -127,7 +127,7 @@ mod tests {
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);
 
-    assert_snapshot!(format!("{:?}", result.info));
+    assert_snapshot!(format!("{}", result.info));
   }
 
   #[test]
@@ -162,7 +162,7 @@ mod tests {
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);
 
-    assert_snapshot!(format!("{:?}", result.info));
+    assert_snapshot!(format!("{}", result.info));
   }
 
   #[test]
@@ -194,7 +194,7 @@ mod tests {
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);
 
-    assert_snapshot!(format!("{:?}", result.info));
+    assert_snapshot!(format!("{}", result.info));
   }
 
   #[test]
@@ -247,7 +247,7 @@ block4:
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);
 
-    assert_snapshot!(format!("{:?}", result.info));
+    assert_snapshot!(format!("{}", result.info));
   }
 
   #[test]
@@ -299,7 +299,7 @@ block4:
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);
 
-    assert_snapshot!(format!("{:?}", result.info));
+    assert_snapshot!(format!("{}", result.info));
   }
 
   #[test]
@@ -377,6 +377,6 @@ block9:
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = interference::build_interference(prog);
 
-    assert_snapshot!(format!("{:?}", result.info));
+    assert_snapshot!(format!("{}", result.info));
   }
 }

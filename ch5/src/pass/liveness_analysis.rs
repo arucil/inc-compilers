@@ -1,4 +1,4 @@
-use asm::{Arg, Block, Fun, Instr, Label, Program};
+use asm::{Block, Fun, Instr, Label, Program};
 use ast::IdxVar;
 use ch3::location_set::{LocationSet, VarStore};
 use ch3::pass::liveness_analysis::AnalysisState;
@@ -40,18 +40,18 @@ fn analyze_body(
 
   let blocks: HashMap<_, _> = body
     .iter()
-    .map(|block| (block.label.clone(), block))
+    .map(|block| (block.label, block))
     .collect();
   let mut graph = Graph::<Label, ()>::new();
   let mut nodes = HashMap::<Label, NodeIndex>::new();
   for block in body {
-    let ix = graph.add_node(block.label.clone());
-    nodes.insert(block.label.clone(), ix);
+    let ix = graph.add_node(block.label);
+    nodes.insert(block.label, ix);
   }
 
   for node in nodes.values() {
     let last = blocks[&graph[*node]].code.last().unwrap().clone();
-    if let Instr::Jmp(Arg::Label(label)) = last {
+    if let Instr::LocalJmp(label) = last {
       if let Some(&node1) = nodes.get(&label) {
         graph.add_edge(node1, *node, ());
       }
@@ -155,13 +155,13 @@ mod tests {
     fn show(&self) -> String {
       let mut buf = String::new();
       for block in &self.blocks {
-        writeln!(&mut buf, "{}:", block.label.name()).unwrap();
+        writeln!(&mut buf, "{}:", block.label).unwrap();
         let live = &self.info.live[&block.label];
         for (i, l) in live.iter().enumerate().take(block.code.len()) {
           buf += "                    ";
           l.write(&mut buf, &self.info.var_store).unwrap();
           buf += "\n";
-          writeln!(&mut buf, "    {:?}", block.code[i]).unwrap();
+          writeln!(&mut buf, "    {}", block.code[i]).unwrap();
         }
         buf += "                    ";
         live

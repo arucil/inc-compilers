@@ -1,10 +1,14 @@
 use crate::location_set::Location;
 use indexmap::IndexMap;
 use petgraph::graph::{Graph, NodeIndex as PrivateNodeIndex, UnGraph};
+use std::fmt::{self, Display, Formatter};
 use std::marker::PhantomData;
 
+#[derive(Debug, Clone, Copy)]
+pub struct Edge;
+
 pub struct LocationGraph<T> {
-  graph: UnGraph<Location, ()>,
+  graph: UnGraph<Location, Edge>,
   nodes: IndexMap<Location, PrivateNodeIndex>,
   _marker: PhantomData<T>,
 }
@@ -57,7 +61,7 @@ impl<T> LocationGraph<T> {
 
   pub fn add_edge(&mut self, n1: NodeIndex<T>, n2: NodeIndex<T>) {
     if !self.graph.contains_edge(n1.index, n2.index) {
-      self.graph.add_edge(n1.index, n2.index, ());
+      self.graph.add_edge(n1.index, n2.index, Edge);
     }
   }
 
@@ -78,7 +82,13 @@ impl<T> LocationGraph<T> {
     })
   }
 
-  pub fn graph(&self) -> &UnGraph<Location, ()> {
+  pub fn graph(&self) -> &UnGraph<Location, Edge> {
     &self.graph
+  }
+}
+
+impl Display for Edge {
+  fn fmt(&self, _f: &mut Formatter) -> fmt::Result {
+    Ok(())
   }
 }

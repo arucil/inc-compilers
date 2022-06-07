@@ -3,7 +3,7 @@ source: ch6/src/pass/register_allocation.rs
 expression: result.to_string_pretty()
 ---
 locals: {tmp.1: Tuple([Void]), tmp.2: Str, y.1: Tuple([Int, Bool, Void, Tuple([Void]), Str]), tmp.3: Bool, tmp.4: Bool, tmp.5: Int}
-used_callee_saved_regs: {}
+used_callee_saved_regs: 
 stack_space: 8 bytes
 rootstack_space: 16 bytes
 constants: {}

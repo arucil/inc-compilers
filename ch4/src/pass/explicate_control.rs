@@ -37,7 +37,7 @@ impl<'a> State<'a> {
 
   fn add_block(&mut self, block: CTail) -> Label {
     let label = self.new_label();
-    self.add_label_block(label.clone(), block);
+    self.add_label_block(label, block);
     label
   }
 
@@ -120,8 +120,8 @@ fn collect_exp_locals(
       if init.ty != Type::Void {
         locals.insert(var.1.clone(), init.ty.clone());
       }
-      collect_exp_locals(&*init, locals);
-      collect_exp_locals(&*body, locals);
+      collect_exp_locals(&**init, locals);
+      collect_exp_locals(&**body, locals);
     }
     ExpKind::Prim { op: _, args } => {
       for arg in args {
@@ -133,28 +133,28 @@ fn collect_exp_locals(
       args,
       r#struct: _,
     } => {
-      collect_exp_locals(&*fun, locals);
+      collect_exp_locals(&**fun, locals);
       for arg in args {
         collect_exp_locals(arg, locals);
       }
     }
     ExpKind::If { cond, conseq, alt } => {
-      collect_exp_locals(&*cond, locals);
-      collect_exp_locals(&*conseq, locals);
-      collect_exp_locals(&*alt, locals);
+      collect_exp_locals(&**cond, locals);
+      collect_exp_locals(&**conseq, locals);
+      collect_exp_locals(&**alt, locals);
     }
     ExpKind::Set { var: _, exp } => {
-      collect_exp_locals(&*exp, locals);
+      collect_exp_locals(&**exp, locals);
     }
     ExpKind::Begin { seq, last } => {
       for exp in seq {
-        collect_exp_locals(&*exp, locals);
+        collect_exp_locals(exp, locals);
       }
-      collect_exp_locals(&*last, locals);
+      collect_exp_locals(&**last, locals);
     }
     ExpKind::While { cond, body } => {
-      collect_exp_locals(&*cond, locals);
-      collect_exp_locals(&*body, locals);
+      collect_exp_locals(&**cond, locals);
+      collect_exp_locals(&**body, locals);
     }
     ExpKind::Print(args) => {
       for arg in args {
@@ -190,7 +190,7 @@ fn remove_unreachable_blocks(
         }
         CTail::Goto(goto_label) => {
           if let Some(goto_block) = blocks.remove(goto_label) {
-            worklist.push_back((goto_label.clone(), goto_block));
+            worklist.push_back((*goto_label, goto_block));
           }
         }
         CTail::If {
@@ -199,10 +199,10 @@ fn remove_unreachable_blocks(
           ..
         } => {
           if let Some(goto_block) = blocks.remove(goto_label1) {
-            worklist.push_back((goto_label1.clone(), goto_block));
+            worklist.push_back((*goto_label1, goto_block));
           }
           if let Some(goto_block) = blocks.remove(goto_label2) {
-            worklist.push_back((goto_label2.clone(), goto_block));
+            worklist.push_back((*goto_label2, goto_block));
           }
         }
         _ => {}
@@ -591,10 +591,9 @@ fn explicate_exp_effect(
     }
     ExpKind::While { cond, body } => {
       let loop_start = state.new_label();
-      let body =
-        explicate_exp_effect(state, *body, CTail::Goto(loop_start.clone()));
+      let body = explicate_exp_effect(state, *body, CTail::Goto(loop_start));
       let block = explicate_pred(state, *cond, body, cont);
-      state.add_label_block(loop_start.clone(), block);
+      state.add_label_block(loop_start, block);
       CTail::Goto(loop_start)
     }
     ExpKind::NewLine => CTail::Seq(CStmt::NewLine, box cont),

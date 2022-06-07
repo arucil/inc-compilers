@@ -21,7 +21,7 @@ fn add_prologue(prog: &mut Program<Info>) {
       src: Arg::Imm(stack_space as i64),
       dest: Arg::Reg(Rsp),
     },
-    Jmp(Arg::Label(Label::Start)),
+    LocalJmp(Label::Start),
   ];
   prog.blocks.push(Block {
     label: Label::EntryPoint,

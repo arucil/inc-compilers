@@ -5,7 +5,7 @@ use asm::{Block, Instr, Program, Reg};
 use ast::IdxVar;
 use indexmap::IndexSet;
 use petgraph::dot::{Config, Dot};
-use std::fmt::{self, Debug, Formatter};
+use std::fmt::{self, Debug, Display, Formatter};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Interference;
@@ -92,6 +92,27 @@ where
       }
     };
 
+    // All registers interfere with reference variables, to force them to be
+    // spilled.
+    macro_rules! spill_all_refs {
+      () => {{
+        for after_loc in live_after {
+          for reg in Reg::all_regs() {
+            let write_loc = reg.into();
+            if after_loc != write_loc {
+              if let Some(var) = after_loc.to_arg_var(self.var_store) {
+                if (self.var_is_ref)(&var) {
+                  let write_loc_node = graph.insert_node(write_loc);
+                  let after_loc_node = graph.insert_node(after_loc);
+                  graph.add_edge(write_loc_node, after_loc_node);
+                }
+              }
+            }
+          }
+        }
+      }};
+    }
+
     match instr {
       Instr::Add { dest, .. }
       | Instr::Sub { dest, .. }
@@ -107,25 +128,18 @@ where
           add(dest_loc);
         }
       }
+      Instr::UserCall { .. } => {
+        for reg in Reg::caller_saved_regs() {
+          add(reg.into());
+        }
+        spill_all_refs!();
+      }
       Instr::Call { gc, .. } => {
         for reg in Reg::caller_saved_regs() {
           add(reg.into());
         }
         if *gc {
-          for after_loc in live_after {
-            for reg in Reg::all_regs() {
-              let write_loc = reg.into();
-              if after_loc != write_loc {
-                if let Some(var) = after_loc.to_arg_var(self.var_store) {
-                  if (self.var_is_ref)(&var) {
-                    let write_loc_node = graph.insert_node(write_loc);
-                    let after_loc_node = graph.insert_node(after_loc);
-                    graph.add_edge(write_loc_node, after_loc_node);
-                  }
-                }
-              }
-            }
-          }
+          spill_all_refs!();
         }
       }
       Instr::Mov { src, dest } | Instr::Movzx { src, dest } => {
@@ -145,12 +159,6 @@ where
           }
         }
       }
-      Instr::Cmp { .. }
-      | Instr::Push(_)
-      | Instr::Ret
-      | Instr::Syscall
-      | Instr::Jmp(_)
-      | Instr::JumpIf { .. } => {}
       Instr::Shl { dest, .. } | Instr::Shr { dest, .. } => {
         if let Some(dest_loc) = Location::from_arg(dest.clone(), self.var_store)
         {
@@ -161,16 +169,24 @@ where
         add(Reg::Rax.into());
         add(Reg::Rdx.into());
       }
+      Instr::Cmp { .. }
+      | Instr::Push(_)
+      | Instr::Ret
+      | Instr::Syscall
+      | Instr::LocalJmp(_)
+      | Instr::TailJmp { .. }
+      | Instr::Jmp(_)
+      | Instr::JumpIf { .. } => {}
     }
   }
 }
 
-impl Debug for Info {
+impl Display for Info {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     let graph = self
       .conflicts
       .graph()
-      .map(|_, var| var.to_arg(&self.var_store), |_, _| ());
+      .map(|_, var| var.to_arg(&self.var_store), |_, e| *e);
     Dot::with_config(&graph, &[Config::EdgeNoLabel]).fmt(f)
   }
 }
@@ -227,7 +243,7 @@ mod tests {
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = build_interference(prog);
 
-    assert_snapshot!(format!("{:?}", result.info));
+    assert_snapshot!(format!("{}", result.info));
   }
 
   #[test]
@@ -262,7 +278,7 @@ mod tests {
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = build_interference(prog);
 
-    assert_snapshot!(format!("{:?}", result.info));
+    assert_snapshot!(format!("{}", result.info));
   }
 
   #[test]
@@ -294,6 +310,6 @@ mod tests {
     let prog = liveness_analysis::analyze_liveness(prog, label_live);
     let result = build_interference(prog);
 
-    assert_snapshot!(format!("{:?}", result.info));
+    assert_snapshot!(format!("{}", result.info));
   }
 }

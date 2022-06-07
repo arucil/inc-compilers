@@ -28,7 +28,7 @@ fn add_prologue(prog: &mut Program<Info>) {
   for &reg in &prog.info.used_callee_saved_regs {
     code.push(Push(Arg::Reg(reg)));
   }
-  code.push(Jmp(Arg::Label(Label::Start)));
+  code.push(LocalJmp(Label::Start));
   prog.blocks.push(Block {
     label: Label::EntryPoint,
     code,

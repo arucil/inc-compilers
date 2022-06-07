@@ -84,6 +84,10 @@ impl LocationSet {
     }
   }
 
+  pub fn clear(&mut self) {
+    self.0.fill(0);
+  }
+
   pub fn write(&self, f: &mut impl Write, var_store: &VarStore) -> fmt::Result {
     write!(f, "{{")?;
     let mut comma = false;
@@ -92,7 +96,7 @@ impl LocationSet {
         write!(f, ", ")?;
       }
       comma = true;
-      write!(f, "{:?}", elem.to_arg(var_store))?;
+      write!(f, "{}", elem.to_arg(var_store))?;
     }
     write!(f, "}}")
   }
@@ -201,7 +205,6 @@ impl Location {
       Arg::Var(var) => Some(Self(var_store.get(var).0 + 16)),
       Arg::Imm(_) => None,
       Arg::ByteReg(reg) => Some(Reg::from(reg).into()),
-      Arg::Label(_) => None,
     }
   }
 

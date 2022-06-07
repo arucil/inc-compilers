@@ -2,7 +2,7 @@ use asm::{Arg, Block, Instr, Program, Reg};
 use ast::IdxVar;
 use indexmap::IndexSet;
 use std::collections::HashMap;
-use std::fmt::{self, Debug, Formatter};
+use std::fmt::{self, Display, Formatter};
 
 pub struct Info {
   pub locals: IndexSet<IdxVar>,
@@ -10,7 +10,7 @@ pub struct Info {
   pub stack_space: usize,
 }
 
-impl Debug for Info {
+impl Display for Info {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     writeln!(f, "locals: {:?}", self.locals)?;
     writeln!(f, "stack_space: {} bytes", self.stack_space)
@@ -68,10 +68,7 @@ fn assign_home_instr(
       Instr::Add { src, dest }
     }
     Instr::Call { label, arity, gc } => Instr::Call { label, arity, gc },
-    Instr::Jmp(arg) => {
-      let arg = assign_home_arg(arg, local_spaces);
-      Instr::Jmp(arg)
-    }
+    Instr::LocalJmp(label) => Instr::LocalJmp(label),
     Instr::Mov { src, dest } => {
       let src = assign_home_arg(src, local_spaces);
       let dest = assign_home_arg(dest, local_spaces);
@@ -81,7 +78,7 @@ fn assign_home_instr(
     Instr::Pop(dest) => Instr::Pop(assign_home_arg(dest, local_spaces)),
     Instr::Push(src) => Instr::Push(assign_home_arg(src, local_spaces)),
     Instr::Ret => Instr::Ret,
-    instr => unimplemented!("{:?}", instr),
+    instr => unimplemented!("{}", instr),
   }
 }
 
@@ -95,7 +92,6 @@ fn assign_home_arg(
     Arg::Reg(r) => Arg::Reg(r),
     Arg::Deref(r, i) => Arg::Deref(r, i),
     Arg::ByteReg(_) => unimplemented!(),
-    Arg::Label(label) => Arg::Label(label),
   }
 }
 

@@ -4,14 +4,14 @@ use ast::{IdxVar, Type};
 use ch2::pass::instruction_selection::{CodeGen, Locals};
 use control::*;
 use indexmap::IndexMap;
-use std::fmt::{self, Debug, Formatter};
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Default)]
 pub struct Info {
   pub locals: IndexMap<IdxVar, Type>,
 }
 
-impl Debug for Info {
+impl Display for Info {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     writeln!(f, "locals: {:?}\n", self.locals)
   }

@@ -4,13 +4,12 @@ use ast::Type;
 use id_arena::Arena;
 use indexmap::IndexMap;
 use num_derive::{FromPrimitive, ToPrimitive};
-use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
-use std::fmt::{self, Debug, Formatter, Write};
+use std::fmt::{self, Display, Formatter, Write};
 use std::iter::IntoIterator;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Program<INFO = (), VAR = !> {
   pub info: INFO,
   pub constants: IndexMap<String, String>,
@@ -21,7 +20,7 @@ pub struct Program<INFO = (), VAR = !> {
   pub types: Arena<Type>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Fun<INFO = (), VAR = !> {
   pub name: String,
   pub info: INFO,
@@ -53,12 +52,17 @@ pub enum Instr<VAR = !> {
   },
   Neg(Arg<VAR>),
   Call {
-    label: Arg<VAR>,
+    label: String,
     arity: usize,
+    /// If the function call may trigger GC.
     gc: bool,
   },
+  UserCall {
+    label: Arg<VAR>,
+    arity: usize,
+  },
   /// Pop the frame and do JMP. Used for tailcall.
-  /// 
+  ///
   /// When performing tailcall, the current frame must be popped, but we don't
   /// know the frame size yet when selecting instructions, so we add a new
   /// instruction that will be patched after register allocation.
@@ -69,6 +73,8 @@ pub enum Instr<VAR = !> {
   Ret,
   Push(Arg<VAR>),
   Pop(Arg<VAR>),
+  LocalJmp(Label),
+  /// Used for tailcall.
   Jmp(Arg<VAR>),
   Syscall,
   Xor {
@@ -110,15 +116,14 @@ pub enum Instr<VAR = !> {
     dest: Arg<VAR>,
   },
   Lea {
-    src: Arg<VAR>,
+    label: String,
     dest: Arg<VAR>,
   },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Label {
   Tmp(u32),
-  Name(String),
   /// entry point of main or function
   Start,
   /// entry point of entire program
@@ -142,8 +147,6 @@ pub enum Arg<VAR = !> {
   Reg(Reg),
   ByteReg(ByteReg),
   Deref(Reg, i32),
-  /// used for .rodata
-  Label(Label),
   Var(VAR),
 }
 
@@ -190,11 +193,11 @@ impl<VAR: Clone> Arg<VAR> {
   }
 }
 
-impl<INFO: Debug, VAR: Debug> Program<INFO, VAR> {
+impl<INFO: Display, VAR: Display> Program<INFO, VAR> {
   pub fn to_string_pretty(&self) -> String {
-    let mut buf = format!("{:?}constants: {:?}\n\n", self.info, self.constants);
+    let mut buf = format!("{}constants: {:?}\n\n", self.info, self.constants);
     for block in &self.blocks {
-      write!(&mut buf, "{:?}", block).unwrap();
+      write!(&mut buf, "{}", block).unwrap();
     }
     buf
   }
@@ -239,15 +242,15 @@ impl<INFO: Debug, VAR: Debug> Program<INFO, VAR> {
       buf += "\n";
       if let Label::EntryPoint = block.label {
         buf += "    global ";
-        writeln!(&mut buf, "{}", block.label.name()).unwrap();
+        writeln!(&mut buf, "{}", block.label).unwrap();
       }
-      write!(&mut buf, "{:?}", block).unwrap();
+      write!(&mut buf, "{}", block).unwrap();
     }
     for fun in &self.funs {
       writeln!(&mut buf, "{}:", fun.name).unwrap();
       for block in &fun.blocks {
         buf += "\n";
-        write!(&mut buf, "{:?}", block).unwrap();
+        write!(&mut buf, "{}", block).unwrap();
       }
     }
     buf
@@ -267,9 +270,9 @@ impl<INFO: Default, VAR> Default for Program<INFO, VAR> {
   }
 }
 
-impl<VAR: Debug> Debug for Block<VAR> {
+impl<VAR: Display> Display for Block<VAR> {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-    writeln!(f, "{}:", self.label.name())?;
+    writeln!(f, "{}:", self.label)?;
     for instr in &self.code {
       write!(f, "    ")?;
       instr.fmt(f)?;
@@ -279,49 +282,50 @@ impl<VAR: Debug> Debug for Block<VAR> {
   }
 }
 
-impl<VAR: Debug> Debug for Instr<VAR> {
+impl<VAR: Display> Display for Instr<VAR> {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     match self {
-      Self::Add { src, dest } => write!(f, "add {:?}, {:?}", dest, src),
-      Self::IMul(src) => write!(f, "imul {:?}", src),
-      Self::IDiv(src) => write!(f, "idiv {:?}", src),
-      Self::Mov { src, dest } => write!(f, "mov {:?}, {:?}", dest, src),
-      Self::Call { label, .. } => write!(f, "call {:?}", label),
-      Self::TailJmp { label, .. } => write!(f, "tailjmp {:?}", label),
-      Self::Jmp(arg) => write!(f, "jmp {:?}", arg),
-      Self::Neg(dest) => write!(f, "neg {:?}", dest),
-      Self::Pop(dest) => write!(f, "pop {:?}", dest),
-      Self::Push(src) => write!(f, "push {:?}", src),
+      Self::Add { src, dest } => write!(f, "add {}, {}", dest, src),
+      Self::IMul(src) => write!(f, "imul {}", src),
+      Self::IDiv(src) => write!(f, "idiv {}", src),
+      Self::Mov { src, dest } => write!(f, "mov {}, {}", dest, src),
+      Self::Call { label, .. } => write!(f, "call {}", label),
+      Self::UserCall { label, .. } => write!(f, "call {}", label),
+      Self::TailJmp { label, .. } => write!(f, "tailjmp {}", label),
+      Self::LocalJmp(label) => write!(f, "jmp {}", label),
+      Self::Jmp(label) => write!(f, "jmp [rel {}]", label),
+      Self::Neg(dest) => write!(f, "neg {}", dest),
+      Self::Pop(dest) => write!(f, "pop {}", dest),
+      Self::Push(src) => write!(f, "push {}", src),
       Self::Ret => write!(f, "ret"),
-      Self::Sub { src, dest } => write!(f, "sub {:?}, {:?}", dest, src),
+      Self::Sub { src, dest } => write!(f, "sub {}, {}", dest, src),
       Self::Syscall => write!(f, "syscall"),
-      Self::Xor { src, dest } => write!(f, "xor {:?}, {:?}", dest, src),
-      Self::Cmp { src, dest } => write!(f, "cmp {:?}, {:?}", dest, src),
-      Self::Movzx { src, dest } => write!(f, "movzx {:?}, {:?}", dest, src),
-      Self::SetIf { cmp, dest } => write!(f, "set{:?} {:?}", cmp, dest),
-      Self::JumpIf { cmp, label } => write!(f, "j{:?} {}", cmp, label.name()),
-      Self::Shr { dest, count } => write!(f, "shr {:?}, {:?}", dest, count),
-      Self::Shl { dest, count } => write!(f, "shl {:?}, {:?}", dest, count),
-      Self::And { src, dest } => write!(f, "and {:?}, {:?}", dest, src),
-      Self::Or { src, dest } => write!(f, "or {:?}, {:?}", dest, src),
-      Self::Lea { src, dest } => write!(f, "lea {:?}, {:?}", dest, src),
+      Self::Xor { src, dest } => write!(f, "xor {}, {}", dest, src),
+      Self::Cmp { src, dest } => write!(f, "cmp {}, {}", dest, src),
+      Self::Movzx { src, dest } => write!(f, "movzx {}, {}", dest, src),
+      Self::SetIf { cmp, dest } => write!(f, "set{} {}", cmp, dest),
+      Self::JumpIf { cmp, label } => write!(f, "j{} {}", cmp, label),
+      Self::Shr { dest, count } => write!(f, "shr {}, {}", dest, count),
+      Self::Shl { dest, count } => write!(f, "shl {}, {}", dest, count),
+      Self::And { src, dest } => write!(f, "and {}, {}", dest, src),
+      Self::Or { src, dest } => write!(f, "or {}, {}", dest, src),
+      Self::Lea { label, dest } => write!(f, "lea {}, [rel {}]", dest, label),
     }
   }
 }
 
-impl<VAR: Debug> Debug for Arg<VAR> {
+impl<VAR: Display> Display for Arg<VAR> {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     match self {
       Self::Imm(n) => write!(f, "{}", n),
       Self::Var(var) => var.fmt(f),
       Self::Deref(r, i) => match i.cmp(&0) {
-        Ordering::Greater => write!(f, "qword [{:?} + {}]", r, i),
-        Ordering::Equal => write!(f, "qword [{:?}]", r),
-        Ordering::Less => write!(f, "qword [{:?} - {}]", r, -i),
+        Ordering::Greater => write!(f, "qword [{} + {}]", r, i),
+        Ordering::Equal => write!(f, "qword [{}]", r),
+        Ordering::Less => write!(f, "qword [{} - {}]", r, -i),
       },
       Self::Reg(r) => r.fmt(f),
       Self::ByteReg(r) => r.fmt(f),
-      Self::Label(l) => write!(f, "{}", l.arg()),
     }
   }
 }
@@ -359,7 +363,7 @@ impl Reg {
   }
 }
 
-impl Debug for Reg {
+impl Display for Reg {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     use Reg::*;
     let op = match self {
@@ -384,7 +388,7 @@ impl Debug for Reg {
   }
 }
 
-impl Debug for ByteReg {
+impl Display for ByteReg {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     use ByteReg::*;
     let op = match self {
@@ -401,7 +405,7 @@ impl Debug for ByteReg {
   }
 }
 
-impl Debug for CmpResult {
+impl Display for CmpResult {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     use CmpResult::*;
     let op = match self {
@@ -416,24 +420,13 @@ impl Debug for CmpResult {
   }
 }
 
-impl Label {
-  pub fn arg(&self) -> Cow<'_, str> {
+impl Display for Label {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     match self {
-      Self::Start => ".start".into(),
-      Self::EntryPoint => "_start".into(),
-      Self::Conclusion => ".conclusion".into(),
-      Self::Tmp(n) => format!(".block{}", n).into(),
-      Self::Name(name) => format!("[rel {}]", name).into(),
-    }
-  }
-
-  pub fn name(&self) -> Cow<'_, str> {
-    match self {
-      Self::Start => ".start".into(),
-      Self::EntryPoint => "_start".into(),
-      Self::Conclusion => ".conclusion".into(),
-      Self::Tmp(n) => format!(".block{}", n).into(),
-      Self::Name(name) => name.clone().into(),
+      Self::Start => write!(f, ".start"),
+      Self::EntryPoint => write!(f, "_start"),
+      Self::Conclusion => write!(f, ".conclusion"),
+      Self::Tmp(n) => write!(f, ".block{}", n),
     }
   }
 }
@@ -506,14 +499,6 @@ pub fn parse_code<VAR: Clone>(
         arg[1..].trim().parse::<i32>().unwrap()
       };
       Arg::Deref(reg, off)
-    } else if arg.starts_with("const_") {
-      Arg::Label(Label::Name(arg.to_owned()))
-    } else if arg.starts_with("block") {
-      Arg::Label(Label::Tmp(
-        arg.strip_prefix("block").unwrap().parse().unwrap(),
-      ))
-    } else if arg == "conclusion" {
-      Arg::Label(Label::Conclusion)
     } else {
       Arg::Var(make_var(arg))
     }
@@ -560,13 +545,13 @@ pub fn parse_code<VAR: Clone>(
             .collect::<Vec<_>>();
           if args.len() == 1 {
             Instr::Call {
-              label: Arg::Label(Label::Name(args[0].to_owned())),
+              label: args[0].to_owned(),
               arity: 0,
               gc: false,
             }
           } else {
             Instr::Call {
-              label: Arg::Label(Label::Name(args[0].to_owned())),
+              label: args[0].to_owned(),
               arity: args[1].parse().unwrap(),
               gc: if args.len() == 3 {
                 assert_eq!(args[2], "gc");
@@ -577,10 +562,7 @@ pub fn parse_code<VAR: Clone>(
             }
           }
         }
-        "jmp" => {
-          let args = get_args(ops[1]);
-          Instr::Jmp(args[0].clone())
-        }
+        "jmp" => Instr::LocalJmp(parse_label(ops[1])),
         "neg" => {
           let args = get_args(ops[1]);
           Instr::Neg(args[0].clone())
@@ -617,10 +599,13 @@ pub fn parse_code<VAR: Clone>(
           }
         }
         "lea" => {
-          let args = get_args(ops[1]);
+          let mut args = ops[1].split(',').map(|arg| arg.trim());
+          let dest = parse_arg(args.next().unwrap());
+          let label = args.next().unwrap().to_owned();
+          assert!(args.next().is_none(), "lea {}", ops[1]);
           Instr::Lea {
-            src: args[1].clone(),
-            dest: args[0].clone(),
+            label,
+            dest,
           }
         }
         _ => {

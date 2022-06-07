@@ -188,7 +188,7 @@ fn collect_set_vars<TYPE>(
       args,
       r#struct: _,
     } => {
-      collect_set_vars(&*fun, set_vars);
+      collect_set_vars(fun, set_vars);
       for exp in args {
         collect_set_vars(exp, set_vars);
       }
