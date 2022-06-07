@@ -1,5 +1,5 @@
 use asm::{Block, Fun, Instr, Label, Program};
-use indexmap::IndexMap;
+use std::collections::HashMap;
 
 pub fn merge_blocks<INFO>(prog: Program<INFO>) -> Program<INFO> {
   Program {
@@ -7,18 +7,18 @@ pub fn merge_blocks<INFO>(prog: Program<INFO>) -> Program<INFO> {
       .funs
       .into_iter()
       .map(|fun| Fun {
-        blocks: merge_body_blocks(fun.blocks),
+        blocks: merge_body_blocks(Label::Prologue, fun.blocks),
         ..fun
       })
       .collect(),
-    blocks: merge_body_blocks(prog.blocks),
+    blocks: merge_body_blocks(Label::EntryPoint, prog.blocks),
     ..prog
   }
 }
 
-fn merge_body_blocks(body: Vec<Block>) -> Vec<Block> {
-  let mut refs = IndexMap::<Label, usize>::new();
-  let mut blocks = IndexMap::<Label, Block>::new();
+fn merge_body_blocks(entry: Label, body: Vec<Block>) -> Vec<Block> {
+  let mut refs = HashMap::<Label, usize>::new();
+  let mut blocks = HashMap::<Label, Block>::new();
   for block in body {
     if let Instr::LocalJmp(label) = block.code.last().unwrap() {
       *refs.entry(*label).or_default() += 1;
@@ -31,7 +31,7 @@ fn merge_body_blocks(body: Vec<Block>) -> Vec<Block> {
     blocks.insert(block.label, block);
   }
 
-  let mut worklist = vec![Label::EntryPoint];
+  let mut worklist = vec![entry];
   let mut new_blocks = vec![];
   while let Some(mut label) = worklist.pop() {
     let mut block = if let Some(block) = blocks.remove(&label) {

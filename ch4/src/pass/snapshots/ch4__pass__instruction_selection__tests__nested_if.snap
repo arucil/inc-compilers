@@ -25,9 +25,9 @@ constants: {}
 .block0:
     mov rax, y.1
     add rax, 2
-    jmp .conclusion
+    jmp .epilogue
 .block1:
     mov rax, y.1
     add rax, 10
-    jmp .conclusion
+    jmp .epilogue
 

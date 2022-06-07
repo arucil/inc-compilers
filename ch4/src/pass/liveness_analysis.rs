@@ -29,9 +29,7 @@ pub fn analyze_liveness(
     var_store.insert(var.clone());
   }
 
-  let state = AnalysisState {
-    var_store: &var_store,
-  };
+  let state = AnalysisState::new(&var_store);
 
   let live = sort_blocks(&prog.blocks)
     .map(|(label, block)| {
@@ -143,7 +141,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => LocationSet::regs([Rax, Rsp])
+      Label::Epilogue => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldInfo {
@@ -179,7 +177,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => LocationSet::regs([Rax, Rsp])
+      Label::Epilogue => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldInfo {
@@ -213,7 +211,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => LocationSet::regs([Rax, Rsp])
+      Label::Epilogue => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldInfo {
@@ -291,7 +289,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => LocationSet::regs([Rax, Rsp])
+      Label::Epilogue => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldInfo {
@@ -344,7 +342,7 @@ block4:
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => LocationSet::regs([Rax, Rsp])
+      Label::Epilogue => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldInfo {
@@ -420,7 +418,7 @@ block9:
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => LocationSet::regs([Rax, Rsp])
+      Label::Epilogue => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldInfo {

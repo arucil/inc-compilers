@@ -13,5 +13,5 @@ constants: {}
     mov rdi, 1
     call rt_print_bool
     call rt_print_newline
-    jmp .conclusion
+    jmp .epilogue
 

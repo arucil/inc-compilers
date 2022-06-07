@@ -38,10 +38,10 @@ constants: {}
     jmp .block6
 .block6:
     mov rax, x.0
-    jmp .conclusion
+    jmp .epilogue
 .block0:
     mov rax, -1
-    jmp .conclusion
+    jmp .epilogue
 .block2:
     mov (tmp).1, y.1
     sub (tmp).1, x.0
@@ -51,8 +51,8 @@ constants: {}
 .block1:
     mov rax, y.1
     neg rax
-    jmp .conclusion
+    jmp .epilogue
 .block5:
     mov rax, 5000
-    jmp .conclusion
+    jmp .epilogue
 

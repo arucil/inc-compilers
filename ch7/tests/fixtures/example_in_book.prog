@@ -1,0 +1,5 @@
+(define (add [x Int] [y Int]) : Int
+  (+ x y))
+(define (main) : Int
+  (add 4 2))
+(print (main))

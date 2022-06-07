@@ -1,7 +1,7 @@
 use super::interference::{Info as OldInfo, Interference, Moves};
 use crate::location_graph::{LocationGraph, NodeIndex};
 use crate::location_set::{Location, Var, VarStore};
-use asm::{Arg, Block, Instr, Program, Reg};
+use asm::{Arg, Block, Instr, LabelOrArg, Program, Reg};
 use ast::IdxVar;
 use indexmap::{IndexMap, IndexSet};
 use priority_queue::PriorityQueue;
@@ -153,7 +153,24 @@ pub fn gen_assign_instr_registers<'a>(
         src: assign(src),
         dest: assign(dest),
       },
-      Instr::Call { label, arity, gc } => Instr::Call { label, arity, gc },
+      Instr::Call {
+        label: LabelOrArg::Label(label),
+        arity,
+        gc,
+      } => Instr::Call {
+        label: LabelOrArg::Label(label),
+        arity,
+        gc,
+      },
+      Instr::Call {
+        label: LabelOrArg::Arg(arg),
+        arity,
+        gc,
+      } => Instr::Call {
+        label: LabelOrArg::Arg(assign(arg)),
+        arity,
+        gc,
+      },
       Instr::LocalJmp(label) => Instr::LocalJmp(label),
       Instr::Mov { src, dest } => Instr::Mov {
         src: assign(src),
@@ -399,7 +416,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => LocationSet::regs([Rax, Rsp])
+      Label::Epilogue => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldOldInfo {
@@ -439,7 +456,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => LocationSet::regs([Rax, Rsp])
+      Label::Epilogue => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldOldInfo {
@@ -472,7 +489,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => LocationSet::regs([Rax, Rsp])
+      Label::Epilogue => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldOldInfo {
@@ -548,7 +565,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => LocationSet::regs([Rax, Rsp])
+      Label::Epilogue => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldOldInfo {

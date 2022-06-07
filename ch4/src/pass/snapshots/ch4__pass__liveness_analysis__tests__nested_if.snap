@@ -25,7 +25,7 @@ expression: result.show()
                     {rsp, rax}
     add rax, 2
                     {rsp, rax}
-    jmp .conclusion
+    jmp .epilogue
                     {}
 
 .block1:
@@ -34,7 +34,7 @@ expression: result.show()
                     {rsp, rax}
     add rax, 10
                     {rsp, rax}
-    jmp .conclusion
+    jmp .epilogue
                     {}
 
 .block2:

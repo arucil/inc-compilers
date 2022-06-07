@@ -14,5 +14,5 @@ constants: {}
     mov qword [rbp - 8], rbx
     call foo
     add qword [rbp - 8], rax
-    jmp .conclusion
+    jmp .epilogue
 

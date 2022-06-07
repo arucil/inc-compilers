@@ -1,5 +1,5 @@
 use crate::location_set::{LocationSet, VarStore};
-use asm::{Arg, Instr, Label, Program, Reg};
+use asm::{Arg, Instr, Label, LabelOrArg, Program, Reg};
 use ast::IdxVar;
 use ch2::pass::instruction_selection::Info as OldInfo;
 use indexmap::{IndexMap, IndexSet};
@@ -26,9 +26,7 @@ pub fn analyze_liveness(
     var_store.insert(var.clone());
   }
 
-  let state = AnalysisState {
-    var_store: &var_store,
-  };
+  let state = AnalysisState::new(&var_store);
 
   let live = prog
     .blocks
@@ -51,10 +49,14 @@ pub fn analyze_liveness(
 }
 
 pub struct AnalysisState<'a> {
-  pub var_store: &'a VarStore,
+  var_store: &'a VarStore,
 }
 
 impl<'a> AnalysisState<'a> {
+  pub fn new(var_store: &'a VarStore) -> Self {
+    Self { var_store }
+  }
+
   pub fn block_liveness(
     &self,
     block: &asm::Block<IdxVar>,
@@ -121,7 +123,7 @@ impl<'a> AnalysisState<'a> {
       }
       Instr::Jmp(arg) => unreachable!("jmp {}", arg),
       Instr::Call {
-        label: _,
+        label,
         arity,
         gc: _,
       } => {
@@ -132,31 +134,26 @@ impl<'a> AnalysisState<'a> {
         for reg in Reg::argument_regs().into_iter().take(*arity) {
           before.add_reg(reg);
         }
-      }
-      Instr::UserCall { label, arity } => {
-        assert!(*arity <= 6);
-        for reg in Reg::caller_saved_regs() {
-          before.remove_reg(reg);
+        if let LabelOrArg::Arg(arg) = label {
+          self.add_arg(before, arg);
         }
-        for reg in Reg::argument_regs().into_iter().take(*arity) {
-          before.add_reg(reg);
-        }
-        self.add_arg(before, label);
       }
       Instr::TailJmp { label, arity } => {
         assert!(*arity <= 6);
         for reg in Reg::argument_regs().into_iter().take(*arity) {
           before.add_reg(reg);
         }
-        self.add_arg(before, label);
+        if let LabelOrArg::Arg(arg) = label {
+          self.add_arg(before, arg);
+        }
       }
       Instr::Shl { dest, count } | Instr::Shr { dest, count } => {
         self.add_arg(before, dest);
         self.add_arg(before, count);
       }
       Instr::IMul(arg) | Instr::IDiv(arg) => {
-        before.remove_reg(Reg::Rax);
         before.remove_reg(Reg::Rdx);
+        before.add_reg(Reg::Rax);
         self.add_arg(before, arg);
       }
       Instr::Lea { label: _, dest } => {
@@ -259,7 +256,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => LocationSet::regs([Rax, Rsp])
+      Label::Epilogue => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldInfo {
@@ -295,7 +292,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => LocationSet::regs([Rax, Rsp])
+      Label::Epilogue => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldInfo {
@@ -329,7 +326,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => LocationSet::regs([Rax, Rsp])
+      Label::Epilogue => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldInfo {

@@ -19,16 +19,17 @@ section .text
     add qword [rbp - 40], rax
     mov rax, qword [rbp - 32]
     add rax, qword [rbp - 40]
-    jmp .conclusion
+    jmp .epilogue
 
     global _start
+    align 8
 _start:
     push rbp
     mov rbp, rsp
     sub rsp, 48
     jmp .start
 
-.conclusion:
+.epilogue:
     mov rsp, rbp
     pop rbp
     mov rdi, rax

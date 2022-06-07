@@ -1,0 +1,68 @@
+---
+source: ch7/src/lib.rs
+expression: prog
+---
+extern rt_initialize, rt_print_int, rt_print_newline
+section .text
+
+    global _start
+    align 8
+_start:
+    push rbp
+    mov rbp, rsp
+    mov rdi, 65536
+    mov rsi, 64
+    call rt_initialize
+    mov r15, rax
+    mov rdi, 3
+    call do
+    mov rcx, rax
+    mov rdi, 7
+    call rcx
+    mov rcx, rax
+    mov rdi, rcx
+    call rt_print_int
+    call rt_print_newline
+    pop rbp
+    mov rax, 60
+    mov rdi, 0
+    syscall
+
+    align 8
+do:
+    push rbp
+    mov rbp, rsp
+    mov rcx, rdi
+    cmp rcx, 2
+    jg .block0
+    mov rdi, rcx
+    pop rbp
+    jmp bar
+
+.block0:
+    lea rax, [rel foo]
+    pop rbp
+    ret
+
+    align 8
+foo:
+    push rbp
+    mov rbp, rsp
+    mov rcx, rdi
+    mov rax, rcx
+    add rax, 1
+    pop rbp
+    ret
+
+    align 8
+bar:
+    push rbp
+    mov rbp, rsp
+    mov rcx, rdi
+    mov rdi, rcx
+    call rt_print_int
+    call rt_print_newline
+    lea rax, [rel foo]
+    pop rbp
+    ret
+

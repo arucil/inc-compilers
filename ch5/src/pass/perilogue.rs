@@ -61,7 +61,7 @@ fn add_epilogue(prog: &mut Program<Info>) {
     Syscall,
   ]);
   prog.blocks.push(Block {
-    label: Label::Conclusion,
+    label: Label::Epilogue,
     code,
   });
 }

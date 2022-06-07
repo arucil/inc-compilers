@@ -1,4 +1,4 @@
-use asm::{Arg, Block, Fun, Instr, Program, Reg};
+use asm::{Arg, Block, Fun, Instr, Program, Reg, LabelOrArg};
 
 pub fn patch_instructions<T>(prog: Program<T>) -> Program<T> {
   Program {
@@ -168,6 +168,21 @@ fn patch_block(block: Block) -> Block {
         code.push(Instr::Mov {
           src: Arg::Reg(Reg::Rax),
           dest,
+        });
+      }
+      // label of TailJmp must be RAX, because many registers are destroyed
+      // before tailcall, including RBP.
+      Instr::TailJmp {
+        label: LabelOrArg::Arg(arg),
+        arity,
+      } => {
+        code.push(Instr::Mov {
+          src: arg,
+          dest: Arg::Reg(Reg::Rax),
+        });
+        code.push(Instr::TailJmp {
+          label: LabelOrArg::Arg(Arg::Reg(Reg::Rax)),
+          arity,
         });
       }
       _ => {

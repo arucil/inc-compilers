@@ -1,4 +1,4 @@
-use asm::{Arg, Block, Instr, Program, Reg};
+use asm::{Arg, Block, Instr, LabelOrArg, Program, Reg};
 use ast::IdxVar;
 use indexmap::IndexSet;
 use std::collections::HashMap;
@@ -67,7 +67,24 @@ fn assign_home_instr(
       let dest = assign_home_arg(dest, local_spaces);
       Instr::Add { src, dest }
     }
-    Instr::Call { label, arity, gc } => Instr::Call { label, arity, gc },
+    Instr::Call {
+      label: LabelOrArg::Label(label),
+      arity,
+      gc,
+    } => Instr::Call {
+      label: LabelOrArg::Label(label),
+      arity,
+      gc,
+    },
+    Instr::Call {
+      label: LabelOrArg::Arg(arg),
+      arity,
+      gc,
+    } => Instr::Call {
+      label: LabelOrArg::Arg(assign_home_arg(arg, local_spaces)),
+      arity,
+      gc,
+    },
     Instr::LocalJmp(label) => Instr::LocalJmp(label),
     Instr::Mov { src, dest } => {
       let src = assign_home_arg(src, local_spaces);

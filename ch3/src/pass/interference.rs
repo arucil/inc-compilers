@@ -92,27 +92,6 @@ where
       }
     };
 
-    // All registers interfere with reference variables, to force them to be
-    // spilled.
-    macro_rules! spill_all_refs {
-      () => {{
-        for after_loc in live_after {
-          for reg in Reg::all_regs() {
-            let write_loc = reg.into();
-            if after_loc != write_loc {
-              if let Some(var) = after_loc.to_arg_var(self.var_store) {
-                if (self.var_is_ref)(&var) {
-                  let write_loc_node = graph.insert_node(write_loc);
-                  let after_loc_node = graph.insert_node(after_loc);
-                  graph.add_edge(write_loc_node, after_loc_node);
-                }
-              }
-            }
-          }
-        }
-      }};
-    }
-
     match instr {
       Instr::Add { dest, .. }
       | Instr::Sub { dest, .. }
@@ -128,18 +107,27 @@ where
           add(dest_loc);
         }
       }
-      Instr::UserCall { .. } => {
-        for reg in Reg::caller_saved_regs() {
-          add(reg.into());
-        }
-        spill_all_refs!();
-      }
       Instr::Call { gc, .. } => {
         for reg in Reg::caller_saved_regs() {
           add(reg.into());
         }
         if *gc {
-          spill_all_refs!();
+          // All registers interfere with reference variables, so all reference
+          // variables are spilled, then GC can easily trace the root set.
+          for after_loc in live_after {
+            for reg in Reg::all_regs() {
+              let write_loc = reg.into();
+              if after_loc != write_loc {
+                if let Some(var) = after_loc.to_arg_var(self.var_store) {
+                  if (self.var_is_ref)(&var) {
+                    let write_loc_node = graph.insert_node(write_loc);
+                    let after_loc_node = graph.insert_node(after_loc);
+                    graph.add_edge(write_loc_node, after_loc_node);
+                  }
+                }
+              }
+            }
+          }
         }
       }
       Instr::Mov { src, dest } | Instr::Movzx { src, dest } => {
@@ -223,7 +211,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => LocationSet::regs([Rax, Rsp])
+      Label::Epilogue => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldOldInfo {
@@ -263,7 +251,7 @@ mod tests {
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => LocationSet::regs([Rax, Rsp])
+      Label::Epilogue => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldOldInfo {

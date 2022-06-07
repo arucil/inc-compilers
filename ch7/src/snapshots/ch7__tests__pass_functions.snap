@@ -1,0 +1,68 @@
+---
+source: ch7/src/lib.rs
+expression: prog
+---
+extern rt_initialize, rt_new_string, rt_print_int, rt_print_newline
+section .rodata
+    const_1 db `abc`
+section .text
+
+    global _start
+    align 8
+_start:
+    push rbp
+    mov rbp, rsp
+    mov rdi, 65536
+    mov rsi, 64
+    call rt_initialize
+    mov r15, rax
+    lea rdx, [rel foo]
+    lea rcx, [rel bar]
+    mov rdi, rdx
+    mov rsi, rcx
+    call do
+    pop rbp
+    mov rax, 60
+    mov rdi, 0
+    syscall
+
+    align 8
+do:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 8
+    push rbx
+    mov rcx, rdi
+    mov rbx, rsi
+    call rcx
+    mov rcx, rax
+    mov rdi, rcx
+    mov rax, rbx
+    pop rbx
+    mov rsp, rbp
+    pop rbp
+    jmp rax
+
+    align 8
+foo:
+    push rbp
+    mov rbp, rsp
+    mov rax, 1
+    pop rbp
+    ret
+
+    align 8
+bar:
+    push rbp
+    mov rbp, rsp
+    mov rcx, rdi
+    mov rdi, rcx
+    call rt_print_int
+    call rt_print_newline
+    mov rdi, 3
+    lea rsi, [rel const_1]
+    mov rdx, r15
+    call rt_new_string
+    pop rbp
+    ret
+

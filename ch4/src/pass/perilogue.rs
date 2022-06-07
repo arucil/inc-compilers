@@ -1,5 +1,5 @@
 use super::register_allocation::Info;
-use asm::{Arg, Block, Instr, Label, Program};
+use asm::{Arg, Block, Instr, Label, LabelOrArg, Program};
 
 pub fn add_perilogue(mut prog: Program<Info>) -> Program<Info> {
   add_prologue(&mut prog);
@@ -48,12 +48,12 @@ fn add_epilogue(prog: &mut Program<Info>) {
       dest: Arg::Reg(Rdi),
     },
     Call {
-      label: label1,
+      label: LabelOrArg::Label(label1),
       arity: 1,
       gc: false,
     },
     Call {
-      label: label2,
+      label: LabelOrArg::Label(label2),
       arity: 0,
       gc: false,
     },
@@ -78,7 +78,7 @@ fn add_epilogue(prog: &mut Program<Info>) {
     Syscall,
   ]);
   prog.blocks.push(Block {
-    label: Label::Conclusion,
+    label: Label::Epilogue,
     code,
   });
 }

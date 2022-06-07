@@ -21,5 +21,5 @@ constants: {}
     add qword [rbp - 48], qword [rbp - 40]
     mov rax, qword [rbp - 32]
     add rax, qword [rbp - 48]
-    jmp .conclusion
+    jmp .epilogue
 

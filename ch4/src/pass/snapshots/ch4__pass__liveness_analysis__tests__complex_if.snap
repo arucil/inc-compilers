@@ -19,7 +19,7 @@ expression: result.show()
                     {rsp}
     mov rax, -1
                     {rsp, rax}
-    jmp .conclusion
+    jmp .epilogue
                     {}
 
 .block1:
@@ -28,7 +28,7 @@ expression: result.show()
                     {rsp, rax}
     neg rax
                     {rsp, rax}
-    jmp .conclusion
+    jmp .epilogue
                     {}
 
 .block2:
@@ -70,14 +70,14 @@ expression: result.show()
                     {rsp}
     mov rax, 5000
                     {rsp, rax}
-    jmp .conclusion
+    jmp .epilogue
                     {}
 
 .block6:
                     {rsp, x.0}
     mov rax, x.0
                     {rsp, rax}
-    jmp .conclusion
+    jmp .epilogue
                     {}
 
 .block7:

@@ -24,7 +24,7 @@ pub fn compile(
   let prog = self::pass::liveness_analysis::analyze_liveness(
     prog,
     hashmap! {
-      Label::Conclusion => LocationSet::regs([Rax, Rbp])
+      Label::Epilogue => LocationSet::regs([Rax, Rbp])
     },
   );
   let prog = self::pass::interference::build_interference(prog);

@@ -1,4 +1,4 @@
-use asm::{Arg, Block, Fun, Instr, Program, Reg};
+use asm::{Arg, Block, Fun, Instr, LabelOrArg, Program, Reg};
 use ast::{IdxVar, Type};
 use ch3::location_set::{Var, VarStore};
 use ch3::pass::register_allocation::{Color, RegisterAlloc};
@@ -166,15 +166,38 @@ pub fn gen_assign_instr_registers<'a>(
         src: assign(src),
         dest: assign(dest),
       },
-      Instr::Call { label, arity, gc } => Instr::Call { label, arity, gc },
-      Instr::UserCall { label, arity } => Instr::UserCall {
-        label: assign(label),
+      Instr::Call {
+        label: LabelOrArg::Label(label),
         arity,
+        gc,
+      } => Instr::Call {
+        label: LabelOrArg::Label(label),
+        arity,
+        gc,
+      },
+      Instr::Call {
+        label: LabelOrArg::Arg(arg),
+        arity,
+        gc,
+      } => Instr::Call {
+        label: LabelOrArg::Arg(assign(arg)),
+        arity,
+        gc,
       },
       Instr::Jmp(arg) => unreachable!("jmp {}", arg),
       Instr::LocalJmp(label) => Instr::LocalJmp(label),
-      Instr::TailJmp { label, arity } => Instr::TailJmp {
-        label: assign(label),
+      Instr::TailJmp {
+        label: LabelOrArg::Label(label),
+        arity,
+      } => Instr::TailJmp {
+        label: LabelOrArg::Label(label),
+        arity,
+      },
+      Instr::TailJmp {
+        label: LabelOrArg::Arg(arg),
+        arity,
+      } => Instr::TailJmp {
+        label: LabelOrArg::Arg(assign(arg)),
         arity,
       },
       Instr::Mov { src, dest } => Instr::Mov {
@@ -288,7 +311,7 @@ start:
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => LocationSet::regs([Rax, Rsp])
+      Label::Epilogue => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldOldInfo {
@@ -353,7 +376,7 @@ start:
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => LocationSet::regs([Rax, Rsp])
+      Label::Epilogue => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldOldInfo {
@@ -417,7 +440,7 @@ start:
     "#,
     );
     let label_live = hashmap! {
-      Label::Conclusion => LocationSet::regs([Rax, Rsp])
+      Label::Epilogue => LocationSet::regs([Rax, Rsp])
     };
     let prog = Program {
       info: OldOldInfo {

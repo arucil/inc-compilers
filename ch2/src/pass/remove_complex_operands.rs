@@ -65,6 +65,7 @@ impl State {
           .into_iter()
           .map(|arg| self.atom_exp(arg, &mut tmps))
           .collect();
+        let args = self.process_special_prim_args(op.1, args, &mut tmps);
         make_tmps_let(
           Exp {
             kind: ExpKind::Prim { op, args },
@@ -240,12 +241,15 @@ impl State {
           .into_iter()
           .map(|arg| self.atom_exp(arg, tmps))
           .collect();
-        let exp = Exp {
-          kind: ExpKind::Prim { op, args },
-          range: exp.range,
-          ty: exp.ty,
-        };
-        self.assign_var(exp, tmps)
+        let args = self.process_special_prim_args(op.1, args, tmps);
+        self.assign_var(
+          Exp {
+            kind: ExpKind::Prim { op, args },
+            range: exp.range,
+            ty: exp.ty,
+          },
+          tmps,
+        )
       }
       ExpKind::Apply {
         fun,
@@ -300,6 +304,45 @@ impl State {
         self.assign_var(exp, tmps)
       }
     }
+  }
+
+  /// Some arguments of some primitive operations need special care.
+  fn process_special_prim_args<TYPE: Clone>(
+    &mut self,
+    op: &str,
+    mut args: Vec<Exp<IdxVar, TYPE>>,
+    tmps: &mut Vec<TmpVar<TYPE>>,
+  ) -> Vec<Exp<IdxVar, TYPE>> {
+    match op {
+      "*" => {
+        if let ExpKind::Int(n) = &args[0].kind {
+          if let ExpKind::Int(_) = &args[1].kind {
+            let arg2 = self.assign_var(args.pop().unwrap(), tmps);
+            let arg1 = self.assign_var(args.pop().unwrap(), tmps);
+            args.push(arg1);
+            args.push(arg2);
+          } else if (i32::MIN as i64..=i32::MAX as i64).contains(n) {
+            args.swap(0, 1);
+          } else {
+            let arg1 = self.assign_var(args.remove(0), tmps);
+            args.push(arg1);
+          }
+        } else if let ExpKind::Int(n) = &args[1].kind {
+          if !(i32::MIN as i64..=i32::MAX as i64).contains(n) {
+            let last = self.assign_var(args.pop().unwrap(), tmps);
+            args.push(last);
+          }
+        }
+      }
+      "quotient" | "remainder" => {
+        if matches!(args[1].kind, ExpKind::Int(_)) {
+          let last = self.assign_var(args.pop().unwrap(), tmps);
+          args.push(last);
+        }
+      }
+      _ => {}
+    }
+    args
   }
 
   fn assign_var<TYPE: Clone>(

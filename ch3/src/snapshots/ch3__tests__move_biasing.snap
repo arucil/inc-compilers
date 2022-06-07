@@ -15,9 +15,10 @@ section .text
     neg rbx
     mov rax, rcx
     add rax, rbx
-    jmp .conclusion
+    jmp .epilogue
 
     global _start
+    align 8
 _start:
     push rbp
     mov rbp, rsp
@@ -25,7 +26,7 @@ _start:
     push rbx
     jmp .start
 
-.conclusion:
+.epilogue:
     mov rdi, rax
     call rt_print_int
     call rt_print_newline

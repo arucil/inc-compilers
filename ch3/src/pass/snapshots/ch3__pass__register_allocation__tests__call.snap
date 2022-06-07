@@ -14,5 +14,5 @@ constants: {}
     mov r12, rbx
     call foo
     add r12, rax
-    jmp .conclusion
+    jmp .epilogue
 

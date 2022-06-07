@@ -1,5 +1,5 @@
 use super::explicate_control::CInfo;
-use asm::{Arg, Block, ByteReg, Fun, Instr, Label, Program, Reg};
+use asm::{Arg, Block, ByteReg, Fun, Instr, Label, LabelOrArg, Program, Reg};
 use ast::{IdxVar, Type};
 use control::*;
 use id_arena::Arena;
@@ -150,7 +150,7 @@ impl<'a> CodeGen<'a> {
       match tail {
         CTail::Return(exp) => {
           self.exp_instructions(Arg::Reg(Reg::Rax), exp);
-          self.code.push(Instr::LocalJmp(Label::Conclusion));
+          self.code.push(Instr::LocalJmp(Label::Epilogue));
           return;
         }
         CTail::Seq(stmt, new_tail) => {
@@ -188,7 +188,7 @@ impl<'a> CodeGen<'a> {
           let label = "rt_length_error".to_owned();
           self.externs.insert(label.clone());
           self.code.push(Instr::Call {
-            label,
+            label: LabelOrArg::Label(label),
             arity: 1,
             gc: false,
           });
@@ -200,7 +200,7 @@ impl<'a> CodeGen<'a> {
           let label = "rt_out_of_bounds_error".to_owned();
           self.externs.insert(label.clone());
           self.code.push(Instr::Call {
-            label,
+            label: LabelOrArg::Label(label),
             arity: 2,
             gc: false,
           });
@@ -210,7 +210,7 @@ impl<'a> CodeGen<'a> {
           let label = "rt_div_by_0_error".to_owned();
           self.externs.insert(label.clone());
           self.code.push(Instr::Call {
-            label,
+            label: LabelOrArg::Label(label),
             arity: 0,
             gc: false,
           });
@@ -223,14 +223,13 @@ impl<'a> CodeGen<'a> {
             self.atom_instructions(Arg::Reg(reg), arg);
           }
           if let CAtom::FunRef(name, arity) = fun {
-            self.code.push(Instr::Call {
-              label: name,
+            self.code.push(Instr::TailJmp {
+              label: LabelOrArg::Label(name),
               arity,
-              gc: true,
             });
           } else {
-            self.code.push(Instr::UserCall {
-              label: atom_to_arg(fun),
+            self.code.push(Instr::TailJmp {
+              label: LabelOrArg::Arg(atom_to_arg(fun)),
               arity: arg_len,
             });
           }
@@ -249,7 +248,7 @@ impl<'a> CodeGen<'a> {
         let label = "rt_print_int".to_owned();
         self.externs.insert(label.clone());
         self.code.push(Instr::Call {
-          label,
+          label: LabelOrArg::Label(label),
           arity: 1,
           gc: false,
         });
@@ -259,7 +258,7 @@ impl<'a> CodeGen<'a> {
         let label = "rt_print_bool".to_owned();
         self.externs.insert(label.clone());
         self.code.push(Instr::Call {
-          label,
+          label: LabelOrArg::Label(label),
           arity: 1,
           gc: false,
         });
@@ -270,7 +269,7 @@ impl<'a> CodeGen<'a> {
           let label = "rt_print_str".to_owned();
           self.externs.insert(label.clone());
           self.code.push(Instr::Call {
-            label,
+            label: LabelOrArg::Label(label),
             arity: 1,
             gc: false,
           });
@@ -278,7 +277,7 @@ impl<'a> CodeGen<'a> {
           let label = "rt_print_str_const".to_owned();
           self.externs.insert(label.clone());
           self.code.push(Instr::Call {
-            label,
+            label: LabelOrArg::Label(label),
             arity: 1,
             gc: false,
           });
@@ -288,7 +287,7 @@ impl<'a> CodeGen<'a> {
         let label = "rt_print_newline".to_owned();
         self.externs.insert(label.clone());
         self.code.push(Instr::Call {
-          label,
+          label: LabelOrArg::Label(label),
           arity: 0,
           gc: false,
         })
@@ -297,7 +296,7 @@ impl<'a> CodeGen<'a> {
         let label = "rt_read_int".to_owned();
         self.externs.insert(label.clone());
         self.code.push(Instr::Call {
-          label,
+          label: LabelOrArg::Label(label),
           arity: 0,
           gc: false,
         })
@@ -348,7 +347,7 @@ impl<'a> CodeGen<'a> {
         let label = "rt_copy_string".to_owned();
         self.externs.insert(label.clone());
         self.code.push(Instr::Call {
-          label,
+          label: LabelOrArg::Label(label),
           arity: 3,
           gc: false,
         })
@@ -361,14 +360,15 @@ impl<'a> CodeGen<'a> {
         }
         if let CAtom::FunRef(name, arity) = fun {
           self.code.push(Instr::Call {
-            label: name,
+            label: LabelOrArg::Label(name),
             arity,
             gc: true,
           });
         } else {
-          self.code.push(Instr::UserCall {
-            label: atom_to_arg(fun),
+          self.code.push(Instr::Call {
+            label: LabelOrArg::Arg(atom_to_arg(fun)),
             arity: arg_len,
+            gc: true,
           });
         }
       }
@@ -395,7 +395,7 @@ impl<'a> CodeGen<'a> {
         let label = "rt_read_int".to_owned();
         self.externs.insert(label.clone());
         self.code.push(Instr::Call {
-          label,
+          label: LabelOrArg::Label(label),
           arity: 0,
           gc: false,
         });
@@ -490,7 +490,7 @@ impl<'a> CodeGen<'a> {
         let label = "rt_allocate".to_owned();
         self.externs.insert(label.clone());
         self.code.push(Instr::Call {
-          label,
+          label: LabelOrArg::Label(label),
           arity: 3,
           gc: true,
         });
@@ -553,7 +553,7 @@ impl<'a> CodeGen<'a> {
         let label = "rt_allocate".to_owned();
         self.externs.insert(label.clone());
         self.code.push(Instr::Call {
-          label,
+          label: LabelOrArg::Label(label),
           arity: 3,
           gc: true,
         });
@@ -578,7 +578,7 @@ impl<'a> CodeGen<'a> {
             let label = "rt_fill_array".to_owned();
             self.externs.insert(label.clone());
             self.code.push(Instr::Call {
-              label,
+              label: LabelOrArg::Label(label),
               arity: 2,
               gc: false,
             });
@@ -649,16 +649,34 @@ impl<'a> CodeGen<'a> {
           count: Arg::Imm(5),
         });
       }
-      CPrim::Mul(atom1, atom2) => {
-        self.atom_instructions(Arg::Reg(Reg::Rax), atom1);
-        self.code.push(Instr::Xor {
-          src: Arg::Reg(Reg::Rdi),
-          dest: Arg::Reg(Reg::Rdi),
-        });
-        let arg2 = atom_to_arg(atom2);
-        self.code.push(Instr::IMul(arg2));
+      CPrim::Mul(CAtom::Int(a), CAtom::Int(b)) => {
         self.code.push(Instr::Mov {
-          src: Arg::Reg(Reg::Rax),
+          src: Arg::Imm(a.wrapping_mul(b)),
+          dest: target,
+        });
+      }
+      CPrim::Mul(CAtom::Int(n @ (-2147483648..=2147483647)), atom2) => {
+        self.code.push(Instr::IMul3 {
+          src1: atom_to_arg(atom2),
+          src2: n as i32,
+          dest: target,
+        });
+      }
+      CPrim::Mul(atom1, CAtom::Int(n @ (-2147483648..=2147483647))) => {
+        self.code.push(Instr::IMul3 {
+          src1: atom_to_arg(atom1),
+          src2: n as i32,
+          dest: target,
+        });
+      }
+      // TODO atom2 is Int but not i32.
+      CPrim::Mul(atom1, atom2) => {
+        self.code.push(Instr::Mov {
+          src: atom_to_arg(atom1),
+          dest: target.clone(),
+        });
+        self.code.push(Instr::IMul {
+          src: atom_to_arg(atom2),
           dest: target,
         });
       }
@@ -697,7 +715,7 @@ impl<'a> CodeGen<'a> {
         let label = "rt_alloc_string".to_owned();
         self.externs.insert(label.clone());
         self.code.push(Instr::Call {
-          label,
+          label: LabelOrArg::Label(label),
           arity: 2,
           gc: true,
         });
@@ -756,7 +774,7 @@ impl<'a> CodeGen<'a> {
           let label = "rt_new_string".to_owned();
           self.externs.insert(label.clone());
           self.code.push(Instr::Call {
-            label,
+            label: LabelOrArg::Label(label),
             arity: 3,
             gc: true,
           });

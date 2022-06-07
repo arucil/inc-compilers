@@ -19,14 +19,14 @@ expression: result.show()
                     {rsp}
     mov rax, 2
                     {rsp, rax}
-    jmp .conclusion
+    jmp .epilogue
                     {}
 
 .block1:
                     {rsp}
     mov rax, 41
                     {rsp, rax}
-    jmp .conclusion
+    jmp .epilogue
                     {}
 
 .block2:

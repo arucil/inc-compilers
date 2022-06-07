@@ -6,6 +6,7 @@ extern rt_print_int, rt_print_newline, rt_read_int
 section .text
 
     global _start
+    align 8
 _start:
     push rbp
     mov rbp, rsp
@@ -17,7 +18,7 @@ _start:
     je .block0
     xor rax, rax
 
-.conclusion:
+.epilogue:
     mov rdi, rax
     call rt_print_int
     call rt_print_newline
@@ -30,5 +31,5 @@ _start:
 
 .block0:
     mov rax, 42
-    jmp .conclusion
+    jmp .epilogue
 

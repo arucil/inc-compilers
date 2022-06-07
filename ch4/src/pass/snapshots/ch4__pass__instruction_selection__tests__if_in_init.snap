@@ -27,8 +27,8 @@ constants: {}
     jmp .block0
 .block1:
     mov rax, 41
-    jmp .conclusion
+    jmp .epilogue
 .block0:
     mov rax, 2
-    jmp .conclusion
+    jmp .epilogue
 

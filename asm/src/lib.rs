@@ -25,6 +25,8 @@ pub struct Fun<INFO = (), VAR = !> {
   pub name: String,
   pub info: INFO,
   /// The order matters.
+  ///
+  /// Prologue block must comes first.
   pub blocks: Vec<Block<VAR>>,
 }
 
@@ -44,7 +46,20 @@ pub enum Instr<VAR = !> {
     src: Arg<VAR>,
     dest: Arg<VAR>,
   },
-  IMul(Arg<VAR>),
+  IMul {
+    /// Must not be Imm.
+    src: Arg<VAR>,
+    /// Must be reg.
+    dest: Arg<VAR>,
+  },
+  IMul3 {
+    /// Must not be Imm.
+    src1: Arg<VAR>,
+    src2: i32,
+    /// Must be reg.
+    dest: Arg<VAR>,
+  },
+  /// Arg must not be Imm.
   IDiv(Arg<VAR>),
   Mov {
     src: Arg<VAR>,
@@ -52,14 +67,10 @@ pub enum Instr<VAR = !> {
   },
   Neg(Arg<VAR>),
   Call {
-    label: String,
+    label: LabelOrArg<VAR>,
     arity: usize,
     /// If the function call may trigger GC.
     gc: bool,
-  },
-  UserCall {
-    label: Arg<VAR>,
-    arity: usize,
   },
   /// Pop the frame and do JMP. Used for tailcall.
   ///
@@ -67,7 +78,7 @@ pub enum Instr<VAR = !> {
   /// know the frame size yet when selecting instructions, so we add a new
   /// instruction that will be patched after register allocation.
   TailJmp {
-    label: Arg<VAR>,
+    label: LabelOrArg<VAR>,
     arity: usize,
   },
   Ret,
@@ -75,7 +86,7 @@ pub enum Instr<VAR = !> {
   Pop(Arg<VAR>),
   LocalJmp(Label),
   /// Used for tailcall.
-  Jmp(Arg<VAR>),
+  Jmp(LabelOrArg<VAR>),
   Syscall,
   Xor {
     src: Arg<VAR>,
@@ -117,8 +128,15 @@ pub enum Instr<VAR = !> {
   },
   Lea {
     label: String,
+    /// Must be reg.
     dest: Arg<VAR>,
   },
+}
+
+#[derive(Clone)]
+pub enum LabelOrArg<VAR> {
+  Arg(Arg<VAR>),
+  Label(String),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -126,9 +144,11 @@ pub enum Label {
   Tmp(u32),
   /// entry point of main or function
   Start,
+  /// before Start
+  Prologue,
+  Epilogue,
   /// entry point of entire program
   EntryPoint,
-  Conclusion,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -243,14 +263,23 @@ impl<INFO: Display, VAR: Display> Program<INFO, VAR> {
       if let Label::EntryPoint = block.label {
         buf += "    global ";
         writeln!(&mut buf, "{}", block.label).unwrap();
+        buf += "    align 8\n";
       }
       write!(&mut buf, "{}", block).unwrap();
     }
     for fun in &self.funs {
-      writeln!(&mut buf, "{}:", fun.name).unwrap();
       for block in &fun.blocks {
         buf += "\n";
-        write!(&mut buf, "{}", block).unwrap();
+        if let Label::Prologue = block.label {
+          buf += "    align 8\n";
+          writeln!(&mut buf, "{}:", fun.name).unwrap();
+          for instr in &block.code {
+            write!(&mut buf, "    ").unwrap();
+            writeln!(&mut buf, "{}", instr).unwrap();
+          }
+        } else {
+          write!(&mut buf, "{}", block).unwrap();
+        }
       }
     }
     buf
@@ -286,14 +315,16 @@ impl<VAR: Display> Display for Instr<VAR> {
   fn fmt(&self, f: &mut Formatter) -> fmt::Result {
     match self {
       Self::Add { src, dest } => write!(f, "add {}, {}", dest, src),
-      Self::IMul(src) => write!(f, "imul {}", src),
+      Self::IMul { src, dest } => write!(f, "imul {}, {}", dest, src),
+      Self::IMul3 { src1, src2, dest } => {
+        write!(f, "imul {}, {}, {}", dest, src1, src2)
+      }
       Self::IDiv(src) => write!(f, "idiv {}", src),
       Self::Mov { src, dest } => write!(f, "mov {}, {}", dest, src),
       Self::Call { label, .. } => write!(f, "call {}", label),
-      Self::UserCall { label, .. } => write!(f, "call {}", label),
       Self::TailJmp { label, .. } => write!(f, "tailjmp {}", label),
       Self::LocalJmp(label) => write!(f, "jmp {}", label),
-      Self::Jmp(label) => write!(f, "jmp [rel {}]", label),
+      Self::Jmp(label) => write!(f, "jmp {}", label),
       Self::Neg(dest) => write!(f, "neg {}", dest),
       Self::Pop(dest) => write!(f, "pop {}", dest),
       Self::Push(src) => write!(f, "push {}", src),
@@ -310,6 +341,15 @@ impl<VAR: Display> Display for Instr<VAR> {
       Self::And { src, dest } => write!(f, "and {}, {}", dest, src),
       Self::Or { src, dest } => write!(f, "or {}, {}", dest, src),
       Self::Lea { label, dest } => write!(f, "lea {}, [rel {}]", dest, label),
+    }
+  }
+}
+
+impl<VAR: Display> Display for LabelOrArg<VAR> {
+  fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    match self {
+      Self::Label(s) => write!(f, "{}", s),
+      Self::Arg(arg) => arg.fmt(f),
     }
   }
 }
@@ -425,7 +465,8 @@ impl Display for Label {
     match self {
       Self::Start => write!(f, ".start"),
       Self::EntryPoint => write!(f, "_start"),
-      Self::Conclusion => write!(f, ".conclusion"),
+      Self::Prologue => write!(f, ".prologue"),
+      Self::Epilogue => write!(f, ".epilogue"),
       Self::Tmp(n) => write!(f, ".block{}", n),
     }
   }
@@ -460,7 +501,8 @@ pub fn parse_blocks<VAR: Clone>(
 
 fn parse_label(label: &str) -> Label {
   match label {
-    "conclusion" => Label::Conclusion,
+    "epilogue" => Label::Epilogue,
+    "conclusion" => Label::Epilogue,
     "start" => Label::Start,
     "_start" => Label::EntryPoint,
     _ => {
@@ -545,13 +587,13 @@ pub fn parse_code<VAR: Clone>(
             .collect::<Vec<_>>();
           if args.len() == 1 {
             Instr::Call {
-              label: args[0].to_owned(),
+              label: LabelOrArg::Label(args[0].to_owned()),
               arity: 0,
               gc: false,
             }
           } else {
             Instr::Call {
-              label: args[0].to_owned(),
+              label: LabelOrArg::Label(args[0].to_owned()),
               arity: args[1].parse().unwrap(),
               gc: if args.len() == 3 {
                 assert_eq!(args[2], "gc");
@@ -603,10 +645,7 @@ pub fn parse_code<VAR: Clone>(
           let dest = parse_arg(args.next().unwrap());
           let label = args.next().unwrap().to_owned();
           assert!(args.next().is_none(), "lea {}", ops[1]);
-          Instr::Lea {
-            label,
-            dest,
-          }
+          Instr::Lea { label, dest }
         }
         _ => {
           if ops[0].starts_with("set") {

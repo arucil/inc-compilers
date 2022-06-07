@@ -15,6 +15,6 @@ call foo
                 {rsp, rax, w.0}
 add w.0, rax
                 {rsp, rax}
-jmp .conclusion
+jmp .epilogue
                 {}
 
