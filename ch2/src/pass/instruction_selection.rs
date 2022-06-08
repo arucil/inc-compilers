@@ -6,6 +6,7 @@ use id_arena::Arena;
 use indexmap::{IndexMap, IndexSet};
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::{self, Display, Formatter};
+use std::mem;
 
 pub trait Locals {
   fn add_local(&mut self, local: IdxVar, ty: Type);
@@ -50,10 +51,11 @@ where
     .into_iter()
     .map(|fun| codegen.gen_fun(fun))
     .collect();
+  let info = prog.info.into();
   let blocks = codegen.gen_body(prog.body);
   let result = codegen.finish();
   Program {
-    info: prog.info.into(),
+    info,
     blocks,
     constants: result.constants,
     externs: result.externs,
@@ -68,6 +70,7 @@ pub struct CodeGen<'a> {
   constants: IndexMap<String, String>,
   const_indices: HashMap<String, usize>,
   externs: BTreeSet<String>,
+  locals: Vec<(IdxVar, Type)>,
   use_heap: bool,
 }
 
@@ -84,6 +87,7 @@ impl<'a> CodeGen<'a> {
       constants: IndexMap::new(),
       const_indices: HashMap::new(),
       externs: BTreeSet::new(),
+      locals: vec![],
       use_heap,
     }
   }
@@ -118,7 +122,7 @@ impl<'a> CodeGen<'a> {
           }
         }
         new_code.append(&mut block.code);
-        std::mem::swap(&mut block.code, &mut new_code);
+        mem::swap(&mut block.code, &mut new_code);
         break;
       }
     }
@@ -129,20 +133,24 @@ impl<'a> CodeGen<'a> {
     }
   }
 
-  pub fn gen_body(&mut self, body: Vec<(Label, CTail)>) -> Vec<Block<IdxVar>> {
-    body
+  pub fn gen_body(
+    &mut self,
+    body: Vec<(Label, CTail)>,
+  ) -> Vec<Block<IdxVar>> {
+    self.locals.clear();
+    let blocks = body
       .into_iter()
       .map(|(label, tail)| Block {
         label,
         code: self.gen_tail(tail),
       })
-      .collect()
+      .collect();
   }
 
   fn gen_tail(&mut self, tail: CTail) -> Vec<Instr<IdxVar>> {
     self.code.clear();
     self.tail_instructions(tail);
-    std::mem::take(&mut self.code)
+    mem::take(&mut self.code)
   }
 
   fn tail_instructions(&mut self, mut tail: CTail) {
@@ -657,19 +665,28 @@ impl<'a> CodeGen<'a> {
       }
       CPrim::Mul(CAtom::Int(n @ (-2147483648..=2147483647)), atom2) => {
         self.code.push(Instr::IMul3 {
-          src1: atom_to_arg(atom2),
-          src2: n as i32,
+          src: atom_to_arg(atom2),
+          num: n as i32,
           dest: target,
         });
       }
       CPrim::Mul(atom1, CAtom::Int(n @ (-2147483648..=2147483647))) => {
         self.code.push(Instr::IMul3 {
-          src1: atom_to_arg(atom1),
-          src2: n as i32,
+          src: atom_to_arg(atom1),
+          num: n as i32,
           dest: target,
         });
       }
-      // TODO atom2 is Int but not i32.
+      CPrim::Mul(atom1, atom2 @ CAtom::Int(_)) => {
+        self.code.push(Instr::Mov {
+          src: atom_to_arg(atom2),
+          dest: target.clone(),
+        });
+        self.code.push(Instr::IMul {
+          src: atom_to_arg(atom1),
+          dest: target,
+        });
+      }
       CPrim::Mul(atom1, atom2) => {
         self.code.push(Instr::Mov {
           src: atom_to_arg(atom1),
@@ -687,7 +704,15 @@ impl<'a> CodeGen<'a> {
           dest: Arg::Reg(Reg::Rdx),
         });
         let arg2 = atom_to_arg(atom2);
-        self.code.push(Instr::IDiv(arg2));
+        if let Arg::Imm(_) = arg2 {
+          self.code.push(Instr::Mov {
+            src: arg2,
+            dest: target.clone(),
+          });
+          self.code.push(Instr::IDiv(target.clone()));
+        } else {
+          self.code.push(Instr::IDiv(arg2));
+        }
         self.code.push(Instr::Mov {
           src: Arg::Reg(Reg::Rax),
           dest: target,
@@ -700,7 +725,15 @@ impl<'a> CodeGen<'a> {
           dest: Arg::Reg(Reg::Rdx),
         });
         let arg2 = atom_to_arg(atom2);
-        self.code.push(Instr::IDiv(arg2));
+        if let Arg::Imm(_) = arg2 {
+          self.code.push(Instr::Mov {
+            src: arg2,
+            dest: target.clone(),
+          });
+          self.code.push(Instr::IDiv(target.clone()));
+        } else {
+          self.code.push(Instr::IDiv(arg2));
+        }
         self.code.push(Instr::Mov {
           src: Arg::Reg(Reg::Rdx),
           dest: target,

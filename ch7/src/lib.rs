@@ -131,4 +131,21 @@ mod tests {
     .unwrap();
     assert_snapshot!(prog);
   }
+
+  #[test]
+  fn mul_div() {
+    let prog = compile(
+      r#"
+(print (* 7 (read)))
+(print (* 2147483648 (read)))
+(print (* (read) -11))
+(print (* (read) -2147483649))
+(let ([x 1] [y 2])
+  (print (remainder (quotient (* x y) 30) -12) (quotient 3 x) (remainder x (- y))))
+      "#,
+      None,
+    )
+    .unwrap();
+    assert_snapshot!(prog);
+  }
 }

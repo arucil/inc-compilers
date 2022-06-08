@@ -1,0 +1,103 @@
+---
+source: ch7/src/lib.rs
+expression: prog
+---
+extern rt_div_by_0_error, rt_initialize, rt_print_int, rt_print_newline, rt_read_int
+section .text
+
+    global _start
+    align 8
+_start:
+    push rbp
+    mov rbp, rsp
+    push rbx
+    push r12
+    mov rdi, 65536
+    mov rsi, 64
+    call rt_initialize
+    mov r15, rax
+    call rt_read_int
+    mov rcx, rax
+    imul rbx, rcx, 7
+    mov rdi, rbx
+    call rt_print_int
+    call rt_print_newline
+    call rt_read_int
+    mov rcx, rax
+    mov rdx, 2147483648
+    imul rdx, rcx
+    mov rdi, rdx
+    call rt_print_int
+    call rt_print_newline
+    call rt_read_int
+    mov rcx, rax
+    imul r12, rcx, -11
+    mov rdi, r12
+    call rt_print_int
+    call rt_print_newline
+    call rt_read_int
+    mov rcx, rax
+    mov rdx, -2147483649
+    imul rdx, rcx
+    mov rdi, rdx
+    call rt_print_int
+    call rt_print_newline
+    mov rdi, 1
+    mov rsi, 2
+    mov rcx, rdi
+    imul rcx, rsi
+    mov rax, 30
+    cmp rax, 0
+    je .block10
+    mov rax, rcx
+    xor rdx, rdx
+    mov rcx, 30
+    idiv rcx
+    mov rcx, rax
+    mov rax, -12
+    cmp rax, 0
+    je .block7
+    mov rax, rcx
+    xor rdx, rdx
+    mov rcx, -12
+    idiv rcx
+    mov rcx, rdx
+    cmp rdi, 0
+    je .block4
+    mov rax, 3
+    xor rdx, rdx
+    idiv rdi
+    mov r12, rax
+    neg rsi
+    cmp rsi, 0
+    je .block1
+    mov rax, rdi
+    xor rdx, rdx
+    idiv rsi
+    mov rbx, rdx
+    mov rdi, rcx
+    call rt_print_int
+    mov rdi, r12
+    call rt_print_int
+    mov rdi, rbx
+    call rt_print_int
+    call rt_print_newline
+    pop r12
+    pop rbx
+    pop rbp
+    mov rax, 60
+    mov rdi, 0
+    syscall
+
+.block1:
+    call rt_div_by_0_error
+
+.block4:
+    call rt_div_by_0_error
+
+.block7:
+    call rt_div_by_0_error
+
+.block10:
+    call rt_div_by_0_error
+

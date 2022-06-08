@@ -644,12 +644,7 @@ fn prim(state: &State, op: &str, mut args: Vec<Exp<IdxVar, Type>>) -> CPrim {
     "*" => {
       let arg2 = args.pop().unwrap();
       let arg1 = args.pop().unwrap();
-      if let ExpKind::Int(n) = &arg2.kind {
-        assert!(*n >= i32::MIN as i64 && *n <= i32::MAX as i64, "{}", n);
-        CPrim::MulI32(atom(arg1), *n as i32)
-      } else {
-        CPrim::Mul(atom(arg1), atom(arg2))
-      }
+      CPrim::Mul(atom(arg1), atom(arg2))
     }
     "quotient" => {
       let arg2 = args.pop().unwrap();

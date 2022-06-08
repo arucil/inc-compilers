@@ -54,8 +54,8 @@ pub enum Instr<VAR = !> {
   },
   IMul3 {
     /// Must not be Imm.
-    src1: Arg<VAR>,
-    src2: i32,
+    src: Arg<VAR>,
+    num: i32,
     /// Must be reg.
     dest: Arg<VAR>,
   },
@@ -316,8 +316,8 @@ impl<VAR: Display> Display for Instr<VAR> {
     match self {
       Self::Add { src, dest } => write!(f, "add {}, {}", dest, src),
       Self::IMul { src, dest } => write!(f, "imul {}, {}", dest, src),
-      Self::IMul3 { src1, src2, dest } => {
-        write!(f, "imul {}, {}, {}", dest, src1, src2)
+      Self::IMul3 { src, num, dest } => {
+        write!(f, "imul {}, {}, {}", dest, src, num)
       }
       Self::IDiv(src) => write!(f, "idiv {}", src),
       Self::Mov { src, dest } => write!(f, "mov {}, {}", dest, src),

@@ -89,7 +89,9 @@ impl<'a> AnalysisState<'a> {
       | Instr::Sub { src, dest }
       | Instr::Xor { src, dest }
       | Instr::And { src, dest }
-      | Instr::Or { src, dest } => {
+      | Instr::Or { src, dest }
+      | Instr::IMul { src, dest }
+      | Instr::IMul3 { src, dest, num: _ } => {
         self.add_arg(before, src);
         self.add_arg(before, dest);
       }
@@ -151,7 +153,7 @@ impl<'a> AnalysisState<'a> {
         self.add_arg(before, dest);
         self.add_arg(before, count);
       }
-      Instr::IMul(arg) | Instr::IDiv(arg) => {
+      Instr::IDiv(arg) => {
         before.remove_reg(Reg::Rdx);
         before.add_reg(Reg::Rax);
         self.add_arg(before, arg);

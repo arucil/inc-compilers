@@ -1,7 +1,9 @@
 (define (which [x Bool] [f (Int -> Int)] [g (Int -> Int)]) : Int
-  ((if x f g) (f 7)))
+  ((if x f g) (f (baz 17))))
 (define (foo [x Int]) : Int
   (+ x 10))
 (define (bar [x Int]) : Int
   (* x 10))
+(define (baz [x Int]) : Int
+  (remainder x 10))
 (print (which (> (read) 0) foo bar))

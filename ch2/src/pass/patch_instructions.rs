@@ -1,4 +1,4 @@
-use asm::{Arg, Block, Fun, Instr, Program, Reg, LabelOrArg};
+use asm::{Arg, Block, Fun, Instr, LabelOrArg, Program, Reg};
 
 pub fn patch_instructions<T>(prog: Program<T>) -> Program<T> {
   Program {
@@ -183,6 +183,34 @@ fn patch_block(block: Block) -> Block {
         code.push(Instr::TailJmp {
           label: LabelOrArg::Arg(Arg::Reg(Reg::Rax)),
           arity,
+        });
+      }
+      Instr::IMul {
+        src,
+        dest: dest @ Arg::Deref(..),
+      } => {
+        code.push(Instr::IMul {
+          src,
+          dest: Arg::Reg(Reg::Rax),
+        });
+        code.push(Instr::Mov {
+          src: Arg::Reg(Reg::Rax),
+          dest,
+        });
+      }
+      Instr::IMul3 {
+        src,
+        num,
+        dest: dest @ Arg::Deref(..),
+      } => {
+        code.push(Instr::IMul3 {
+          src,
+          num,
+          dest: Arg::Reg(Reg::Rax),
+        });
+        code.push(Instr::Mov {
+          src: Arg::Reg(Reg::Rax),
+          dest,
         });
       }
       _ => {

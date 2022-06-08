@@ -101,7 +101,9 @@ where
       | Instr::Pop(dest)
       | Instr::And { dest, .. }
       | Instr::Or { dest, .. }
-      | Instr::Lea { dest, .. } => {
+      | Instr::Lea { dest, .. }
+      | Instr::IMul { dest, .. }
+      | Instr::IMul3 { dest, .. } => {
         if let Some(dest_loc) = Location::from_arg(dest.clone(), self.var_store)
         {
           add(dest_loc);
@@ -153,7 +155,7 @@ where
           add(dest_loc);
         }
       }
-      Instr::IMul(_) | Instr::IDiv(_) => {
+      Instr::IDiv(_) => {
         add(Reg::Rax.into());
         add(Reg::Rdx.into());
       }

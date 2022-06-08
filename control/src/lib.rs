@@ -84,10 +84,7 @@ pub enum CPrim {
   Neg(CAtom),
   Add(CAtom, CAtom),
   Sub(CAtom, CAtom),
-  /// arg2 is not Int.
   Mul(CAtom, CAtom),
-  MulI32(CAtom, i32),
-  /// arg2 is not Int.
   Div(CAtom, CAtom),
   Rem(CAtom, CAtom),
   Not(CAtom),
@@ -304,9 +301,6 @@ impl Debug for CPrim {
       }
       Self::Mul(arg1, arg2) => {
         write!(f, "(* {:?} {:?})", arg1, arg2)
-      }
-      Self::MulI32(arg1, arg2) => {
-        write!(f, "(* {:?} {})", arg1, arg2)
       }
       Self::Div(arg1, arg2) => {
         write!(f, "(qoutient {:?} {:?})", arg1, arg2)

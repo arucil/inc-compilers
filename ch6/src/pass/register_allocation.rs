@@ -246,7 +246,15 @@ pub fn gen_assign_instr_registers<'a>(
         dest: assign(dest),
         count: assign(count),
       },
-      Instr::IMul(arg) => Instr::IMul(assign(arg)),
+      Instr::IMul { src, dest } => Instr::IMul {
+        src: assign(src),
+        dest: assign(dest),
+      },
+      Instr::IMul3 { src, num, dest } => Instr::IMul3 {
+        src: assign(src),
+        num,
+        dest: assign(dest),
+      },
       Instr::IDiv(arg) => Instr::IDiv(assign(arg)),
       Instr::Lea { label, dest } => Instr::Lea {
         label,

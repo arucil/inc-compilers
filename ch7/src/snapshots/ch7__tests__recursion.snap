@@ -39,8 +39,7 @@ fact1:
     call fact1
     mov rcx, rax
     mov rax, rbx
-    xor rdx, rdx
-    imul rcx
+    imul rax, rcx
 
 .epilogue:
     pop rbx
@@ -57,20 +56,19 @@ fact2:
     push rbp
     mov rbp, rsp
     mov rcx, rdi
+    mov rdx, rsi
     cmp rcx, 0
     je .block2
-    mov rdi, rcx
-    sub rdi, 1
-    mov rax, rsi
-    xor rdx, rdx
-    imul rcx
-    mov rcx, rax
     mov rsi, rcx
+    sub rsi, 1
+    imul rdx, rcx
+    mov rdi, rsi
+    mov rsi, rdx
     pop rbp
     jmp fact2
 
 .block2:
-    mov rax, rsi
+    mov rax, rdx
     pop rbp
     ret
 
