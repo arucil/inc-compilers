@@ -93,8 +93,8 @@ baz:
     je .block3
     mov rax, rcx
     xor rdx, rdx
-    mov rax, 10
-    idiv rax
+    mov rcx, 10
+    idiv rcx
     mov rax, rdx
     pop rbp
     ret

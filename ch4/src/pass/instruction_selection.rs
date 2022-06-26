@@ -42,12 +42,11 @@ pub fn select_instruction(
     .into_iter()
     .map(|fun| codegen.gen_fun(fun))
     .collect();
-  let blocks = codegen.gen_body(prog.body);
+  let mut info = Info { locals: prog.info.locals };
+  let blocks = codegen.gen_body(prog.body, &mut info);
   let result = codegen.finish();
   Program {
-    info: Info {
-      locals: prog.info.locals,
-    },
+    info,
     blocks,
     constants: result.constants,
     externs: result.externs,

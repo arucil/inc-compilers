@@ -51,8 +51,8 @@ where
     .into_iter()
     .map(|fun| codegen.gen_fun(fun))
     .collect();
-  let info = prog.info.into();
-  let blocks = codegen.gen_body(prog.body);
+  let mut info = prog.info.into();
+  let blocks = codegen.gen_body(prog.body, &mut info);
   let result = codegen.finish();
   Program {
     info,
@@ -71,6 +71,7 @@ pub struct CodeGen<'a> {
   const_indices: HashMap<String, usize>,
   externs: BTreeSet<String>,
   locals: Vec<(IdxVar, Type)>,
+  tmp_counter: usize,
   use_heap: bool,
 }
 
@@ -88,6 +89,7 @@ impl<'a> CodeGen<'a> {
       const_indices: HashMap::new(),
       externs: BTreeSet::new(),
       locals: vec![],
+      tmp_counter: 0,
       use_heap,
     }
   }
@@ -107,7 +109,9 @@ impl<'a> CodeGen<'a> {
     NewInfo: From<OldInfo> + Locals,
   {
     let mut info: NewInfo = fun.info.into();
-    let mut blocks = self.gen_body(fun.blocks);
+    let mut blocks = self.gen_body(fun.blocks, &mut info);
+
+    // move parameter registers to parameter variables
     for block in &mut blocks {
       if let Label::Start = block.label {
         let mut new_code = vec![];
@@ -133,10 +137,14 @@ impl<'a> CodeGen<'a> {
     }
   }
 
-  pub fn gen_body(
+  pub fn gen_body<I>(
     &mut self,
     body: Vec<(Label, CTail)>,
-  ) -> Vec<Block<IdxVar>> {
+    locals: &mut I,
+  ) -> Vec<Block<IdxVar>>
+  where
+    I: Locals,
+  {
     self.locals.clear();
     let blocks = body
       .into_iter()
@@ -145,6 +153,10 @@ impl<'a> CodeGen<'a> {
         code: self.gen_tail(tail),
       })
       .collect();
+    for (local, ty) in mem::take(&mut self.locals) {
+      locals.add_local(local, ty);
+    }
+    blocks
   }
 
   fn gen_tail(&mut self, tail: CTail) -> Vec<Instr<IdxVar>> {
@@ -705,11 +717,12 @@ impl<'a> CodeGen<'a> {
         });
         let arg2 = atom_to_arg(atom2);
         if let Arg::Imm(_) = arg2 {
+          let tmp = self.new_tmp(Type::Int);
           self.code.push(Instr::Mov {
             src: arg2,
-            dest: target.clone(),
+            dest: Arg::Var(tmp.clone()),
           });
-          self.code.push(Instr::IDiv(target.clone()));
+          self.code.push(Instr::IDiv(Arg::Var(tmp)));
         } else {
           self.code.push(Instr::IDiv(arg2));
         }
@@ -726,11 +739,12 @@ impl<'a> CodeGen<'a> {
         });
         let arg2 = atom_to_arg(atom2);
         if let Arg::Imm(_) = arg2 {
+          let tmp = self.new_tmp(Type::Int);
           self.code.push(Instr::Mov {
             src: arg2,
-            dest: target.clone(),
+            dest: Arg::Var(tmp.clone()),
           });
-          self.code.push(Instr::IDiv(target.clone()));
+          self.code.push(Instr::IDiv(Arg::Var(tmp)));
         } else {
           self.code.push(Instr::IDiv(arg2));
         }
@@ -851,6 +865,16 @@ impl<'a> CodeGen<'a> {
       Type::Struct(..) => unreachable!(),
       Type::Alias(_) => unreachable!(),
     }
+  }
+
+  fn new_tmp(&mut self, ty: Type) -> IdxVar {
+    self.tmp_counter += 1;
+    let var = IdxVar {
+      name: "(codegen-tmp)".to_owned(),
+      index: self.tmp_counter,
+    };
+    self.locals.push((var.clone(), ty));
+    var
   }
 }
 
