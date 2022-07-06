@@ -27,6 +27,17 @@ _start:
     mov rdi, rcx
     call rt_print_int
     call rt_print_newline
+    call rt_read_int
+    mov rcx, rax
+    mov rdi, rcx
+    call qux
+    mov rcx, rax
+    mov rdi, 2
+    call rcx
+    mov rcx, rax
+    mov rdi, rcx
+    call rt_print_int
+    call rt_print_newline
     pop r12
     pop rbx
     pop rbp
@@ -101,3 +112,20 @@ baz:
 
 .block3:
     call rt_div_by_0_error
+
+    align 8
+qux:
+    push rbp
+    mov rbp, rsp
+    mov rcx, rdi
+    cmp rcx, 0
+    jg .block5
+    lea rax, [rel bar]
+
+.epilogue:
+    pop rbp
+    ret
+
+.block5:
+    lea rax, [rel foo]
+    jmp .epilogue

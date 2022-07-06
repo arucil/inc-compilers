@@ -148,4 +148,19 @@ mod tests {
     .unwrap();
     assert_snapshot!(prog);
   }
+
+  #[test]
+  fn call_arg_reg() {
+    let prog = compile(
+      r#"
+(define (foo [x Int] [y Int] [z Int] [w Int]) : Void
+  (void))
+(let ([a 1] [x (+ a 1)] [y (+ x 2)] [z (+ a 3)] [w (+ z 4)])
+  (foo x y z w))
+      "#,
+      None,
+    )
+    .unwrap();
+    assert_snapshot!(prog);
+  }
 }

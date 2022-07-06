@@ -6,4 +6,7 @@
   (* x 10))
 (define (baz [x Int]) : Int
   (remainder x 10))
+(define (qux [x Int]) : (Int -> Int)
+  (if (> x 0) foo bar))
 (print (which (> (read) 0) foo bar))
+(print ((qux (read)) 2))

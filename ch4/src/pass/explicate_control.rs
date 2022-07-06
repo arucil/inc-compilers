@@ -120,8 +120,8 @@ fn collect_exp_locals(
       if init.ty != Type::Void {
         locals.insert(var.1.clone(), init.ty.clone());
       }
-      collect_exp_locals(&**init, locals);
-      collect_exp_locals(&**body, locals);
+      collect_exp_locals(init, locals);
+      collect_exp_locals(body, locals);
     }
     ExpKind::Prim { op: _, args } => {
       for arg in args {
@@ -133,28 +133,28 @@ fn collect_exp_locals(
       args,
       r#struct: _,
     } => {
-      collect_exp_locals(&**fun, locals);
+      collect_exp_locals(fun, locals);
       for arg in args {
         collect_exp_locals(arg, locals);
       }
     }
     ExpKind::If { cond, conseq, alt } => {
-      collect_exp_locals(&**cond, locals);
-      collect_exp_locals(&**conseq, locals);
-      collect_exp_locals(&**alt, locals);
+      collect_exp_locals(cond, locals);
+      collect_exp_locals(conseq, locals);
+      collect_exp_locals(alt, locals);
     }
     ExpKind::Set { var: _, exp } => {
-      collect_exp_locals(&**exp, locals);
+      collect_exp_locals(exp, locals);
     }
     ExpKind::Begin { seq, last } => {
       for exp in seq {
         collect_exp_locals(exp, locals);
       }
-      collect_exp_locals(&**last, locals);
+      collect_exp_locals(last, locals);
     }
     ExpKind::While { cond, body } => {
-      collect_exp_locals(&**cond, locals);
-      collect_exp_locals(&**body, locals);
+      collect_exp_locals(cond, locals);
+      collect_exp_locals(body, locals);
     }
     ExpKind::Print(args) => {
       for arg in args {

@@ -1,0 +1,34 @@
+---
+source: ch7/src/lib.rs
+expression: prog
+---
+extern rt_initialize
+section .text
+
+    global _start
+    align 8
+_start:
+    push rbp
+    mov rbp, rsp
+    mov rdi, 65536
+    mov rsi, 64
+    call rt_initialize
+    mov r15, rax
+    mov rdx, 1
+    mov rdi, rdx
+    add rdi, 1
+    mov rsi, rdi
+    add rsi, 2
+    add rdx, 3
+    mov rcx, rdx
+    add rcx, 4
+    pop rbp
+    jmp foo
+
+    align 8
+foo:
+    push rbp
+    mov rbp, rsp
+    pop rbp
+    ret
+
