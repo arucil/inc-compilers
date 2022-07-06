@@ -10,18 +10,35 @@ section .text
 _start:
     push rbp
     mov rbp, rsp
+    push rbx
+    push r12
+    push r13
+    push r14
     mov rdi, 65536
     mov rsi, 64
     call rt_initialize
     mov r15, rax
-    mov rdx, 1
-    mov rdi, rdx
-    add rdi, 1
-    mov rsi, rdi
-    add rsi, 2
-    add rdx, 3
-    mov rcx, rdx
-    add rcx, 4
+    mov rbx, 1
+    mov r12, rbx
+    add r12, 1
+    mov r14, r12
+    add r14, 2
+    add rbx, 3
+    mov r13, rbx
+    add r13, 4
+    mov rdi, r12
+    mov rsi, r14
+    mov rdx, rbx
+    mov rcx, r13
+    call foo
+    mov rdi, rbx
+    mov rsi, r12
+    mov rdx, r14
+    mov rcx, r13
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
     pop rbp
     jmp foo
 
