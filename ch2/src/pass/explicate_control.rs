@@ -149,6 +149,7 @@ fn collect_exp_locals<TYPE>(
     ExpKind::NewLine => {}
     ExpKind::FunRef { .. } => {}
     ExpKind::Error(_) => unreachable!(),
+    ExpKind::Lambda { .. } => unreachable!(),
   }
 }
 

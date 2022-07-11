@@ -302,6 +302,7 @@ fn build_exp(input: &str, cst: Cst) -> Result<Exp> {
           "print" => return build_print(input, xs, range),
           "newline" => return build_newline(input, xs, range),
           "void" => return build_void(input, xs, range),
+          "lambda" => return build_lambda(input, xs, range),
           _ => {
             const OPERATORS: &[&str] = &[
               "read",
@@ -325,6 +326,7 @@ fn build_exp(input: &str, cst: Cst) -> Result<Exp> {
               "make-vector",
               "string-append",
               "string-length",
+              "procedure-arity",
             ];
             if let Some(&op) = OPERATORS.iter().find(|&&s| s == op) {
               let op = (sym_range, op);
@@ -855,6 +857,84 @@ fn build_void(_: &str, xs: Vec<Cst>, range: Range) -> Result<Exp> {
     Err(CompileError {
       range,
       message: "too many arguments".to_owned(),
+    })
+  }
+}
+
+fn build_lambda(input: &str, mut xs: Vec<Cst>, range: Range) -> Result<Exp> {
+  if xs.len() < 5 {
+    return Err(CompileError {
+      range,
+      message: "invalid lambda form".to_owned(),
+    });
+  }
+
+  let body = if xs.len() == 5 {
+    build_exp(input, xs.pop().unwrap())?
+  } else {
+    build_iter_begin(input, xs.drain(4..))?
+  };
+  let ret = make_type_def(input, xs.pop().unwrap())?;
+  if let Cst::Symbol(sym_range) = xs.pop().unwrap() {
+    if &input[sym_range.start..sym_range.end] != ":" {
+      return Err(CompileError {
+        range,
+        message: "invalid lambda form".to_owned(),
+      });
+    }
+  } else {
+    return Err(CompileError {
+      range,
+      message: "invalid lambda form".to_owned(),
+    });
+  }
+  if let Cst::List(names, _) = xs.pop().unwrap() {
+    let mut param_names = HashSet::new();
+    let mut params = vec![];
+    for param_def in names {
+      if let Cst::List(mut xs, param_range) = param_def {
+        if xs.len() != 2 {
+          return Err(CompileError {
+            range: param_range,
+            message: "invalid parameter definition".to_owned(),
+          });
+        }
+        let ty = make_type_def(input, xs.pop().unwrap())?;
+        if let Cst::Symbol(sym_range) = xs.pop().unwrap() {
+          let name = &input[sym_range.start..sym_range.end];
+          if !param_names.insert(name) {
+            return Err(CompileError {
+              range: sym_range,
+              message: format!("duplicate parameter {}", name),
+            });
+          }
+          params.push((name.to_owned(), ty));
+        } else {
+          return Err(CompileError {
+            range: param_range,
+            message: "invalid lambda form".to_owned(),
+          });
+        }
+      } else {
+        return Err(CompileError {
+          range: param_def.range(),
+          message: "invalid lambda form".to_owned(),
+        });
+      }
+    }
+    Ok(Exp {
+      kind: ExpKind::Lambda {
+        params,
+        ret,
+        body: box body,
+      },
+      range,
+      ty: (),
+    })
+  } else {
+    Err(CompileError {
+      range,
+      message: "invalid function definition".to_owned(),
     })
   }
 }

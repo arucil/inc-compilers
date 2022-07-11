@@ -83,6 +83,11 @@ pub enum ExpKind<VAR, TYPE> {
   ),
   NewLine,
   Error(Error<VAR, TYPE>),
+  Lambda {
+    params: Vec<(VAR, Type)>,
+    ret: Type,
+    body: Box<Exp<VAR, TYPE>>,
+  },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -368,6 +373,40 @@ impl<VAR: Display, TYPE: Debug> Exp<VAR, TYPE> {
             .group(),
         )
         .append("}"),
+      ExpKind::Lambda { params, ret, body } => RcDoc::text("(")
+        .append(
+          RcDoc::text("lambda")
+            .append(Doc::line())
+            .append(
+              RcDoc::text("(")
+                .append(
+                  RcDoc::intersperse(
+                    params.iter().map(|(name, ty)| {
+                      RcDoc::text("[")
+                        .append(name.to_string())
+                        .append(Doc::line())
+                        .append(ty.to_doc())
+                        .append("]")
+                        .group()
+                    }),
+                    Doc::line(),
+                  )
+                  .nest(1),
+                )
+                .append(")")
+                .group(),
+            )
+            .group()
+            .append(Doc::space())
+            .append(":")
+            .append(Doc::space())
+            .append(ret.to_doc())
+            .group()
+            .append(Doc::line())
+            .append(body.to_doc())
+            .nest(1),
+        )
+        .append(")"),
     }
   }
 }
@@ -392,6 +431,7 @@ impl<VAR, TYPE> ExpKind<VAR, TYPE> {
       Self::Print(..) => false,
       Self::NewLine => false,
       Self::Error(_) => false,
+      Self::Lambda { .. } => false,
     }
   }
 }
