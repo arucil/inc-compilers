@@ -217,22 +217,27 @@ impl Uniq {
       },
       // ch8
       ExpKind::Lambda { params, ret, body } => {
+        let counter = self.counter;
+        self.counter = 0;
         let mut old_indices = Vec::with_capacity(params.len());
-        let params = params
+        let params: Vec<_> = params
           .into_iter()
           .map(|(var, ty)| {
             let index = self.counter;
             self.counter += 1;
-            if let Some(old_index) = self.env.insert(var.clone(), index) {
-              old_indices.push((var.clone(), old_index));
-            }
+            old_indices.push(self.env.insert(var.clone(), index));
             (IdxVar { name: var, index }, ty)
           })
           .collect();
         let body = box self.uniquify_exp(*body);
-        for (var, index) in old_indices {
-          self.env.insert(var, index);
+        for (index, (var, _)) in old_indices.into_iter().zip(&params) {
+          if let Some(index) = index {
+            self.env.insert(var.name.clone(), index);
+          } else {
+            self.env.remove(&var.name);
+          }
         }
+        self.counter = counter;
         Exp {
           kind: ExpKind::Lambda { params, ret, body },
           range,
