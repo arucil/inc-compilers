@@ -215,6 +215,30 @@ impl Uniq {
         range,
         ty,
       },
+      // ch8
+      ExpKind::Lambda { params, ret, body } => {
+        let mut old_indices = Vec::with_capacity(params.len());
+        let params = params
+          .into_iter()
+          .map(|(var, ty)| {
+            let index = self.counter;
+            self.counter += 1;
+            if let Some(old_index) = self.env.insert(var.clone(), index) {
+              old_indices.push((var.clone(), old_index));
+            }
+            (IdxVar { name: var, index }, ty)
+          })
+          .collect();
+        let body = box self.uniquify_exp(*body);
+        for (var, index) in old_indices {
+          self.env.insert(var, index);
+        }
+        Exp {
+          kind: ExpKind::Lambda { params, ret, body },
+          range,
+          ty,
+        }
+      }
     }
   }
 }
